@@ -9,14 +9,34 @@ export type EvidenceKind =
   | 'attacking-events'
   | 'player-events'
   | 'passing'
+  | 'possession-losses'
+  | 'physical-measurements'
+  | 'build-up-phase'
 
 export type ClaimMeaningCategory =
   | 'factual-comparison'
   | 'performance-judgement'
   | 'historical-circumstance'
+  | 'coaching-question'
   | 'other'
 
-export type ClaimMetric = 'shots' | 'shots-on-target' | 'goals'
+export type ClaimIntent =
+  | 'statistical-request'
+  | 'factual-claim'
+  | 'subjective-judgement'
+  | 'unavailable-metric'
+  | 'coaching-question'
+  | 'unrecognized-language'
+
+export type ClaimMetric =
+  | 'shots'
+  | 'shots-on-target'
+  | 'goals'
+  | 'possession-percentage'
+  | 'pass-attempts'
+  | 'pass-completions'
+  | 'pass-completion-percentage'
+  | 'running-distance'
 export type ClaimOperator =
   | 'greater-than'
   | 'less-than'
@@ -24,11 +44,13 @@ export type ClaimOperator =
   | 'greater-or-equal'
   | 'less-or-equal'
   | 'not-equal'
+  | 'comparison-request'
 
 export type InterpretedClaim = {
   id: string
   subject: MatchTeam | null
   text: string
+  intent: ClaimIntent
   meaning: {
     category: ClaimMeaningCategory
     description: string
@@ -55,7 +77,7 @@ export type AnalysisRequest = {
 export type EvidenceReference = {
   id: string
   time: string
-  team: MatchTeam
+  team: MatchTeam | 'Shared play'
   description: string
 }
 
@@ -71,8 +93,109 @@ export type TeamStatistic = {
   value: number
 }
 
+export type CalculationTrace = {
+  team: MatchTeam
+  metric: ClaimMetric | 'possession-losses-by-area'
+  area?: 'defensive-third' | 'middle-third' | 'final-third'
+  value: number
+  numerator: number
+  denominator: number
+  numeratorRecordIds: string[]
+  denominatorRecordIds: string[]
+  denominatorDescription: string
+}
+
+export type EvidenceFoundation = {
+  dataset: {
+    id: string
+    version: string
+    label: string
+    source: string
+    provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
+  }
+  capabilities: Array<{
+    id: string
+    label: string
+    status: 'available' | 'partial' | 'not-recorded'
+    detail: string
+  }>
+  possessionDenominatorMinutes: number
+  possessionCoverageComplete: boolean
+  passCoverageComplete: boolean
+  turnoverCoverageComplete: boolean
+  missingCoveragePeriods: string[]
+  excludedOutOfPlayMinutes: number
+  contestedMinutes: number
+  metricDefinitions: string[]
+  teams: Record<
+    MatchTeam,
+    {
+      possessionMinutes: number
+      possessionPercentage: number | null
+      passAttempts: number
+      completedPasses: number
+      passCompletionPercentage: number | null
+      possessionLosses: Record<
+        'defensive-third' | 'middle-third' | 'final-third',
+        number | null
+      >
+      finalThirdEntries: number | null
+    }
+  >
+  possessionIntervals: Array<{
+    id: string
+    team: MatchTeam | null
+    status: 'controlled' | 'contested' | 'out-of-play'
+    start: string
+    end: string
+    durationMinutes: number
+    endReason?: string
+    relatedEventIds: string[]
+  }>
+  passRecords: Array<{
+    id: string
+    possessionId: string
+    team: MatchTeam
+    playerId: string
+    time: string
+    start: { x: number; y: number }
+    end: { x: number; y: number }
+    outcome: 'complete' | 'incomplete'
+    qualifiers: string[]
+    provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
+  }>
+  turnoverRecords: Array<{
+    id: string
+    possessionId: string
+    team: MatchTeam
+    time: string
+    location: { x: number; y: number }
+    lostPassId: string
+    recoveredBy: MatchTeam | null
+    provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
+  }>
+  passReferences: EvidenceReference[]
+  turnoverReferences: EvidenceReference[]
+  recoveryReferences: EvidenceReference[]
+  pressureReferences: EvidenceReference[]
+  players: Array<{
+    id: string
+    team: MatchTeam
+    name: string
+    status: 'starter' | 'substitute'
+  }>
+  substitutions: Array<{
+    id: string
+    team: MatchTeam
+    time: string
+    playerOnId: string
+    playerOffId: string
+  }>
+  windowLabel: string
+}
+
 export type ClaimEvidence = {
-  role: 'supporting' | 'challenging' | 'context' | 'anchor'
+  role: 'supporting' | 'challenging' | 'context' | 'calculation' | 'anchor'
   reference: EvidenceReference
 }
 
@@ -83,8 +206,12 @@ export type ClaimResult = {
     | 'contradicted'
     | 'insufficient evidence for a firm conclusion'
     | 'clarification needed'
+    | 'statistics provided'
+    | 'unavailable data'
+    | 'unrecognized language'
   periodLabel: string
   statistics: TeamStatistic[]
+  calculations: CalculationTrace[]
   evidenceAvailability: EvidenceAvailability[]
   evidence: ClaimEvidence[]
   limitation: string
@@ -102,5 +229,6 @@ export type AnalysisResponse = {
     { shots: number; shotsOnTarget: number; goals: number }
   >
   periodEvents: EvidenceReference[]
+  evidenceFoundation: EvidenceFoundation
   claims: ClaimResult[]
 }

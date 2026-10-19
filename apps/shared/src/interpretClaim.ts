@@ -1,6 +1,10 @@
 import { TEAMS, type MatchTeam } from './match.ts'
 
-export type ClaimMetric = 'shots' | 'shots-on-target' | 'goals'
+export type ClaimMetric =
+  | 'shots'
+  | 'shots-on-target'
+  | 'goals'
+  | 'possession-percentage'
 export type ClaimComparison =
   | 'greater-than'
   | 'less-than'
@@ -43,7 +47,7 @@ const teamPattern = TEAMS.map((team) => team.replace(/[.*+?^${}()|[\]\\]/g, '\\$
   .join('|')
 
 const comparisonPattern = new RegExp(
-  `^(?<subject>${teamPattern})\\s+(?:(?<negation>did not|didn't)\\s+(?<negatedVerb>have|record|recorded|take|took|make|made|score|scored)\\s+(?<negatedOperator>more|fewer|less)\\s+(?<negatedMetric>shots on target|shots|goals)\\s+than\\s+|(?<verb>had|have|has|recorded|took|made|scored)\\s+(?<operator>more|fewer|less|no more|no fewer|the same number of|same number of|as many)\\s+(?<metric>shots on target|shots|goals)\\s+(?:than|as)\\s+)(?<opponent>${teamPattern})[.!?]*$`,
+  `^(?<subject>${teamPattern})\\s+(?:(?<negation>did not|didn't)\\s+(?<negatedVerb>have|record|recorded|take|took|make|made|score|scored)\\s+(?<negatedOperator>more|fewer|less)\\s+(?<negatedMetric>shots on target|shots|goals|possession)\\s+than\\s+|(?<verb>had|have|has|recorded|took|made|scored)\\s+(?<operator>more|fewer|less|no more|no fewer|the same number of|same number of|as many)\\s+(?<metric>shots on target|shots|goals|possession)\\s+(?:than|as)\\s+)(?<opponent>${teamPattern})[.!?]*$`,
   'i',
 )
 
@@ -98,6 +102,7 @@ function parseComparison(
   const usesCountVerb = /^(?:have|has|had)$/i.test(claimVerb)
   if (usesGoalVerb && !goalClaim) return undefined
   if (goalClaim && !usesGoalVerb && !usesCountVerb) return undefined
+  if (!goalClaim && !usesCountVerb && /possession/i.test(metricWord)) return undefined
 
   const comparison = getComparison(comparisonWord, Boolean(negation))
   const claimMetric: ClaimMetric =
@@ -105,8 +110,15 @@ function parseComparison(
       ? 'goals'
       : metricWord === 'shots on target'
         ? 'shots-on-target'
-        : 'shots'
-  const metricLabel = claimMetric === 'shots-on-target' ? 'shots on target' : claimMetric
+        : metricWord === 'possession'
+          ? 'possession-percentage'
+          : 'shots'
+  const metricLabel =
+    claimMetric === 'shots-on-target'
+      ? 'shots on target'
+      : claimMetric === 'possession-percentage'
+        ? 'possession'
+        : claimMetric
   const comparisonText: Record<ClaimComparison, string> = {
     'greater-than': `more ${metricLabel} than ${opponent}`,
     'less-than': `fewer ${metricLabel} than ${opponent}`,

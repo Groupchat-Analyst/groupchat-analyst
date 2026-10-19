@@ -6,6 +6,7 @@ import {
 } from '../../shared/src/match.js'
 import type {
   AnalysisRequest,
+  ClaimIntent,
   ClaimMeaningCategory,
   ClaimMetric,
   ClaimOperator,
@@ -22,14 +23,45 @@ const evidenceKinds: EvidenceKind[] = [
   'attacking-events',
   'player-events',
   'passing',
+  'possession-losses',
+  'physical-measurements',
+  'build-up-phase',
 ]
 const meaningCategories: ClaimMeaningCategory[] = [
   'factual-comparison',
   'performance-judgement',
   'historical-circumstance',
+  'coaching-question',
   'other',
 ]
-const metrics: ClaimMetric[] = ['shots', 'shots-on-target', 'goals']
+const claimIntents: ClaimIntent[] = [
+  'statistical-request',
+  'factual-claim',
+  'subjective-judgement',
+  'unavailable-metric',
+  'coaching-question',
+  'unrecognized-language',
+]
+const metrics: ClaimMetric[] = [
+  'shots',
+  'shots-on-target',
+  'goals',
+  'possession-percentage',
+  'pass-attempts',
+  'pass-completions',
+  'pass-completion-percentage',
+  'running-distance',
+]
+const evidenceForMetric: Record<ClaimMetric, EvidenceKind> = {
+  shots: 'shots',
+  'shots-on-target': 'shots-on-target',
+  goals: 'goals',
+  'possession-percentage': 'possession',
+  'pass-attempts': 'passing',
+  'pass-completions': 'passing',
+  'pass-completion-percentage': 'passing',
+  'running-distance': 'physical-measurements',
+}
 const operators: ClaimOperator[] = [
   'greater-than',
   'less-than',
@@ -37,6 +69,7 @@ const operators: ClaimOperator[] = [
   'greater-or-equal',
   'less-or-equal',
   'not-equal',
+  'comparison-request',
 ]
 
 export class InputValidationError extends Error {
@@ -170,6 +203,7 @@ export function validateInterpretation(
       'id',
       'subject',
       'text',
+      'intent',
       'meaning',
       'requiredEvidence',
       'timePeriod',
@@ -183,6 +217,9 @@ export function validateInterpretation(
     const subject = claim.subject
     if (subject !== null && !isTeam(subject)) {
       throw new Error(`${label} has an invalid subject.`)
+    }
+    if (!claimIntents.includes(claim.intent as ClaimIntent)) {
+      throw new Error(`${label} intent is invalid.`)
     }
     const meaning = requireRecord(claim.meaning, `${label} meaning`)
     if (
@@ -226,12 +263,24 @@ export function validateInterpretation(
     if (
       (comparison &&
         (meaning.category !== 'factual-comparison' ||
-          !requiredEvidence.includes(comparison.metric))) ||
+          !requiredEvidence.includes(evidenceForMetric[comparison.metric]))) ||
       (meaning.category === 'factual-comparison' && !comparison)
     ) {
       throw new Error(
         `${label} comparison must be factual and request its calculated metric.`,
       )
+    }
+    if (
+      (claim.intent === 'statistical-request' &&
+        comparison?.operator !== 'comparison-request') ||
+      (comparison?.operator === 'comparison-request' &&
+        claim.intent !== 'statistical-request') ||
+      (claim.intent === 'unavailable-metric' &&
+        !requiredEvidence.some((kind) =>
+          ['physical-measurements', 'player-events'].includes(kind),
+        ))
+    ) {
+      throw new Error(`${label} intent does not match its evidence request.`)
     }
     const timePeriod = requireRecord(claim.timePeriod, `${label} time period`)
     let normalizedTimePeriod: InterpretedClaim['timePeriod']
@@ -293,7 +342,11 @@ export function validateInterpretation(
       claim.clarificationNeeds,
       `${label} clarification needs`,
     )
-    if (subject === null && clarificationNeeds.length === 0) {
+    if (
+      subject === null &&
+      clarificationNeeds.length === 0 &&
+      meaning.category !== 'coaching-question'
+    ) {
       throw new Error(`${label} needs clarification when its subject is unknown.`)
     }
     if (
@@ -319,6 +372,7 @@ export function validateInterpretation(
       id: requireString(claim.id, `${label} ID`, 64),
       subject: subject as InterpretedClaim['subject'],
       text: requireString(claim.text, `${label} text`, 500),
+      intent: claim.intent as ClaimIntent,
       meaning: {
         category: meaning.category as ClaimMeaningCategory,
         description: requireString(

@@ -48,8 +48,8 @@ export type BroadAssessment = AssessmentBase & {
   kind: 'partial'
   claim: BroadClaim
   status: 'insufficient evidence for a firm conclusion'
-  subjectStats: Record<ClaimMetric, number>
-  otherTeamStats: Record<ClaimMetric, number>
+  subjectStats: Record<Exclude<ClaimMetric, 'possession-percentage'>, number>
+  otherTeamStats: Record<Exclude<ClaimMetric, 'possession-percentage'>, number>
   subjectEvidence: EventReference[]
   otherTeamEvidence: EventReference[]
   limitation: string
@@ -71,6 +71,7 @@ const METRIC_LABELS: Record<ClaimMetric, string> = {
   shots: 'shots',
   'shots-on-target': 'shots on target',
   goals: 'goals',
+  'possession-percentage': 'possession',
 }
 
 function periodName(period: AnalysisPeriod, selectedTime: string): string {
@@ -192,7 +193,7 @@ function assessPart(
 function metricStats(
   analysis: MatchAnalysis,
   team: MatchTeam,
-): Record<ClaimMetric, number> {
+): Record<Exclude<ClaimMetric, 'possession-percentage'>, number> {
   return {
     shots: analysis.shots[team].shots,
     'shots-on-target': analysis.shots[team].shotsOnTarget,
@@ -208,6 +209,7 @@ function getMetricValue(
   team: MatchTeam,
   analysis: MatchAnalysis,
 ): number {
+  if (metric === 'possession-percentage') return Number.NaN
   if (metric === 'shots') return analysis.shots[team].shots
   if (metric === 'shots-on-target') return analysis.shots[team].shotsOnTarget
   return metricStats(analysis, team).goals
@@ -215,6 +217,7 @@ function getMetricValue(
 
 function isRelevantEvent(event: MatchEvent, metric: ClaimMetric): boolean {
   if (event.type !== 'shot') return false
+  if (metric === 'possession-percentage') return false
   if (metric === 'shots') return true
   if (metric === 'goals') return event.outcome === 'goal'
   return event.outcome === 'goal' || event.outcome === 'saved'

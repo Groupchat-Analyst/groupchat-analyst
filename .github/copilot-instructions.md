@@ -2,15 +2,21 @@
 
 - The central experience is: enter a football opinion, interpret the claim, retrieve relevant match evidence, assess it, and provide a shareable explanation.
 - Separate compound opinions into individual claims and show how each was understood. Ask for clarification when a clause or reference is ambiguous.
+- Treat coordinated team names in a statistical request (for example, “compare A and B's pass completion”) as entities in one request, not separate claims. Split only when the language forms separate predicates/claims.
+- Represent intent explicitly: statistical request, factual claim, subjective judgement, unavailable metric, coaching question, or unrecognized language. A statistical request returns calculations without a truth verdict; unavailable metrics and unrecognized wording must not trigger unrelated evidence.
 - Keep claim interpretation separate from deterministic evidence/statistic calculation so a future server-side AI interpreter can replace the deliberately limited local parser.
 - Broad claims such as “dominated” and “lucky” may receive relevant, time-filtered statistics and event references as context, but never silently redefine them as a shot-count comparison. Label broad claims “insufficient evidence for a firm conclusion” when the data cannot establish their meaning.
 - Retrieve evidence both for and against a claim; do not cherry-pick. Cite the underlying event IDs and match times, and respect the selected match time and evidence period in every statistic, assessment, and reference.
-- Never invent missing player, passing, possession, chance-quality, or other match data. A broad judgement must not receive a definitive verdict based only on shot counts.
+- Treat the richer interval/pass fixture as synthetic data, not observed match truth. Calculate possession from clipped controlled intervals, not from pass counts. Exclude contested and out-of-play minutes from the documented possession denominator, and distinguish incomplete coverage/null from a recorded zero.
+- Treat final-third entries as completed pass endpoints crossing the documented normalized pitch boundary, and turnovers as recorded incomplete-pass endpoints. These positional summaries do not establish continuous territorial control, defensive shape, or tactical causes.
+- For aggregate metrics, expose numerator, denominator, every included stable record ID, and a readable denominator definition. Label abbreviated citations as examples; claim-specific evidence must match the metric and team.
+- A requested build-up-phase filter is unavailable unless the dataset explicitly defines that phase. In that case, label any all-pass-turnover breakdown as broader context, link each cited turnover to its pass, and separate recorded locations from possible tactical explanations.
+- Never invent missing video, tracking, physical, chance-quality, or other match data. A broad judgement must not receive a definitive verdict based only on shots or possession share.
 - Keep local interpreter coverage explicit and bounded; avoid adding an ever-growing set of phrase-specific exceptions. Unsupported claims must receive clarification or an explicit limitation, not a guessed interpretation.
 - The browser sends only the opinion and selected time/period. The server owns the fixture, time filtering, statistics, evidence selection, and assessment; reject client-supplied statistics and never let a model calculate or replace them.
 - Validate structured interpretation output before use. Model/provider failures and invalid output must be explicit, never converted into success-shaped or silently guessed assessments.
 - The default server provider is a local rule-based interpreter, not Microsoft AI. The Foundry structured-output adapter must remain disabled unless explicitly enabled; keep credentials server-side in ignored local settings or server environment variables.
-- Represent unavailable possession, territory, player, and passing evidence explicitly. Do not silently substitute shot counts. Historical periods anchored to an event must use an exclusive cutoff and exclude all later events.
+- Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Do not silently substitute another metric. Historical periods anchored to an event must use an exclusive cutoff and exclude all later events and future interval endpoints/outcomes.
 - Explain missing data specifically and neutrally; do not blame the user for not supplying formal criteria.
 - Keep match data clearly labelled as fictional/synthetic in the prototype.
 - Calculate all statistics in application code; never ask AI to calculate them.

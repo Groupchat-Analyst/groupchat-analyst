@@ -23,6 +23,17 @@ const CLAIM_SCHEMA = {
           id: { type: 'string' },
           subject: { anyOf: [{ type: 'string', enum: ['Northbridge', 'Eastport'] }, { type: 'null' }] },
           text: { type: 'string' },
+          intent: {
+            type: 'string',
+            enum: [
+              'statistical-request',
+              'factual-claim',
+              'subjective-judgement',
+              'unavailable-metric',
+              'coaching-question',
+              'unrecognized-language',
+            ],
+          },
           meaning: {
             type: 'object',
             additionalProperties: false,
@@ -33,6 +44,7 @@ const CLAIM_SCHEMA = {
                   'factual-comparison',
                   'performance-judgement',
                   'historical-circumstance',
+                  'coaching-question',
                   'other',
                 ],
               },
@@ -44,7 +56,7 @@ const CLAIM_SCHEMA = {
                     additionalProperties: false,
                     properties: {
                       opponent: { type: 'string', enum: ['Northbridge', 'Eastport'] },
-                      metric: { type: 'string', enum: ['shots', 'shots-on-target', 'goals'] },
+                      metric: { type: 'string', enum: ['shots', 'shots-on-target', 'goals', 'possession-percentage', 'pass-attempts', 'pass-completions', 'pass-completion-percentage', 'running-distance'] },
                       operator: {
                         type: 'string',
                         enum: [
@@ -54,6 +66,7 @@ const CLAIM_SCHEMA = {
                           'greater-or-equal',
                           'less-or-equal',
                           'not-equal',
+                          'comparison-request',
                         ],
                       },
                     },
@@ -78,6 +91,9 @@ const CLAIM_SCHEMA = {
                 'attacking-events',
                 'player-events',
                 'passing',
+                'possession-losses',
+                'physical-measurements',
+                'build-up-phase',
               ],
             },
           },
@@ -113,6 +129,7 @@ const CLAIM_SCHEMA = {
           'id',
           'subject',
           'text',
+          'intent',
           'meaning',
           'requiredEvidence',
           'timePeriod',
@@ -155,7 +172,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
           {
             role: 'system',
             content:
-              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Use only team names and event IDs in the supplied context. Identify missing data needs explicitly. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. Mark unavailable possession, territorial, player, and passing evidence as required when the wording needs it; never replace it with shots. If a team or meaning is unclear, use null subject and explain clarificationNeeds.',
+              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Use only team names and event IDs in the supplied context. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If a team or meaning is unclear, use null subject and explain clarificationNeeds.',
           },
           {
             role: 'user',
@@ -163,6 +180,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
               opinion,
               selectedTime: context.selectedTime,
               selectedPeriod: context.period,
+              availableEvidenceCapabilities: context.capabilities,
               availableEvents: context.events.map((event) => ({
                 id: event.id,
                 clock: event.clock,
