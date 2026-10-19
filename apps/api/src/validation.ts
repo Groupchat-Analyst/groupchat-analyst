@@ -1,0 +1,337 @@
+import {
+  getMatchTimeOptions,
+  type AnalysisPeriod,
+  type MatchEvent,
+  type MatchClock,
+} from '../../shared/src/match.js'
+import type {
+  AnalysisRequest,
+  ClaimMeaningCategory,
+  ClaimMetric,
+  ClaimOperator,
+  EvidenceKind,
+  InterpretedClaim,
+} from '../../shared/src/apiContracts.js'
+
+const evidenceKinds: EvidenceKind[] = [
+  'possession',
+  'territorial-control',
+  'shots',
+  'shots-on-target',
+  'goals',
+  'attacking-events',
+  'player-events',
+  'passing',
+]
+const meaningCategories: ClaimMeaningCategory[] = [
+  'factual-comparison',
+  'performance-judgement',
+  'historical-circumstance',
+  'other',
+]
+const metrics: ClaimMetric[] = ['shots', 'shots-on-target', 'goals']
+const operators: ClaimOperator[] = [
+  'greater-than',
+  'less-than',
+  'equal',
+  'greater-or-equal',
+  'less-or-equal',
+  'not-equal',
+]
+
+export class InputValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InputValidationError'
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasExactKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  return (
+    Object.keys(value).length === keys.length &&
+    keys.every((key) => Object.hasOwn(value, key))
+  )
+}
+
+function isTeam(value: unknown): value is 'Northbridge' | 'Eastport' {
+  return value === 'Northbridge' || value === 'Eastport'
+}
+
+function isClock(value: unknown): value is MatchClock {
+  if (!isRecord(value)) return false
+  const expectedKeys =
+    value.stoppageMinutes === undefined
+      ? ['period', 'minute']
+      : ['period', 'minute', 'stoppageMinutes']
+  if (!hasExactKeys(value, expectedKeys)) return false
+  if (
+    !Number.isInteger(value.period) ||
+    !Number.isInteger(value.minute) ||
+    (value.period !== 1 && value.period !== 2) ||
+    typeof value.minute !== 'number'
+  ) {
+    return false
+  }
+  if (
+    value.stoppageMinutes !== undefined &&
+    (!Number.isInteger(value.stoppageMinutes) ||
+      typeof value.stoppageMinutes !== 'number')
+  ) {
+    return false
+  }
+
+  return getMatchTimeOptions().some(
+    (clock) =>
+      clock.period === value.period &&
+      clock.minute === value.minute &&
+      clock.stoppageMinutes === value.stoppageMinutes,
+  )
+}
+
+export function parseAnalysisRequest(value: unknown): AnalysisRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['opinion', 'selectedClock', 'period'])
+  ) {
+    throw new InputValidationError(
+      'Request must contain only opinion, selectedClock, and period.',
+    )
+  }
+  if (typeof value.opinion !== 'string' || value.opinion.length > 2000) {
+    throw new InputValidationError('Opinion must be text no longer than 2,000 characters.')
+  }
+  if (!isClock(value.selectedClock)) {
+    throw new InputValidationError('Selected match time is invalid.')
+  }
+  if (
+    value.period !== 'match-so-far' &&
+    value.period !== 'last-10-minutes'
+  ) {
+    throw new InputValidationError('Selected evidence period is invalid.')
+  }
+
+  return {
+    opinion: value.opinion.trim(),
+    selectedClock: value.selectedClock,
+    period: value.period as AnalysisPeriod,
+  }
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`)
+  return value
+}
+
+function requireString(
+  value: unknown,
+  label: string,
+  maxLength: number,
+): string {
+  if (typeof value !== 'string' || value.trim().length === 0 || value.length > maxLength) {
+    throw new Error(`${label} must be non-empty text of at most ${maxLength} characters.`)
+  }
+  return value.trim()
+}
+
+function requireStringArray(value: unknown, label: string): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 8 ||
+    !value.every(
+      (item) => typeof item === 'string' && item.trim().length > 0 && item.length <= 240,
+    )
+  ) {
+    throw new Error(`${label} must contain at most eight short text items.`)
+  }
+  return value.map((item) => item.trim())
+}
+
+export function validateInterpretation(
+  value: unknown,
+  availableEvents: MatchEvent[],
+): InterpretedClaim[] {
+  const root = requireRecord(value, 'Interpretation')
+  if (!hasExactKeys(root, ['claims']) || !Array.isArray(root.claims)) {
+    throw new Error('Interpretation must contain only a claims array.')
+  }
+  if (root.claims.length > 8) {
+    throw new Error('Interpretation may contain at most eight claims.')
+  }
+  const eventIds = new Set(availableEvents.map((event) => event.id))
+
+  return root.claims.map((value, index) => {
+    const label = `Claim ${index + 1}`
+    const claim = requireRecord(value, label)
+    const claimKeys = [
+      'id',
+      'subject',
+      'text',
+      'meaning',
+      'requiredEvidence',
+      'timePeriod',
+      'historicalEventAnchor',
+      'clarificationNeeds',
+    ]
+    if (!hasExactKeys(claim, claimKeys)) {
+      throw new Error(`${label} has missing or unexpected fields.`)
+    }
+
+    const subject = claim.subject
+    if (subject !== null && !isTeam(subject)) {
+      throw new Error(`${label} has an invalid subject.`)
+    }
+    const meaning = requireRecord(claim.meaning, `${label} meaning`)
+    if (
+      !hasExactKeys(meaning, ['category', 'description', 'comparison']) ||
+      !meaningCategories.includes(meaning.category as ClaimMeaningCategory)
+    ) {
+      throw new Error(`${label} meaning is invalid.`)
+    }
+    const comparisonValue = meaning.comparison
+    let comparison: InterpretedClaim['meaning']['comparison'] = null
+    if (comparisonValue !== null) {
+      const rawComparison = requireRecord(comparisonValue, `${label} comparison`)
+      if (
+        !hasExactKeys(rawComparison, ['opponent', 'metric', 'operator']) ||
+        !isTeam(rawComparison.opponent) ||
+        !metrics.includes(rawComparison.metric as ClaimMetric) ||
+        !operators.includes(rawComparison.operator as ClaimOperator)
+      ) {
+        throw new Error(`${label} comparison is invalid.`)
+      }
+      if (subject === null || rawComparison.opponent === subject) {
+        throw new Error(`${label} comparison must name two different teams.`)
+      }
+      comparison = {
+        opponent: rawComparison.opponent,
+        metric: rawComparison.metric as ClaimMetric,
+        operator: rawComparison.operator as ClaimOperator,
+      }
+    }
+
+    if (
+      !Array.isArray(claim.requiredEvidence) ||
+      claim.requiredEvidence.length > evidenceKinds.length ||
+      !claim.requiredEvidence.every(
+        (kind) => evidenceKinds.includes(kind as EvidenceKind),
+      )
+    ) {
+      throw new Error(`${label} has invalid required evidence.`)
+    }
+    const requiredEvidence = [...new Set(claim.requiredEvidence as EvidenceKind[])]
+    if (
+      (comparison &&
+        (meaning.category !== 'factual-comparison' ||
+          !requiredEvidence.includes(comparison.metric))) ||
+      (meaning.category === 'factual-comparison' && !comparison)
+    ) {
+      throw new Error(
+        `${label} comparison must be factual and request its calculated metric.`,
+      )
+    }
+    const timePeriod = requireRecord(claim.timePeriod, `${label} time period`)
+    let normalizedTimePeriod: InterpretedClaim['timePeriod']
+    if (
+      hasExactKeys(timePeriod, ['kind']) &&
+      timePeriod.kind === 'selected'
+    ) {
+      normalizedTimePeriod = { kind: 'selected' }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId']) &&
+      timePeriod.kind === 'selected' &&
+      timePeriod.eventId === null
+    ) {
+      normalizedTimePeriod = { kind: 'selected' }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId']) &&
+      timePeriod.kind === 'before-event' &&
+      typeof timePeriod.eventId === 'string' &&
+      eventIds.has(timePeriod.eventId)
+    ) {
+      normalizedTimePeriod = {
+        kind: 'before-event',
+        eventId: timePeriod.eventId,
+      }
+    } else {
+      throw new Error(`${label} time period is invalid or references an unavailable event.`)
+    }
+
+    let historicalEventAnchor: InterpretedClaim['historicalEventAnchor'] = null
+    if (claim.historicalEventAnchor !== null) {
+      const anchor = requireRecord(
+        claim.historicalEventAnchor,
+        `${label} historical event anchor`,
+      )
+      if (
+        !hasExactKeys(anchor, ['eventId', 'relationship']) ||
+        typeof anchor.eventId !== 'string' ||
+        !eventIds.has(anchor.eventId)
+      ) {
+        throw new Error(`${label} historical event anchor is invalid or unavailable.`)
+      }
+      historicalEventAnchor = {
+        eventId: anchor.eventId,
+        relationship: requireString(
+          anchor.relationship,
+          `${label} anchor relationship`,
+          120,
+        ),
+      }
+    }
+    if (
+      normalizedTimePeriod.kind === 'before-event' &&
+      (!historicalEventAnchor ||
+        historicalEventAnchor.eventId !== normalizedTimePeriod.eventId)
+    ) {
+      throw new Error(`${label} before-event period must use its historical anchor.`)
+    }
+    const clarificationNeeds = requireStringArray(
+      claim.clarificationNeeds,
+      `${label} clarification needs`,
+    )
+    if (subject === null && clarificationNeeds.length === 0) {
+      throw new Error(`${label} needs clarification when its subject is unknown.`)
+    }
+    if (
+      meaning.category === 'historical-circumstance' &&
+      normalizedTimePeriod.kind === 'before-event'
+    ) {
+      const anchorEvent = availableEvents.find(
+        (event) => event.id === normalizedTimePeriod.eventId,
+      )
+      if (
+        !anchorEvent ||
+        anchorEvent.type !== 'shot' ||
+        anchorEvent.outcome !== 'goal' ||
+        (subject !== null && anchorEvent.team !== subject)
+      ) {
+        throw new Error(
+          `${label} historical period must anchor to a goal by its named subject.`,
+        )
+      }
+    }
+
+    return {
+      id: requireString(claim.id, `${label} ID`, 64),
+      subject: subject as InterpretedClaim['subject'],
+      text: requireString(claim.text, `${label} text`, 500),
+      meaning: {
+        category: meaning.category as ClaimMeaningCategory,
+        description: requireString(
+          meaning.description,
+          `${label} meaning description`,
+          300,
+        ),
+        comparison,
+      },
+      requiredEvidence,
+      timePeriod: normalizedTimePeriod,
+      historicalEventAnchor,
+      clarificationNeeds,
+    }
+  })
+}
