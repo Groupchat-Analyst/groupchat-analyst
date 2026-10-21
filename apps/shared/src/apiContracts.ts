@@ -12,6 +12,7 @@ export type EvidenceKind =
   | 'possession-losses'
   | 'physical-measurements'
   | 'build-up-phase'
+  | 'lineups'
 
 export type ClaimMeaningCategory =
   | 'factual-comparison'
@@ -37,6 +38,9 @@ export type ClaimMetric =
   | 'pass-completions'
   | 'pass-completion-percentage'
   | 'running-distance'
+  | 'minutes-played'
+  | 'recoveries'
+  | 'pressure-observations'
 export type ClaimOperator =
   | 'greater-than'
   | 'less-than'
@@ -46,9 +50,17 @@ export type ClaimOperator =
   | 'not-equal'
   | 'comparison-request'
 
+export type PlayerEntityReference = {
+  id: string
+  name: string
+  team: MatchTeam
+}
+
 export type InterpretedClaim = {
   id: string
   subject: MatchTeam | null
+  playerSubject: PlayerEntityReference | null
+  playerMetric: ClaimMetric | null
   text: string
   intent: ClaimIntent
   meaning: {
@@ -56,10 +68,12 @@ export type InterpretedClaim = {
     description: string
     comparison: {
       opponent: MatchTeam
+      opponentPlayer: PlayerEntityReference | null
       metric: ClaimMetric
       operator: ClaimOperator
     } | null
   }
+
   requiredEvidence: EvidenceKind[]
   timePeriod:
     | { kind: 'selected' }
@@ -90,14 +104,14 @@ export type EvidenceAvailability = {
 export type TeamStatistic = {
   team: MatchTeam
   metric: ClaimMetric
-  value: number
+  value: number | null
 }
 
 export type CalculationTrace = {
   team: MatchTeam
   metric: ClaimMetric | 'possession-losses-by-area'
   area?: 'defensive-third' | 'middle-third' | 'final-third'
-  value: number
+  value: number | null
   numerator: number
   denominator: number
   numeratorRecordIds: string[]
@@ -157,6 +171,7 @@ export type EvidenceFoundation = {
     possessionId: string
     team: MatchTeam
     playerId: string
+    receiverId: string
     time: string
     start: { x: number; y: number }
     end: { x: number; y: number }
@@ -168,6 +183,7 @@ export type EvidenceFoundation = {
     id: string
     possessionId: string
     team: MatchTeam
+    playerId: string
     time: string
     location: { x: number; y: number }
     lostPassId: string
@@ -183,6 +199,9 @@ export type EvidenceFoundation = {
     team: MatchTeam
     name: string
     status: 'starter' | 'substitute'
+    participation: 'on-pitch' | 'participated' | 'unused-substitute' | 'not-yet-on-pitch'
+    minutesInWindow: number
+    selectedWindowActions: number
   }>
   substitutions: Array<{
     id: string
@@ -191,7 +210,48 @@ export type EvidenceFoundation = {
     playerOnId: string
     playerOffId: string
   }>
+  buildUpAnnotations: Array<{
+    id: string
+    version: string
+    phase: 'build-up'
+    team: MatchTeam
+    possessionId: string
+    passIds: string[]
+    turnoverIds: string[]
+    pressureIds: string[]
+    coverage: 'selected-sample'
+  }>
+  buildUpCoverage: 'selected-sample'
   windowLabel: string
+}
+
+export type PlayerStatistic = {
+  playerId: string
+  playerName: string
+  team: MatchTeam
+  metric: ClaimMetric
+  value: number | null
+}
+
+export type PlayerCalculationTrace = {
+  playerId: string
+  playerName: string
+  team: MatchTeam
+  metric:
+    | 'pass-attempts'
+    | 'pass-completions'
+    | 'pass-completion-percentage'
+    | 'shots'
+    | 'shots-on-target'
+    | 'goals'
+    | 'recoveries'
+    | 'pressure-observations'
+  numerator: number
+  denominator: number
+  value: number | null
+  numeratorRecordIds: string[]
+  denominatorRecordIds: string[]
+  denominatorDescription: string
 }
 
 export type ClaimEvidence = {
@@ -211,6 +271,8 @@ export type ClaimResult = {
     | 'unrecognized language'
   periodLabel: string
   statistics: TeamStatistic[]
+  playerStatistics: PlayerStatistic[]
+  playerCalculations: PlayerCalculationTrace[]
   calculations: CalculationTrace[]
   evidenceAvailability: EvidenceAvailability[]
   evidence: ClaimEvidence[]

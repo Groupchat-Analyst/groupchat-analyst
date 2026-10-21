@@ -20,6 +20,7 @@ export type MatchEvent =
       team: MatchTeam
       type: 'shot'
       outcome: 'goal' | 'saved' | 'blocked' | 'off-target'
+      playerId?: string
       description: string
     }
   | {
@@ -50,6 +51,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'north-player-09',
     description: 'Low shot from the edge of the box, saved by the goalkeeper.',
   },
   {
@@ -58,6 +60,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'off-target',
+    playerId: 'east-player-10',
     description: 'First-time effort from outside the area goes wide.',
   },
   {
@@ -73,6 +76,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'east-player-11',
     description: 'Header from a cross is held by the goalkeeper.',
   },
   {
@@ -81,6 +85,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'blocked',
+    playerId: 'north-player-11',
     description: 'A defender blocks a shot inside the area.',
   },
   {
@@ -89,6 +94,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'off-target',
+    playerId: 'east-player-08',
     description: 'Free-kick attempt clears the crossbar.',
   },
   {
@@ -97,6 +103,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'goal',
+    playerId: 'north-player-09',
     description: 'Northbridge score with a close-range shot.',
   },
   {
@@ -105,6 +112,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'east-player-11',
     description: 'Eastport test the goalkeeper soon after the restart.',
   },
   {
@@ -113,6 +121,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'off-target',
+    playerId: 'north-player-11',
     description: 'A counter-attacking effort goes wide.',
   },
   {
@@ -121,6 +130,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'goal',
+    playerId: 'east-player-10',
     description: 'Eastport level the score with a shot from the area.',
   },
   {
@@ -129,6 +139,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'north-player-08',
     description: 'A driven effort is pushed away by the goalkeeper.',
   },
   {
@@ -137,6 +148,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'blocked',
+    playerId: 'east-player-09',
     description: 'A defender gets in the way of a shot from the area.',
   },
   {
@@ -145,6 +157,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'north-player-09',
     description: 'A header from a cross is saved.',
   },
   {
@@ -153,6 +166,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'goal',
+    playerId: 'east-player-11',
     description: 'Eastport take the lead with a shot from close range.',
   },
   {
@@ -161,6 +175,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Eastport',
     type: 'shot',
     outcome: 'saved',
+    playerId: 'east-player-08',
     description: 'Late shot is held by the goalkeeper.',
   },
   {
@@ -169,6 +184,7 @@ export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
     team: 'Northbridge',
     type: 'shot',
     outcome: 'off-target',
+    playerId: 'north-player-11',
     description: 'Northbridge shoot over in stoppage time.',
   },
 ]

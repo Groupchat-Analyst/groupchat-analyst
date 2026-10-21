@@ -1,4 +1,5 @@
 import type { InterpretedClaim } from '../../../shared/src/apiContracts.js'
+import type { SyntheticMatchEvidence } from '../../../shared/src/evidence.js'
 import type { EvidenceCapability } from '../../../shared/src/evidence.js'
 import type { AnalysisPeriod, MatchClock, MatchEvent } from '../../../shared/src/match.js'
 
@@ -8,6 +9,7 @@ export type InterpretationContext = {
   selectedTime: string
   period: AnalysisPeriod
   capabilities: EvidenceCapability[]
+  players: SyntheticMatchEvidence['players']
 }
 
 export interface InterpretationProvider {

@@ -22,6 +22,30 @@ const CLAIM_SCHEMA = {
         properties: {
           id: { type: 'string' },
           subject: { anyOf: [{ type: 'string', enum: ['Northbridge', 'Eastport'] }, { type: 'null' }] },
+          playerSubject: {
+            anyOf: [
+              {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  team: { type: 'string', enum: ['Northbridge', 'Eastport'] },
+                },
+                playerMetric: {
+                  anyOf: [
+                    {
+                      type: 'string',
+                      enum: ['shots', 'shots-on-target', 'goals', 'possession-percentage', 'pass-attempts', 'pass-completions', 'pass-completion-percentage', 'running-distance', 'minutes-played', 'recoveries', 'pressure-observations'],
+                    },
+                    { type: 'null' },
+                  ],
+                },
+                required: ['id', 'name', 'team'],
+              },
+              { type: 'null' },
+            ],
+          },
           text: { type: 'string' },
           intent: {
             type: 'string',
@@ -56,7 +80,22 @@ const CLAIM_SCHEMA = {
                     additionalProperties: false,
                     properties: {
                       opponent: { type: 'string', enum: ['Northbridge', 'Eastport'] },
-                      metric: { type: 'string', enum: ['shots', 'shots-on-target', 'goals', 'possession-percentage', 'pass-attempts', 'pass-completions', 'pass-completion-percentage', 'running-distance'] },
+                      opponentPlayer: {
+                        anyOf: [
+                          {
+                            type: 'object',
+                            additionalProperties: false,
+                            properties: {
+                              id: { type: 'string' },
+                              name: { type: 'string' },
+                              team: { type: 'string', enum: ['Northbridge', 'Eastport'] },
+                            },
+                            required: ['id', 'name', 'team'],
+                          },
+                          { type: 'null' },
+                        ],
+                      },
+                      metric: { type: 'string', enum: ['shots', 'shots-on-target', 'goals', 'possession-percentage', 'pass-attempts', 'pass-completions', 'pass-completion-percentage', 'running-distance', 'minutes-played', 'recoveries', 'pressure-observations'] },
                       operator: {
                         type: 'string',
                         enum: [
@@ -70,7 +109,7 @@ const CLAIM_SCHEMA = {
                         ],
                       },
                     },
-                    required: ['opponent', 'metric', 'operator'],
+                    required: ['opponent', 'opponentPlayer', 'metric', 'operator'],
                   },
                   { type: 'null' },
                 ],
@@ -94,6 +133,7 @@ const CLAIM_SCHEMA = {
                 'possession-losses',
                 'physical-measurements',
                 'build-up-phase',
+                'lineups',
               ],
             },
           },
@@ -128,6 +168,8 @@ const CLAIM_SCHEMA = {
         required: [
           'id',
           'subject',
+          'playerSubject',
+          'playerMetric',
           'text',
           'intent',
           'meaning',
@@ -172,7 +214,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
           {
             role: 'system',
             content:
-              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Use only team names and event IDs in the supplied context. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If a team or meaning is unclear, use null subject and explain clarificationNeeds.',
+              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Resolve players only from availablePlayers and return their exact ID, name, and team; ambiguity such as Bruno must be clarified. Use only team names, players, and event IDs in the supplied context. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. A small build-up annotation sample is partial, not complete match-wide coverage. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If an entity or meaning is unclear, explain clarificationNeeds.',
           },
           {
             role: 'user',
@@ -181,6 +223,12 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
               selectedTime: context.selectedTime,
               selectedPeriod: context.period,
               availableEvidenceCapabilities: context.capabilities,
+              availablePlayers: context.players.map(({ id, name, team, status }) => ({
+                id,
+                name,
+                team,
+                status,
+              })),
               availableEvents: context.events.map((event) => ({
                 id: event.id,
                 clock: event.clock,

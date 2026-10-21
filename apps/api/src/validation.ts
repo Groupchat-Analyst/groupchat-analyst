@@ -12,6 +12,7 @@ import type {
   ClaimOperator,
   EvidenceKind,
   InterpretedClaim,
+  PlayerEntityReference,
 } from '../../shared/src/apiContracts.js'
 
 const evidenceKinds: EvidenceKind[] = [
@@ -26,6 +27,7 @@ const evidenceKinds: EvidenceKind[] = [
   'possession-losses',
   'physical-measurements',
   'build-up-phase',
+  'lineups',
 ]
 const meaningCategories: ClaimMeaningCategory[] = [
   'factual-comparison',
@@ -51,6 +53,9 @@ const metrics: ClaimMetric[] = [
   'pass-completions',
   'pass-completion-percentage',
   'running-distance',
+  'minutes-played',
+  'recoveries',
+  'pressure-observations',
 ]
 const evidenceForMetric: Record<ClaimMetric, EvidenceKind> = {
   shots: 'shots',
@@ -61,6 +66,9 @@ const evidenceForMetric: Record<ClaimMetric, EvidenceKind> = {
   'pass-completions': 'passing',
   'pass-completion-percentage': 'passing',
   'running-distance': 'physical-measurements',
+  'minutes-played': 'lineups',
+  recoveries: 'player-events',
+  'pressure-observations': 'player-events',
 }
 const operators: ClaimOperator[] = [
   'greater-than',
@@ -186,6 +194,7 @@ function requireStringArray(value: unknown, label: string): string[] {
 export function validateInterpretation(
   value: unknown,
   availableEvents: MatchEvent[],
+  availablePlayers: Array<PlayerEntityReference> = [],
 ): InterpretedClaim[] {
   const root = requireRecord(value, 'Interpretation')
   if (!hasExactKeys(root, ['claims']) || !Array.isArray(root.claims)) {
@@ -195,6 +204,25 @@ export function validateInterpretation(
     throw new Error('Interpretation may contain at most eight claims.')
   }
   const eventIds = new Set(availableEvents.map((event) => event.id))
+  const playersById = new Map(availablePlayers.map((player) => [player.id, player]))
+
+  function parsePlayerReference(value: unknown, label: string): PlayerEntityReference | null {
+    if (value === null) return null
+    const raw = requireRecord(value, label)
+    if (
+      !hasExactKeys(raw, ['id', 'name', 'team']) ||
+      typeof raw.id !== 'string' ||
+      typeof raw.name !== 'string' ||
+      !isTeam(raw.team)
+    ) {
+      throw new Error(`${label} is invalid.`)
+    }
+    const known = playersById.get(raw.id)
+    if (!known || known.name !== raw.name || known.team !== raw.team) {
+      throw new Error(`${label} does not match a player in the current fixture.`)
+    }
+    return { id: known.id, name: known.name, team: known.team }
+  }
 
   return root.claims.map((value, index) => {
     const label = `Claim ${index + 1}`
@@ -202,6 +230,8 @@ export function validateInterpretation(
     const claimKeys = [
       'id',
       'subject',
+      'playerSubject',
+      'playerMetric',
       'text',
       'intent',
       'meaning',
@@ -213,11 +243,27 @@ export function validateInterpretation(
     if (!hasExactKeys(claim, claimKeys)) {
       throw new Error(`${label} has missing or unexpected fields.`)
     }
+    const claimText = requireString(claim.text, `${label} text`, 500)
 
     const subject = claim.subject
     if (subject !== null && !isTeam(subject)) {
       throw new Error(`${label} has an invalid subject.`)
     }
+    const playerSubject = parsePlayerReference(
+      claim.playerSubject,
+      `${label} player subject`,
+    )
+    if (playerSubject && subject !== playerSubject.team) {
+      throw new Error(`${label} player subject must belong to its named team.`)
+    }
+    const playerMetric =
+      claim.playerMetric === null
+        ? null
+        : metrics.includes(claim.playerMetric as ClaimMetric)
+          ? (claim.playerMetric as ClaimMetric)
+          : (() => {
+              throw new Error(`${label} player metric is invalid.`)
+            })()
     if (!claimIntents.includes(claim.intent as ClaimIntent)) {
       throw new Error(`${label} intent is invalid.`)
     }
@@ -233,18 +279,41 @@ export function validateInterpretation(
     if (comparisonValue !== null) {
       const rawComparison = requireRecord(comparisonValue, `${label} comparison`)
       if (
-        !hasExactKeys(rawComparison, ['opponent', 'metric', 'operator']) ||
+        !hasExactKeys(rawComparison, ['opponent', 'opponentPlayer', 'metric', 'operator']) ||
         !isTeam(rawComparison.opponent) ||
         !metrics.includes(rawComparison.metric as ClaimMetric) ||
         !operators.includes(rawComparison.operator as ClaimOperator)
       ) {
         throw new Error(`${label} comparison is invalid.`)
       }
+      const opponentPlayer = parsePlayerReference(
+        rawComparison.opponentPlayer,
+        `${label} comparison player`,
+      )
       if (subject === null || rawComparison.opponent === subject) {
-        throw new Error(`${label} comparison must name two different teams.`)
+        if (
+          !playerSubject ||
+          !opponentPlayer ||
+          rawComparison.opponent !== opponentPlayer.team ||
+          playerSubject.id === opponentPlayer.id
+        ) {
+          throw new Error(`${label} comparison must name two different teams or players.`)
+        }
+      }
+      if (
+        opponentPlayer &&
+        (!playerSubject || rawComparison.opponent !== opponentPlayer.team)
+      ) {
+        throw new Error(`${label} comparison player must match the comparison team.`)
+      }
+      if (Boolean(playerSubject) !== Boolean(opponentPlayer)) {
+        throw new Error(
+          `${label} must compare two players or two teams; mixed player/team comparisons are not supported.`,
+        )
       }
       comparison = {
         opponent: rawComparison.opponent,
+        opponentPlayer,
         metric: rawComparison.metric as ClaimMetric,
         operator: rawComparison.operator as ClaimOperator,
       }
@@ -272,7 +341,17 @@ export function validateInterpretation(
     }
     if (
       (claim.intent === 'statistical-request' &&
-        comparison?.operator !== 'comparison-request') ||
+        (comparison
+          ? comparison.operator !== 'comparison-request'
+          : subject === null ||
+            meaning.category !== 'other' ||
+          !requiredEvidence.some((kind) =>
+            ['shots', 'shots-on-target', 'goals', 'passing', 'player-events', 'lineups'].includes(kind),
+          ))) ||
+      (playerMetric !== null && playerSubject === null) ||
+      (playerMetric !== null &&
+        !requiredEvidence.includes(evidenceForMetric[playerMetric])) ||
+      (comparison !== null && playerMetric !== null) ||
       (comparison?.operator === 'comparison-request' &&
         claim.intent !== 'statistical-request') ||
       (claim.intent === 'unavailable-metric' &&
@@ -366,12 +445,31 @@ export function validateInterpretation(
           `${label} historical period must anchor to a goal by its named subject.`,
         )
       }
+      if (
+        normalizedTimePeriod.kind === 'before-event' &&
+        playerSubject
+      ) {
+        const scorer = availableEvents.find(
+          (event) => event.id === normalizedTimePeriod.eventId,
+        )
+        if (
+          !scorer ||
+          scorer.type !== 'shot' ||
+          scorer.playerId !== playerSubject.id
+        ) {
+          throw new Error(
+            `${label} historical anchor must be a goal scored by the named player.`,
+          )
+        }
+      }
     }
 
     return {
       id: requireString(claim.id, `${label} ID`, 64),
       subject: subject as InterpretedClaim['subject'],
-      text: requireString(claim.text, `${label} text`, 500),
+      playerSubject,
+      playerMetric,
+      text: claimText,
       intent: claim.intent as ClaimIntent,
       meaning: {
         category: meaning.category as ClaimMeaningCategory,

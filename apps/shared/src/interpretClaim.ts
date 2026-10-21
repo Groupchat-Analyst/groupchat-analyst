@@ -96,21 +96,23 @@ function parseComparison(
 
   const comparisonWord = negatedOperator ?? operator
   const metricWord = negatedMetric ?? metric
-  const goalClaim = metricWord === 'goals'
+  const normalizedMetric = metricWord.toLowerCase()
+  const goalClaim = normalizedMetric === 'goals'
   const claimVerb = negatedOperator ? negatedVerb : verb
-  const usesGoalVerb = /^(?:score|scored)$/i.test(claimVerb)
-  const usesCountVerb = /^(?:have|has|had)$/i.test(claimVerb)
+  const normalizedVerb = claimVerb.toLowerCase()
+  const usesGoalVerb = /^(?:score|scored)$/.test(normalizedVerb)
+  const usesCountVerb = /^(?:have|has|had)$/.test(normalizedVerb)
   if (usesGoalVerb && !goalClaim) return undefined
   if (goalClaim && !usesGoalVerb && !usesCountVerb) return undefined
-  if (!goalClaim && !usesCountVerb && /possession/i.test(metricWord)) return undefined
+  if (!goalClaim && !usesCountVerb && normalizedMetric === 'possession') return undefined
 
   const comparison = getComparison(comparisonWord, Boolean(negation))
   const claimMetric: ClaimMetric =
-    metricWord === 'goals'
+    normalizedMetric === 'goals'
       ? 'goals'
-      : metricWord === 'shots on target'
+      : normalizedMetric === 'shots on target'
         ? 'shots-on-target'
-        : metricWord === 'possession'
+        : normalizedMetric === 'possession'
           ? 'possession-percentage'
           : 'shots'
   const metricLabel =
