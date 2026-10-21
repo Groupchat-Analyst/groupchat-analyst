@@ -15,7 +15,6 @@ const CLAIM_SCHEMA = {
   properties: {
     claims: {
       type: 'array',
-      maxItems: 8,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -32,16 +31,28 @@ const CLAIM_SCHEMA = {
                   name: { type: 'string' },
                   team: { type: 'string', enum: ['Northbridge', 'Eastport'] },
                 },
-                playerMetric: {
-                  anyOf: [
-                    {
-                      type: 'string',
-                      enum: ['shots', 'shots-on-target', 'goals', 'possession-percentage', 'pass-attempts', 'pass-completions', 'pass-completion-percentage', 'running-distance', 'minutes-played', 'recoveries', 'pressure-observations'],
-                    },
-                    { type: 'null' },
-                  ],
-                },
                 required: ['id', 'name', 'team'],
+              },
+              { type: 'null' },
+            ],
+          },
+          playerMetric: {
+            anyOf: [
+              {
+                type: 'string',
+                enum: [
+                  'shots',
+                  'shots-on-target',
+                  'goals',
+                  'possession-percentage',
+                  'pass-attempts',
+                  'pass-completions',
+                  'pass-completion-percentage',
+                  'running-distance',
+                  'minutes-played',
+                  'recoveries',
+                  'pressure-observations',
+                ],
               },
               { type: 'null' },
             ],
@@ -214,7 +225,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
           {
             role: 'system',
             content:
-              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Resolve players only from availablePlayers and return their exact ID, name, and team; ambiguity such as Bruno must be clarified. Use only team names, players, and event IDs in the supplied context. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. A small build-up annotation sample is partial, not complete match-wide coverage. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If an entity or meaning is unclear, explain clarificationNeeds.',
+              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Resolve players only from availablePlayers and return their exact ID, name, and team; ambiguity such as Bruno must be clarified. Use only team names, players, and event IDs in the supplied context. For a goal, the playerId on its availableEvents shot is the authoritative scorer; never attribute that goal to another player. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. A small build-up annotation sample is partial, not complete match-wide coverage. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If an entity or meaning is unclear, explain clarificationNeeds.',
           },
           {
             role: 'user',
@@ -234,6 +245,9 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
                 clock: event.clock,
                 team: event.team,
                 type: event.type,
+                ...(event.type === 'shot' && event.playerId
+                  ? { playerId: event.playerId }
+                  : {}),
                 description: event.description,
                 ...(event.type === 'shot' ? { outcome: event.outcome } : {}),
               })),
