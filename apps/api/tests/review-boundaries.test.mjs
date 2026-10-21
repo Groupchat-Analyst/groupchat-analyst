@@ -100,7 +100,7 @@ test('keeps non-scorer player questions before a team goal valid', async () => {
   const claim = result.claims[0]
   assert.equal(claim.claim.clarificationNeeds.length, 0)
   assert.equal(claim.claim.historicalEventAnchor.eventId, 'event-07')
-  assert.match(result.summary, /has not yet entered the pitch/)
+  assert.match(result.summary, /Ben White had not yet come on/)
   assert.equal(
     claim.playerStatistics.find(({ metric }) => metric === 'minutes-played').value,
     0,
