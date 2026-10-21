@@ -125,9 +125,9 @@ npm.cmd run build
 npm.cmd run lint
 ```
 
-## Microsoft Foundry model enablement
+## Microsoft Foundry integration
 
-No Azure resources have been created and no model service has been called. To enable the prepared adapter later, an administrator/user will need:
+The server-side Foundry adapter has been exercised against an existing Microsoft Foundry deployment. No Azure resources were created for this integration. The source defaults to the local interpreter, while this workstation's ignored API settings select Foundry. To use Foundry in another environment, an administrator/user will need:
 
 1. An Azure subscription and a Microsoft Foundry resource or Azure OpenAI resource in a supported region.
 2. A deployed model whose Chat Completions endpoint supports strict JSON Schema structured outputs.
@@ -147,11 +147,23 @@ Put the values only in the ignored `apps\api\local.settings.json` file or in the
 }
 ```
 
-The API still calculates statistics and validates every returned claim. The model interprets language only; it does not decide the score, generate statistics, or supply event evidence. The default setting remains local rules, and no cloud, messaging, or publishing integration is included.
+The API still calculates statistics and validates every returned claim. The model interprets language only; it does not decide the score, generate statistics, or supply event evidence. The source-level default remains local rules. No messaging or publishing integration is included.
+
+### First live verification
+
+The first live integration check used the ignored `apps\api\local.settings.json` configuration for provider `foundry`, deployment `gpt-5-mini`, and an HTTPS `/openai/v1` endpoint. The adapter's strict Chat Completions structured-output request succeeded with the deployed model. Sequential live requests returned provider `foundry` and HTTP 200 for:
+
+- Pass completion: Northbridge 30/38 (78.9%); Eastport 23/32 (71.9%).
+- Shots on target: at 57′, Eastport 2 and Northbridge 2 (the “more” claim was contradicted); at 58′, Eastport 3 and Northbridge 2 (supported).
+- Northbridge's first goal: the historical claim anchored to `event-07` at 45+3′. The claim's contextual evidence ended before the goal; the goal remained a separate anchor.
+- Running distance: explicitly unavailable, with no unrelated calculated statistics.
+- “Bruno”: clarification identified Bruno Guimarães (Northbridge) and Bruno Fernandes (Eastport), without exposing player IDs in the answer.
+
+In the browser, the pass-comparison response was labelled Foundry. The displayed answer and the value passed by the copy handler matched the API summary exactly. Reading the Windows clipboard showed the same answer with the expected LF-to-CRLF line-ending conversion. The browser request contained only `opinion`, `selectedClock`, and `period`; Foundry credentials remained server-side. A local Azure Functions storage-health warning appeared because no storage connection was configured, but the HTTP-only function was available and completed the analysis requests.
 
 ## Current limitations
 
-The local interpreter is intentionally bounded and is not a general language model. Its clause splitting and supported comparison language are limited. The richer synthetic fixture does not reproduce professional match analysis. Its intervals, pass outcomes, locations, and event references are fabricated for demonstration; partial pressure events are not continuous pressing evidence. Possession percentage is defined over recorded controlled minutes and excludes contested/out-of-play time. Thirds/entries are simple normalized-coordinate definitions. The data cannot establish tactical causes, defensive shape, chance quality, physical workload, or whether possession/dominance means a team played better. There is no video or continuous tracking and no calibrated xG. The Foundry adapter is unenabled and has not been tested against a live deployment.
+The local interpreter is intentionally bounded and is not a general language model. Its clause splitting and supported comparison language are limited. The richer synthetic fixture does not reproduce professional match analysis. Its intervals, pass outcomes, locations, and event references are fabricated for demonstration; partial pressure events are not continuous pressing evidence. Possession percentage is defined over recorded controlled minutes and excludes contested/out-of-play time. Thirds/entries are simple normalized-coordinate definitions. The data cannot establish tactical causes, defensive shape, chance quality, physical workload, or whether possession/dominance means a team played better. There is no video or continuous tracking and no calibrated xG. The Foundry integration has passed a small live acceptance set, not broad model evaluation or production reliability testing.
 
 The project licence remains undecided.
 
@@ -172,4 +184,4 @@ Verified locally in the browser at `http://127.0.0.1:5174/` with the local API a
 - Running distance returned “unavailable data” with no unrelated statistics or evidence.
 - The same “same number of goals” comparison was contradicted at 57′ (1–0) and supported at 58′ (1–1). Both responses returned HTTP 200 and matched the displayed summaries.
 
-The browser harness did not expose a browser-level zoom control; the 410px check verifies the responsive reflow expected when a 200% zoom halves an 820px CSS viewport, rather than claiming a direct browser-zoom setting. Foundry remained disabled, and both local servers were left running.
+The browser harness did not expose a browser-level zoom control; the 410px check verifies the responsive reflow expected when a 200% zoom halves an 820px CSS viewport, rather than claiming a direct browser-zoom setting. At the time of this presentation check, Foundry was disabled and both local servers were left running.

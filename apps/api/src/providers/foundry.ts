@@ -224,8 +224,24 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
         messages: [
           {
             role: 'system',
-            content:
-              'Interpret the user opinion as separate, minimal claims. Return only the required structured format. Do not assess truth, calculate statistics, or invent evidence. Resolve players only from availablePlayers and return their exact ID, name, and team; ambiguity such as Bruno must be clarified. Use only team names, players, and event IDs in the supplied context. For a goal, the playerId on its availableEvents shot is the authoritative scorer; never attribute that goal to another player. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. A small build-up annotation sample is partial, not complete match-wide coverage. For a claim about circumstances before a goal, select a real goal event anchor and set timePeriod to before-event with that same ID; the server applies an exclusive cutoff. If an entity or meaning is unclear, explain clarificationNeeds.',
+            content: `Interpret the user opinion as separate, minimal claims. Return every field required by the schema, using null for nullable fields. Do not assess truth, calculate statistics, or invent evidence.
+
+Use only availableTeams, availablePlayers, and availableEvents from the supplied context. Resolve players only from availablePlayers and return their exact ID, name, and team. Keep claim.text concise and faithful; express yes/no questions as declarative propositions rather than repeating question wording. Never put record IDs in claim.text, descriptions, or clarification text. If a name is ambiguous, set subject and playerSubject to null, include one concise clarificationNeeds item, and do not guess. For example, “Bruno” is ambiguous between Bruno Fernandes (Eastport) and Bruno Guimarães (Northbridge).
+
+For a team comparison, put the first team in subject, the other in meaning.comparison.opponent, and set playerSubject and opponentPlayer to null. For a player comparison, set playerSubject to the first player's exact reference, subject to that player's team, opponentPlayer to the second player's exact reference, and opponent to that player's team. Never mix a team and player in one comparison. Any comparison uses meaning.category factual-comparison and the evidence kind matching its metric.
+
+Intent and operator must agree:
+- A request to calculate or compare statistics uses intent statistical-request. A comparison request uses meaning.comparison.operator comparison-request; do not turn a request into a factual verdict.
+- An asserted comparison uses intent factual-claim and its stated directional operator (for example, greater-than). Do not use comparison-request for an assertion.
+- An assertion or request about a metric marked not-recorded uses intent unavailable-metric, even when phrased as a factual comparison. Keep its comparison and stated operator, use the matching unavailable evidence kind, and do not ask for clarification unless the entity or metric itself is ambiguous. Unavailability is not ambiguity. For example, running distance uses requiredEvidence physical-measurements; never substitute another statistic.
+- A broad player performance question is not a verdict. Resolve the player, use intent subjective-judgement and meaning.category performance-judgement, and request player-events, passing, shots, and goals as relevant to the wording.
+- If clarification is needed, clarificationNeeds must contain no more than eight short items, each no longer than 240 characters.
+
+Set playerMetric only for a single-player metric request; otherwise set it to null. Match evidence kinds to metrics: shots to shots, shots on target to shots-on-target, goals to goals, pass metrics to passing, possession percentage to possession, running distance to physical-measurements, minutes played to lineups, and recoveries or pressure observations to player-events. Use only evidence kinds that answer the claim.
+
+For a goal, the playerId on its availableEvents shot is the authoritative scorer; never attribute that goal to another player. Use the capability catalogue to distinguish available, partial, and unrecorded evidence. Identify missing data needs explicitly; never replace unavailable possession or territorial evidence with shots. A small build-up annotation sample is partial, not complete match-wide coverage.
+
+For a claim about circumstances before a goal, use intent factual-claim, meaning.category historical-circumstance, and select a real goal event from availableEvents as both historicalEventAnchor.eventId and timePeriod.eventId; set timePeriod.kind to before-event. The server applies an exclusive cutoff, so that goal and every later event are not evidence. Otherwise use timePeriod.kind selected and historicalEventAnchor null. If an entity or meaning is unclear, explain clarificationNeeds.`,
           },
           {
             role: 'user',
@@ -233,6 +249,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
               opinion,
               selectedTime: context.selectedTime,
               selectedPeriod: context.period,
+              availableTeams: ['Northbridge', 'Eastport'],
               availableEvidenceCapabilities: context.capabilities,
               availablePlayers: context.players.map(({ id, name, team, status }) => ({
                 id,

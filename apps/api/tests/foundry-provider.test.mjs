@@ -48,7 +48,17 @@ test('serializes strict schema and selected scorer context through the actual pr
   assert.equal(claimsSchema.maxItems, undefined)
   assert.equal(claimProperties.playerMetric.anyOf[1].type, 'null')
 
+  const systemInstructions = serializedBody.messages[0].content
+  assert.match(systemInstructions, /For a team comparison, put the first team in subject/)
+  assert.match(systemInstructions, /comparison-request/)
+  assert.match(systemInstructions, /clarificationNeeds must contain no more than eight/)
+  assert.match(systemInstructions, /Never put record IDs in claim\.text/)
+  assert.match(systemInstructions, /express yes\/no questions as declarative propositions/)
+  assert.match(systemInstructions, /Unavailability is not ambiguity/)
+  assert.match(systemInstructions, /exclusive cutoff/)
+
   const userContext = JSON.parse(serializedBody.messages[1].content)
+  assert.deepEqual(userContext.availableTeams, ['Northbridge', 'Eastport'])
   const eventById = new Map(userContext.availableEvents.map((event) => [event.id, event]))
   assert.equal(eventById.get('event-07').playerId, 'north-player-09')
   assert.equal(eventById.get('event-10').playerId, 'east-player-10')
