@@ -14,6 +14,7 @@ export type EvidenceKind =
   | 'build-up-phase'
   | 'lineups'
 
+/** Describes the claim's meaning, independently of its requested operation or time scope. */
 export type ClaimMeaningCategory =
   | 'factual-comparison'
   | 'performance-judgement'
@@ -21,6 +22,7 @@ export type ClaimMeaningCategory =
   | 'coaching-question'
   | 'other'
 
+/** Describes what the user wants done; historical scope must not change the operation. */
 export type ClaimIntent =
   | 'statistical-request'
   | 'factual-claim'

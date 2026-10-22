@@ -75,6 +75,11 @@ test('serializes strict schema and selected scorer context through the actual pr
   assert.equal(claimProperties.playerMetric.anyOf[1].type, 'null')
 
   const systemInstructions = serializedBody.messages[0].content
+  assert.match(systemInstructions, /Keep requested operation, claim meaning, and time scope distinct/)
+  assert.match(systemInstructions, /quantitative count or rate before a goal remains intent statistical-request/)
+  assert.match(systemInstructions, /A numerical assertion before a goal remains factual-claim/)
+  assert.match(systemInstructions, /For every before-event scope, select a real goal/)
+  assert.match(systemInstructions, /A player's statistics may be scoped before a team goal without claiming that player scored it/)
   assert.match(systemInstructions, /For a team comparison, put the first team in subject/)
   assert.match(systemInstructions, /comparison-request/)
   assert.match(systemInstructions, /tag question that asks whether a comparison is true/)

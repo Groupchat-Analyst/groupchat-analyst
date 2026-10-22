@@ -806,9 +806,13 @@ function calculationTraces(
         : claim.intent === 'subjective-judgement' &&
             claim.requiredEvidence.includes('possession')
           ? TEAMS
-            : claim.requiredEvidence.includes('possession')
-              ? TEAMS
-            : []
+            : claim.intent === 'statistical-request' &&
+                claim.requiredEvidence.includes('passing') &&
+                claim.subject
+              ? [claim.subject]
+              : claim.requiredEvidence.includes('possession')
+                ? TEAMS
+              : []
   const traces: CalculationTrace[] = []
 
   for (const team of teams) {
@@ -832,6 +836,26 @@ function calculationTraces(
         numeratorRecordIds: completed.map(({ id }) => id),
         denominatorRecordIds: passes.map(({ id }) => id),
         denominatorDescription: `All ${passes.length} recorded pass attempts for ${team} in ${advanced.startElapsed}–${advanced.endElapsed} played minutes; the percentage is unavailable when there are no attempts or pass coverage is incomplete.`,
+      })
+      continue
+    }
+
+    if (
+      claim.intent === 'statistical-request' &&
+      !claim.meaning.comparison &&
+      claim.requiredEvidence.includes('passing')
+    ) {
+      const passes = advanced.passes.filter((pass) => pass.team === team)
+      const completed = passes.filter((pass) => pass.outcome === 'complete')
+      traces.push({
+        team,
+        metric: 'pass-completions',
+        value: completed.length,
+        numerator: completed.length,
+        denominator: passes.length,
+        numeratorRecordIds: completed.map(({ id }) => id),
+        denominatorRecordIds: passes.map(({ id }) => id),
+        denominatorDescription: `${completed.length} completed passes among ${passes.length} recorded attempts for ${team} in the claim's calculated period; any exclusive historical cutoff is applied.`,
       })
       continue
     }
@@ -938,6 +962,22 @@ function makeLimitation(
   }
   if (claim.intent === 'unrecognized-language') {
     return 'The local interpreter cannot reliably identify the requested football evidence. No unrelated statistics or events were selected.'
+  }
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    if (
+      result === 'supported' ||
+      result === 'contradicted'
+    ) {
+      const goalRecorded =
+        (halfTimeAssertion === 'scored') === (result === 'supported')
+      const recordedFact = goalRecorded
+        ? `${claim.subject} have a recorded first-half goal`
+        : `No ${claim.subject} first-half goal is recorded`
+      const verdict = result === 'supported' ? 'supports' : 'contradicts'
+      return `${recordedFact}; this ${verdict} the half-time scoring assertion. The conclusion is limited to recorded first-half goal events in this synthetic fixture and does not assess broader performance.`
+    }
+    return `The selected-time evidence does not settle whether ${claim.subject} will score before half-time; only recorded first-half goal events are considered.`
   }
   if (claim.intent === 'statistical-request') {
     if (claim.requiredEvidence.includes('passing')) {

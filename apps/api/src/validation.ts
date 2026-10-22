@@ -682,10 +682,7 @@ export function validateInterpretation(
     ) {
       throw new Error(`${label} needs clarification when its subject is unknown.`)
     }
-    if (
-      meaning.category === 'historical-circumstance' &&
-      normalizedTimePeriod.kind === 'before-event'
-    ) {
+    if (normalizedTimePeriod.kind === 'before-event') {
       const anchorEvent = availableEvents.find(
         (event) => event.id === normalizedTimePeriod.eventId,
       )
@@ -696,20 +693,16 @@ export function validateInterpretation(
         (subject !== null && anchorEvent.team !== subject)
       ) {
         throw new Error(
-          `${label} historical period must anchor to a goal by its named subject.`,
+          `${label} before-event period must anchor to a goal by its named subject.`,
         )
       }
       if (
-        normalizedTimePeriod.kind === 'before-event' &&
-        playerSubject
+        playerSubject &&
+        meaning.category === 'historical-circumstance'
       ) {
-        const scorer = availableEvents.find(
-          (event) => event.id === normalizedTimePeriod.eventId,
-        )
         if (
-          !scorer ||
-          scorer.type !== 'shot' ||
-          scorer.playerId !== playerSubject.id
+          anchorEvent.type !== 'shot' ||
+          anchorEvent.playerId !== playerSubject.id
         ) {
           throw new Error(
             `${label} historical anchor must be a goal scored by the named player.`,
