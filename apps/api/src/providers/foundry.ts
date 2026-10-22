@@ -2,6 +2,13 @@ import type {
   InterpretationContext,
   InterpretationProvider,
 } from './provider.js'
+import { InterpretationProviderError } from './provider.js'
+
+type FoundryUsage = {
+  promptTokens?: number
+  completionTokens?: number
+  totalTokens?: number
+}
 
 type FoundryConfiguration = {
   baseUrl: string
@@ -199,13 +206,16 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
   readonly name = 'foundry' as const
   private readonly configuration: FoundryConfiguration
   private readonly request: typeof fetch
+  private readonly onUsage?: (usage: FoundryUsage) => void
 
   constructor(
     configuration: FoundryConfiguration,
     request: typeof fetch = fetch,
+    onUsage?: (usage: FoundryUsage) => void,
   ) {
     this.configuration = configuration
     this.request = request
+    this.onUsage = onUsage
   }
 
   async interpret(
@@ -213,13 +223,17 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
     context: InterpretationContext,
   ): Promise<unknown> {
     const endpoint = `${this.configuration.baseUrl.replace(/\/+$/, '')}/chat/completions`
-    const response = await this.request(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'api-key': this.configuration.apiKey,
-      },
-      body: JSON.stringify({
+    const timeoutSignal = AbortSignal.timeout(30_000)
+    let response: Response
+    try {
+      response = await this.request(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'api-key': this.configuration.apiKey,
+        },
+        signal: timeoutSignal,
+        body: JSON.stringify({
         model: this.configuration.deployment,
         messages: [
           {
@@ -232,9 +246,11 @@ For a team comparison, put the first team in subject, the other in meaning.compa
 
 Intent and operator must agree:
 - A request to calculate or compare statistics uses intent statistical-request. A comparison request uses meaning.comparison.operator comparison-request; do not turn a request into a factual verdict.
-- An asserted comparison uses intent factual-claim and its stated directional operator (for example, greater-than). Do not use comparison-request for an assertion.
-- An assertion or request about a metric marked not-recorded uses intent unavailable-metric, even when phrased as a factual comparison. Keep its comparison and stated operator, use the matching unavailable evidence kind, and do not ask for clarification unless the entity or metric itself is ambiguous. Unavailability is not ambiguity. For example, running distance uses requiredEvidence physical-measurements; never substitute another statistic.
+- An asserted comparison uses intent factual-claim and its stated directional operator (for example, greater-than). Do not use comparison-request for an assertion. A yes/no or tag question that asks whether a comparison is true is a factual-claim, not a request for descriptive statistics. A negative tag does not negate the preceding proposition: “Saka's accuracy was below Amad's, wasn't it?” means Saka is below Amad, so use less-than (not greater-or-equal).
+- An assertion or request about a metric marked not-recorded uses intent unavailable-metric, even when phrased as a factual comparison. Keep its comparison, use the matching unavailable evidence kind, and do not ask for clarification unless the entity or metric itself is ambiguous. Unavailability is not ambiguity. For an unavailable comparison phrased as a question (“Which team covered greater distance?”), use comparison.operator comparison-request while keeping intent unavailable-metric; do not turn unavailable data into a verdict. For a directional assertion about unavailable distance, use its stated directional operator. Running distance uses metric running-distance and requiredEvidence physical-measurements; never substitute another statistic.
 - A broad player performance question is not a verdict. Resolve the player, use intent subjective-judgement and meaning.category performance-judgement, and request player-events, passing, shots, and goals as relevant to the wording.
+- Broad team judgements such as “controlled the match”, “dominated”, or “were in complete control” are subjective-judgement claims, not requests to measure territorial control. Do not ask clarification just because territorial tracking is absent. Use available possession/shot context, explain its limits, and do not claim an overall verdict from those proxies.
+- Phrases such as “covered more/greater distance”, “which side covered the greater distance”, “covered more ground”, and “ran further” request running-distance, which is not recorded. Use intent unavailable-metric, meaning.category factual-comparison, comparison metric running-distance, the operator appropriate to the assertion/request wording, and requiredEvidence physical-measurements. Do not request clarification when both teams are named.
 - If clarification is needed, clarificationNeeds must contain no more than eight short items, each no longer than 240 characters.
 
 Set playerMetric only for a single-player metric request; otherwise set it to null. Match evidence kinds to metrics: shots to shots, shots on target to shots-on-target, goals to goals, pass metrics to passing, possession percentage to possession, running distance to physical-measurements, minutes played to lineups, and recoveries or pressure observations to player-events. Use only evidence kinds that answer the claim.
@@ -279,14 +295,38 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
             schema: CLAIM_SCHEMA,
           },
         },
-      }),
-    })
-    if (!response.ok) {
-      throw new Error(
-        `Microsoft Foundry interpretation failed with HTTP ${response.status}.`,
+        }),
+      })
+    } catch (error) {
+      const timedOut =
+        timeoutSignal.aborted ||
+        (error instanceof Error && error.name === 'TimeoutError')
+      throw new InterpretationProviderError(
+        'transport',
+        timedOut
+          ? 'Microsoft Foundry interpretation timed out after 30 seconds.'
+          : 'Microsoft Foundry could not be reached.',
+        error,
       )
     }
-    const result: unknown = await response.json()
+    if (!response.ok) {
+      throw new InterpretationProviderError(
+        response.status === 429 ? 'throttling' : 'transport',
+        response.status === 429
+          ? 'Microsoft Foundry is throttling interpretation requests (HTTP 429).'
+          : `Microsoft Foundry interpretation failed with HTTP ${response.status}.`,
+      )
+    }
+    let result: unknown
+    try {
+      result = await response.json()
+    } catch (error) {
+      throw new InterpretationProviderError(
+        'schema',
+        'Microsoft Foundry returned invalid JSON.',
+        error,
+      )
+    }
     if (
       typeof result !== 'object' ||
       result === null ||
@@ -294,7 +334,10 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
       !Array.isArray(result.choices) ||
       result.choices.length === 0
     ) {
-      throw new Error('Microsoft Foundry returned no interpretation choices.')
+      throw new InterpretationProviderError(
+        'incomplete-output',
+        'Microsoft Foundry returned no interpretation choices.',
+      )
     }
     const firstChoice: unknown = result.choices[0]
     if (
@@ -302,20 +345,90 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
       firstChoice === null ||
       !('message' in firstChoice) ||
       typeof firstChoice.message !== 'object' ||
-      firstChoice.message === null ||
-      !('content' in firstChoice.message) ||
-      typeof firstChoice.message.content !== 'string'
+      firstChoice.message === null
     ) {
-      throw new Error('Microsoft Foundry returned an invalid structured response.')
+      throw new InterpretationProviderError(
+        'incomplete-output',
+        'Microsoft Foundry returned an incomplete structured response.',
+      )
     }
 
-    const parsed: unknown = JSON.parse(firstChoice.message.content)
+    const message = firstChoice.message
+    if (
+      'refusal' in message &&
+      typeof message.refusal === 'string' &&
+      message.refusal.length > 0
+    ) {
+      throw new InterpretationProviderError(
+        'refusal',
+        'Microsoft Foundry refused to interpret this request.',
+      )
+    }
+    if (
+      'finish_reason' in firstChoice &&
+      firstChoice.finish_reason === 'length'
+    ) {
+      throw new InterpretationProviderError(
+        'incomplete-output',
+        'Microsoft Foundry output was truncated.',
+      )
+    }
+    if (
+      !('content' in message) ||
+      typeof message.content !== 'string' ||
+      message.content.length === 0
+    ) {
+      throw new InterpretationProviderError(
+        'incomplete-output',
+        'Microsoft Foundry returned no structured interpretation content.',
+      )
+    }
+
+    if ('usage' in result && typeof result.usage === 'object' && result.usage !== null) {
+      const rawUsage = result.usage
+      const usage: FoundryUsage = {}
+      if (
+        'prompt_tokens' in rawUsage &&
+        typeof rawUsage.prompt_tokens === 'number' &&
+        Number.isInteger(rawUsage.prompt_tokens)
+      ) {
+        usage.promptTokens = rawUsage.prompt_tokens
+      }
+      if (
+        'completion_tokens' in rawUsage &&
+        typeof rawUsage.completion_tokens === 'number' &&
+        Number.isInteger(rawUsage.completion_tokens)
+      ) {
+        usage.completionTokens = rawUsage.completion_tokens
+      }
+      if (
+        'total_tokens' in rawUsage &&
+        typeof rawUsage.total_tokens === 'number' &&
+        Number.isInteger(rawUsage.total_tokens)
+      ) {
+        usage.totalTokens = rawUsage.total_tokens
+      }
+      if (Object.keys(usage).length > 0) this.onUsage?.(usage)
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(message.content)
+    } catch (error) {
+      throw new InterpretationProviderError(
+        'schema',
+        'Microsoft Foundry returned content that was not valid structured JSON.',
+        error,
+      )
+    }
     return parsed
   }
 }
 
 export function createFoundryProvider(
   environment: NodeJS.ProcessEnv,
+  onUsage: (usage: FoundryUsage) => void = (usage) =>
+    console.info('Microsoft Foundry token usage:', usage),
 ): FoundryInterpretationProvider {
   const baseUrl = environment.FOUNDRY_OPENAI_BASE_URL?.trim()
   const apiKey = environment.FOUNDRY_API_KEY?.trim()
@@ -331,5 +444,9 @@ export function createFoundryProvider(
     )
   }
 
-  return new FoundryInterpretationProvider({ baseUrl, apiKey, deployment })
+  return new FoundryInterpretationProvider(
+    { baseUrl, apiKey, deployment },
+    fetch,
+    onUsage,
+  )
 }

@@ -30,7 +30,10 @@ import {
   type MatchEvent,
   type MatchTeam,
 } from '../../shared/src/match.js'
-import type { InterpretationProvider } from './providers/provider.js'
+import {
+  InterpretationProviderError,
+  type InterpretationProvider,
+} from './providers/provider.js'
 import { LocalInterpretationProvider } from './providers/local.js'
 import { parseAnalysisRequest, validateInterpretation } from './validation.js'
 
@@ -1753,11 +1756,25 @@ export async function analyzeOpinion(
         players: fixture.players,
       })
     : { claims: [] }
-  const claims = validateInterpretation(
-    interpreted,
-    eventsThroughSelectedTime,
-    fixture.players,
-  )
+  let claims: InterpretedClaim[]
+  try {
+    claims = validateInterpretation(
+      interpreted,
+      eventsThroughSelectedTime,
+      fixture.players,
+    )
+  } catch (error) {
+    if (provider.name === 'foundry') {
+      throw new InterpretationProviderError(
+        'semantic-validation',
+        error instanceof Error
+          ? error.message
+          : 'Microsoft Foundry interpretation did not match the validated claim contract.',
+        error,
+      )
+    }
+    throw error
+  }
   const results = claims.map((claim) => {
     const anchorEventId =
       claim.timePeriod.kind === 'before-event'

@@ -353,7 +353,8 @@ export function validateInterpretation(
         !requiredEvidence.includes(evidenceForMetric[playerMetric])) ||
       (comparison !== null && playerMetric !== null) ||
       (comparison?.operator === 'comparison-request' &&
-        claim.intent !== 'statistical-request') ||
+        claim.intent !== 'statistical-request' &&
+        claim.intent !== 'unavailable-metric') ||
       (claim.intent === 'unavailable-metric' &&
         !requiredEvidence.some((kind) =>
           ['physical-measurements', 'player-events'].includes(kind),
