@@ -28,7 +28,7 @@ Explicit build-up phase-scoped passing counts, rates, and comparisons are unsupp
 1. Start at `57′`, point out that the score is 1–0, and submit the locally supported question “Northbridge scored before half-time.” Show the goal reference and the limitation that it says nothing by itself about the run of play.
 2. Jump to `58′`. The score changes to 1–1 and the equaliser appears in the replay timeline; no analysis is sent until you explicitly submit again.
 3. Switch Fan to Analyst. The same submitted answer and verdict remain; Analyst opens the calculation and historical details. Toggle back to Fan to show the concise presentation and visible limitation.
-4. Copy the reply, then copy the separate evidence-card text or download its locally rendered SVG. Point out the question, submitted time/window, evidence, limitation and synthetic-data label.
+4. Copy the reply, then copy the card text or download the card image (PNG). Point out the question, assessed time/window, answer, key facts, limitation and the single synthetic-data label. Multi-claim questions produce a clearly labelled extended card.
 
 ## Proposed final live verification (not run)
 
