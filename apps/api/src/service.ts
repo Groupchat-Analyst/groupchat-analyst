@@ -72,7 +72,7 @@ function periodLabel(
   selectedPeriodLabel: string,
   events: MatchEvent[],
 ): string {
-  if (goalBeforeHalfTimeAssertion(claim.text)) {
+  if (goalBeforeHalfTimeAssertion(claim)) {
     return 'Recorded first-half goal events'
   }
   if (claim.timePeriod.kind === 'selected') return selectedPeriodLabel
@@ -86,7 +86,7 @@ function eventsForClaim(
   claim: InterpretedClaim,
   selectedEvents: MatchEvent[],
 ): MatchEvent[] {
-  if (goalBeforeHalfTimeAssertion(claim.text)) {
+  if (goalBeforeHalfTimeAssertion(claim)) {
     return selectedEvents.filter(
       (event) =>
         event.type === 'shot' &&
@@ -460,7 +460,7 @@ function evidenceForClaim(
     return [...evidence.values()]
   }
 
-  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion) {
     for (const event of events) {
       if (
@@ -647,7 +647,7 @@ function evidenceForClaim(
       requiredMetrics.some((metric) => matchesMetric(event, metric))
     if (!relevant) continue
 
-    const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+    const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
     let role: ClaimEvidence['role'] = halfTimeAssertion
       ? halfTimeAssertion === 'scored'
         ? 'supporting'
@@ -1015,7 +1015,7 @@ function assessOneClaim(
   fixture: SyntheticMatchEvidence,
 ): ClaimResult {
   const evidenceEvents =
-    goalBeforeHalfTimeAssertion(claim.text) !== undefined ||
+    goalBeforeHalfTimeAssertion(claim) !== undefined ||
     claim.timePeriod.kind === 'before-event'
       ? eventsForClaim(claim, allSelectedEvents)
       : eventsForClaim(claim, selectedPeriodEvents)
@@ -1044,7 +1044,7 @@ function assessOneClaim(
       claim.intent !== 'coaching-question' &&
       claim.intent !== 'unavailable-metric' &&
       claim.intent !== 'unrecognized-language' &&
-      goalBeforeHalfTimeAssertion(claim.text) === undefined
+      goalBeforeHalfTimeAssertion(claim) === undefined
     ? playerResults(claim, advanced, scopedEvents, fixture)
     : { statistics: [], calculations: [] }
   const statistics: TeamStatistic[] = canRetrieveSubjectEvidence &&
@@ -1192,7 +1192,7 @@ function assessOneClaim(
         : 'contradicted'
     }
   }
-  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion && claim.clarificationNeeds.length === 0) {
     const goalRecorded = evidenceEvents.some(
       (event) =>
@@ -1531,7 +1531,7 @@ function answerForClaim(
   if (claim.intent === 'unavailable-metric') return result.limitation
   if (claim.intent === 'unrecognized-language') return result.limitation
   if (claim.intent === 'coaching-question') return coachingSentence(result)
-  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion) {
     const goal = events.find(
       (event) =>

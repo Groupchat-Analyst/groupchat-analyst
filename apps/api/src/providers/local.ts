@@ -37,7 +37,7 @@ function splitOpinion(opinion: string): string[] {
         /\s+(?:and|but|however)\s+(?=(?:were|was|are|is|felt|looked|seemed|played|deserved|became|remained)\b)/i,
       ),
     )
-    .map((part) => part.trim().replace(/^[, ]+|[.!?]+$/g, ''))
+    .map((part) => part.trim().replace(/^[, ]+|[,.!?]+$/g, ''))
     .filter(Boolean)
 }
 

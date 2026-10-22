@@ -206,33 +206,95 @@ function requireStringArray(value: unknown, label: string): string[] {
 
 export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
 
+const halfTimeAssertionPattern =
+  /^(Northbridge|Eastport)\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?|scored)\s+before half[- ]time[.!?]?$/i
+
 export function goalBeforeHalfTimeAssertion(
-  text: string,
+  value: unknown,
+  allowNormalization = false,
 ): GoalBeforeHalfTimeAssertion | undefined {
-  if (/\bagainst the run of play\b/i.test(text)) return undefined
+  if (!isRecord(value) || typeof value.text !== 'string') return undefined
+  const match = halfTimeAssertionPattern.exec(value.text.trim())
   if (
-    /\b(?:did\s+not|didn['’]t|never|has\s+not|hasn['’]t|have\s+not|haven['’]t|had\s+not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before\s+half[- ]time\b/i.test(
-      text,
-    )
+    !match ||
+    typeof value.subject !== 'string' ||
+    value.subject.toLowerCase() !== match[1].toLowerCase()
   ) {
-    return 'did-not-score'
-  }
-  if (/\bnot\s+scored\s+before\s+half[- ]time\b/i.test(text)) {
     return undefined
   }
-  if (/\bscored\s+before\s+half[- ]time\b/i.test(text)) return 'scored'
-  return undefined
+  if (
+    value.playerSubject !== null ||
+    value.playerMetric !== null ||
+    !Array.isArray(value.clarificationNeeds) ||
+    value.clarificationNeeds.length !== 0 ||
+    value.historicalEventAnchor !== null ||
+    !Array.isArray(value.requiredEvidence) ||
+    value.requiredEvidence.some(
+      (kind) => kind !== 'goals' && kind !== 'attacking-events',
+    ) ||
+    !isRecord(value.meaning) ||
+    value.meaning.comparison !== null ||
+    !isRecord(value.timePeriod) ||
+    value.timePeriod.kind !== 'selected'
+  ) {
+    return undefined
+  }
+  if (allowNormalization) {
+    if (
+      !['statistical-request', 'factual-claim'].includes(value.intent as string) ||
+      !['historical-circumstance', 'other'].includes(
+        value.meaning.category as string,
+      )
+    ) {
+      return undefined
+    }
+  } else if (
+    value.intent !== 'factual-claim' ||
+    value.meaning.category !== 'historical-circumstance'
+  ) {
+    return undefined
+  }
+  return /^(?:Northbridge|Eastport)\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before half[- ]time[.!?]?$/i.test(
+    value.text.trim(),
+  )
+    ? 'did-not-score'
+    : 'scored'
 }
 
-function hasUnclearHalfTimeScoringWording(text: string): boolean {
-  if (goalBeforeHalfTimeAssertion(text) || /\bagainst the run of play\b/i.test(text)) {
+function hasAmbiguousHalfTimeScoringClaim(value: Record<string, unknown>): boolean {
+  if (
+    typeof value.text !== 'string' ||
+    !['factual-claim', 'statistical-request', 'unrecognized-language'].includes(
+      value.intent as string,
+    ) ||
+    !isRecord(value.meaning) ||
+    !['historical-circumstance', 'other'].includes(
+      value.meaning.category as string,
+    ) ||
+    value.meaning.comparison !== null ||
+    value.playerSubject !== null ||
+    value.playerMetric !== null ||
+    value.historicalEventAnchor !== null ||
+    !Array.isArray(value.requiredEvidence) ||
+    value.requiredEvidence.some(
+      (kind) => kind !== 'goals' && kind !== 'attacking-events',
+    ) ||
+    !Array.isArray(value.clarificationNeeds) ||
+    value.clarificationNeeds.length !== 0 ||
+    !isRecord(value.timePeriod) ||
+    value.timePeriod.kind !== 'selected'
+  ) {
     return false
   }
+  const text = value.text.trim()
+  const subject =
+    value.subject === 'Northbridge' || value.subject === 'Eastport'
+      ? value.subject
+      : undefined
+  if (!subject || goalBeforeHalfTimeAssertion(value, true)) return false
   return (
-    /\b(?:score|scores|scored|scoring|goal|goals)\b.{0,48}\bbefore half[- ]time\b/i.test(
-      text,
-    ) ||
-    /\bbefore half[- ]time\b.{0,48}\b(?:score|scores|scored|scoring|goal|goals)\b/i.test(
+    new RegExp(`\\b${subject}\\b`, 'i').test(text) &&
+    /(?:\b(?:score|scores|scored|scoring|goal|goals)\b.{0,80}\bbefore half[- ]time\b|\bbefore half[- ]time\b.{0,80}\b(?:score|scores|scored|scoring|goal|goals)\b)/i.test(
       text,
     )
   )
@@ -252,20 +314,7 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
         ? meaning.comparison
         : undefined
       if (
-        typeof claim.text === 'string' &&
-        claim.subject !== null &&
-        comparison === undefined &&
-        meaning.comparison === null &&
-        claim.playerMetric === null &&
-        hasUnclearHalfTimeScoringWording(claim.text) &&
-        ['factual-claim', 'statistical-request', 'unrecognized-language'].includes(
-          claim.intent as string,
-        ) &&
-        ['historical-circumstance', 'other'].includes(
-          meaning.category as string,
-        ) &&
-        Array.isArray(claim.clarificationNeeds) &&
-        claim.clarificationNeeds.length === 0
+        hasAmbiguousHalfTimeScoringClaim(claim)
       ) {
         claim.clarificationNeeds = [
           'Please rephrase whether the team scored or did not score before half-time.',
@@ -340,19 +389,7 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
         claim.historicalEventAnchor = null
       }
 
-      if (
-        typeof claim.text === 'string' &&
-        claim.subject !== null &&
-        goalBeforeHalfTimeAssertion(claim.text) !== undefined &&
-        !/against the run of play/i.test(claim.text) &&
-        meaning.comparison === null &&
-        claim.playerMetric === null &&
-        ['statistical-request', 'factual-claim'].includes(claim.intent as string) &&
-        meaningCategories.includes(meaning.category as ClaimMeaningCategory) &&
-        Object.hasOwn(claim, 'requiredEvidence') &&
-        Object.hasOwn(claim, 'timePeriod') &&
-        Object.hasOwn(claim, 'historicalEventAnchor')
-      ) {
+      if (goalBeforeHalfTimeAssertion(claim, true)) {
         claim.intent = 'factual-claim'
         meaning.category = 'historical-circumstance'
         meaning.comparison = null
@@ -634,7 +671,7 @@ export function validateInterpretation(
       meaning.category === 'historical-circumstance' &&
       clarificationNeeds.length === 0 &&
       normalizedTimePeriod.kind !== 'before-event' &&
-      goalBeforeHalfTimeAssertion(claimText) === undefined
+      goalBeforeHalfTimeAssertion(claim) === undefined
     ) {
       throw new Error(`${label} historical circumstance requires an exclusive before-event period or clarification.`)
     }

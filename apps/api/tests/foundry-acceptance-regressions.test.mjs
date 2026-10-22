@@ -292,6 +292,129 @@ test('local interpreter preserves before-half-time negation and clarifies unsupp
   assert.match(unclear.summary, /rephrase whether the team scored or did not score/i)
 })
 
+test('embedded half-time wording is not treated as a complete factual assertion', async (t) => {
+  const cases = [
+    {
+      text: 'It is not true that Northbridge scored before half-time.',
+      intent: 'factual-claim',
+      category: 'historical-circumstance',
+      requiredEvidence: ['goals'],
+      expected: 'clarification needed',
+    },
+    {
+      text: 'Northbridge deserved to have scored before half-time.',
+      intent: 'subjective-judgement',
+      category: 'performance-judgement',
+      requiredEvidence: ['attacking-events'],
+      expected: 'insufficient evidence for a firm conclusion',
+    },
+    {
+      text: 'Northbridge almost scored before half-time.',
+      intent: 'factual-claim',
+      category: 'historical-circumstance',
+      requiredEvidence: ['goals'],
+      expected: 'clarification needed',
+    },
+    {
+      text: 'If Northbridge scored before half-time, they would have won.',
+      intent: 'factual-claim',
+      category: 'historical-circumstance',
+      requiredEvidence: ['goals'],
+      expected: 'clarification needed',
+    },
+    {
+      text: '“Northbridge scored before half-time.”',
+      intent: 'factual-claim',
+      category: 'historical-circumstance',
+      requiredEvidence: ['goals'],
+      expected: 'clarification needed',
+    },
+  ]
+
+  for (const item of cases) {
+    await t.test(item.text, async () => {
+      const claim = {
+        id: 'embedded-half-time-language',
+        subject: 'Northbridge',
+        playerSubject: null,
+        playerMetric: null,
+        text: item.text,
+        intent: item.intent,
+        meaning: {
+          category: item.category,
+          description: item.text,
+          comparison: null,
+        },
+        requiredEvidence: item.requiredEvidence,
+        timePeriod: { kind: 'selected' },
+        historicalEventAnchor: null,
+        clarificationNeeds: [],
+      }
+      const result = await analyzeOpinion(
+        request(item.text),
+        providerWithClaims([claim]),
+      )
+
+      assert.equal(result.claims[0].assessment, item.expected)
+      assert.equal(result.claims[0].claim.intent, item.intent)
+      assert.equal(result.claims[0].claim.meaning.category, item.category)
+      assert.doesNotMatch(result.summary, /scored before half-time at 45\+3′/)
+      if (item.expected === 'clarification needed') {
+        assert.match(result.summary, /rephrase whether the team scored or did not score/i)
+      } else {
+        assert.match(result.summary, /do not establish the broader judgement/i)
+      }
+    })
+  }
+})
+
+test('Foundry passing question with a half-time reference remains a passing request', async () => {
+  const text = 'How many passes had Northbridge completed when they scored before half-time?'
+  const claim = {
+    id: 'northbridge-passes-at-goal',
+    subject: 'Northbridge',
+    playerSubject: null,
+    playerMetric: null,
+    text,
+    intent: 'statistical-request',
+    meaning: {
+      category: 'other',
+      description: 'Count Northbridge pass completions.',
+      comparison: null,
+    },
+    requiredEvidence: ['passing'],
+    timePeriod: { kind: 'selected' },
+    historicalEventAnchor: null,
+    clarificationNeeds: [],
+  }
+  const result = await analyzeOpinion(
+    request(text),
+    providerWithClaims([claim]),
+  )
+
+  assert.equal(result.provider, 'foundry')
+  assert.equal(result.claims[0].claim.intent, 'statistical-request')
+  assert.deepEqual(result.claims[0].claim.requiredEvidence, ['passing'])
+  assert.deepEqual(
+    result.claims[0].statistics.map(({ metric }) => metric).sort(),
+    ['pass-attempts', 'pass-completion-percentage', 'pass-completions'],
+  )
+  assert.doesNotMatch(result.summary, /scored before half-time at 45\+3′|first-half goal events/)
+
+  const metricClaim = {
+    ...claim,
+    id: 'northbridge-passing-metric-not-rewritten',
+    text: 'Northbridge scored before half-time.',
+    requiredEvidence: ['passing'],
+  }
+  const metricResult = await analyzeOpinion(
+    request(metricClaim.text),
+    providerWithClaims([metricClaim]),
+  )
+  assert.equal(metricResult.claims[0].claim.intent, 'statistical-request')
+  assert.deepEqual(metricResult.claims[0].claim.requiredEvidence, ['passing'])
+})
+
 test('explicit negated before-half-time claims are contradicted by a recorded goal', async (t) => {
   for (const text of [
     'Northbridge did not score before half-time.',
