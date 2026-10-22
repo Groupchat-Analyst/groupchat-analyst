@@ -131,7 +131,7 @@ test('captured D03 and R01 interpretations reproduce the original request-versus
   }
 })
 
-test('offline replay of all captured cases preserves the original scores and isolates the D01 limitation repair', async () => {
+test('offline replay preserves captured assessments and limits summaries to verified repairs', async () => {
   for (const captured of ledger.attempts) {
     const result = await analyzeOpinion(
       {
@@ -144,7 +144,15 @@ test('offline replay of all captured cases preserves the original scores and iso
     const original = captured.actualResponse
     assert.equal(result.provider, 'foundry', captured.attemptId)
     assert.deepEqual(result.score, original.score, captured.attemptId)
-    assert.equal(result.summary, original.summary, captured.attemptId)
+    if (['F04', 'R02'].includes(captured.attemptId)) {
+      assert.match(result.summary, /cannot establish whether.*against the run of play/i)
+      assert.match(result.summary, /Eastport accounted for 43\.9% and Northbridge 56\.1%/)
+      assert.match(result.summary, /strictly before Eastport's goal at 58′/)
+      assert.match(result.summary, /no continuous territorial or chance-quality data/i)
+      assert.doesNotMatch(result.summary, /annotated build-up sample|recorded losses/i)
+    } else {
+      assert.equal(result.summary, original.summary, captured.attemptId)
+    }
     assert.equal(result.claims.length, original.claims.length, captured.attemptId)
     for (const [index, claim] of result.claims.entries()) {
       const oldClaim = original.claims[index]

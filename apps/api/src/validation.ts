@@ -300,6 +300,19 @@ function hasAmbiguousHalfTimeScoringClaim(value: Record<string, unknown>): boole
   )
 }
 
+function isBuildUpLossLocationQuestion(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const asksForLocation =
+    /^\s*(?:where\b|(?:locate|identify|show|map)\s+where\b|(?:which|what)\s+(?:areas?|parts?|zones?)\b)/i.test(
+      value,
+    )
+  return (
+    asksForLocation &&
+    /\b(?:lose|loses|losing|lost)\s+(?:possession|the ball)\b/i.test(value) &&
+    /\bbuild[- ]?up\b/i.test(value)
+  )
+}
+
 export function normalizeKnownInterpretation(value: unknown): unknown {
   if (!isRecord(value) || !Array.isArray(value.claims)) return value
   return {
@@ -354,8 +367,9 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
         claim.playerMetric === null &&
         requiredEvidence.includes('build-up-phase') &&
         requiredEvidence.includes('possession-losses') &&
-        claimIntents.includes(claim.intent as ClaimIntent) &&
-        meaningCategories.includes(meaning.category as ClaimMeaningCategory)
+        claim.intent === 'statistical-request' &&
+        meaning.category === 'other' &&
+        isBuildUpLossLocationQuestion(claim.text)
       ) {
         claim.intent = 'coaching-question'
         meaning.category = 'coaching-question'

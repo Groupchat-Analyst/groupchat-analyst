@@ -1631,11 +1631,34 @@ function answerForClaim(
       result.assessment === 'supported'
         ? `The recorded evidence supports the view that ${claim.text.replace(/[.!?]+$/, '')}.`
         : `The available evidence cannot establish whether ${claim.text.replace(/[.!?]+$/, '')}.`
+    const isRunOfPlayJudgement =
+      /against the run of play/i.test(claim.text) && claim.subject !== null
+    const subjectPossession =
+      isRunOfPlayJudgement
+        ? result.calculations.find(
+            ({ team, metric }) =>
+              team === claim.subject && metric === 'possession-percentage',
+          )
+        : undefined
+    const opponentPossession =
+      isRunOfPlayJudgement
+        ? result.calculations.find(
+            ({ team, metric }) =>
+              team !== claim.subject && metric === 'possession-percentage',
+          )
+        : undefined
+    const possessionContext =
+      subjectPossession &&
+      subjectPossession.value !== null &&
+      opponentPossession &&
+      opponentPossession.value !== null
+        ? ` Before the goal, ${subjectPossession.team} accounted for ${subjectPossession.value}% and ${opponentPossession.team} ${opponentPossession.value}% of recorded controlled-possession time (${subjectPossession.denominator} recorded minutes; contested and out-of-play intervals are excluded).`
+        : ''
     const limitation = result.limitation.includes('territory') ||
       result.limitation.includes('chance quality')
       ? 'The fixture has no continuous territorial or chance-quality data.'
       : result.limitation
-    return `${conclusion} ${scope} ${limitation}`
+    return `${conclusion}${possessionContext} ${scope} ${limitation}`
   }
   if (
     claim.intent === 'subjective-judgement' &&
