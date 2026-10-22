@@ -4,6 +4,7 @@ import { test } from 'node:test'
 
 const configUrl = new URL('../public/staticwebapp.config.json', import.meta.url)
 const appUrl = new URL('./App.tsx', import.meta.url)
+const workflowUrl = new URL('../../../.github/workflows/shared-preview.yml', import.meta.url)
 
 test('shared preview requires its invited role for the site and API', async () => {
   const config = JSON.parse(await readFile(configUrl, 'utf8'))
@@ -29,4 +30,15 @@ test('the browser uses the same-origin API route, not localhost', async () => {
 
   assert.match(app, /fetch\('\/api\/analyze'/)
   assert.doesNotMatch(app, /localhost|127\.0\.0\.1/)
+})
+
+test('deployment is manual, uses the repository secret, and has no environment gate', async () => {
+  const workflow = await readFile(workflowUrl, 'utf8')
+
+  assert.match(workflow, /^on:\r?\n  workflow_dispatch:\r?$/m)
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/)
+  assert.match(workflow, /ref: main/)
+  assert.match(workflow, /secrets\.AZURE_STATIC_WEB_APPS_API_TOKEN/)
+  assert.doesNotMatch(workflow, /^\s+environment:/m)
+  assert.doesNotMatch(workflow, /^\s+(push|pull_request):/m)
 })

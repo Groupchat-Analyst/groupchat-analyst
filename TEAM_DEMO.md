@@ -4,9 +4,11 @@
 
 This is a deployment handoff, not a live preview: no preview URL or Azure resource has been created. The prepared source is based on reviewed commit `65cc0f59a868e810d952085f961d6a81672b9ef8`.
 
-After the owner approves deployment, Rob will receive an invitation to the Azure Static Web App role `preview-user` at his chosen Microsoft account address. He opens the resulting HTTPS URL and signs in with that same account. The app and `/api/*` routes require that role; an authenticated but uninvited account is not granted access. The initial deployment must keep `CLAIM_INTERPRETER_PROVIDER=local`, so preview traffic cannot spend Foundry tokens. The API is served as the Static Web App's managed Functions API, not as a separate public Function App.
+After deployment, Rob will receive an invitation to the Azure Static Web App role `preview-user` at his chosen Microsoft account address. He opens the resulting HTTPS URL and signs in with that same account. The app and `/api/*` routes require that role; an authenticated but uninvited account is not granted access. The initial deployment must keep `CLAIM_INTERPRETER_PROVIDER=local`, so preview traffic cannot spend Foundry tokens. The API is served as the Static Web App's managed Functions API, not as a separate public Function App.
 
 The invitation, URL, deployment token, and any future service credentials must be handled outside source control. Do not configure Foundry credentials for the initial preview.
+
+> **Hosted preview capability note:** This preview uses the deterministic local interpreter, not Microsoft Foundry. It supports a narrower, bounded set of question phrasings and may clarify or decline questions that the Foundry-backed prototype can interpret. The same synthetic fixture, server-side calculations, evidence rules, and historical cutoffs remain in place; this is a difference in language interpretation, not match data. Do not describe the hosted preview as AI-powered.
 
 ## What Rob can try
 
@@ -43,14 +45,16 @@ Browser address and approximate time:
 | Access | Microsoft Entra sign-in and a manually invited `preview-user` role; route rules protect both the site and API | Configuration prepared; Rob's invitation requires a deployed resource |
 | Interpreter | Local deterministic interpreter | Must be explicitly selected in the Static Web App's server-side application settings |
 | Foundry | Disabled for this preview | No credentials or model deployment configured |
-| Deployment | Manually dispatched GitHub Actions workflow, protected by the `shared-preview` environment | Workflow prepared; Azure deployment token and environment approval are not configured |
+| Deployment | Manually dispatched GitHub Actions workflow using the repository Actions secret `AZURE_STATIC_WEB_APPS_API_TOKEN`; deployment runs only when dispatched from `main` | Workflow prepared; secret is not configured |
+
+GitHub confirms the repository is private and organization-owned. The repository metadata does not expose the organization's billing plan, so the plan itself could not be verified here. GitHub's current documentation says GitHub Free users can configure environments only for public repositories; creating environments for private organization repositories requires GitHub Team. The workflow therefore does not reference a GitHub environment and uses a repository-level Actions secret instead. This does **not** provide a required-reviewer or owner-approval gate: GitHub users with write access can manually run the workflow. The job is limited to `main` and checks out `main`, but this is not a substitute for branch protection or an approval rule. Restrict repository write access and protect `main` before adding the deployment secret.
 
 Azure CLI and Azure PowerShell modules are not installed in the current workspace, so no active subscription or existing Azure resource could be inspected. The plan above is a proposal; it does not assume any resource already exists.
 
 ## Owner deployment handoff
 
 1. Review and approve this setup and the cost assumptions below. In Azure, create a Static Web App on the **Free** plan in the desired region, connected to the intended repository. Do not enable Foundry.
-2. In GitHub repository settings, create the `shared-preview` environment and require owner approval. Add the Static Web Apps deployment token as the environment secret `AZURE_STATIC_WEB_APPS_API_TOKEN`; never place its value in a file or log.
+2. Before adding a deployment credential, ensure only trusted maintainers have repository write access and protect `main` using the rules available to the organization. In GitHub repository settings, add the Static Web Apps deployment token as an Actions **repository secret** named `AZURE_STATIC_WEB_APPS_API_TOKEN`; never place its value in a file or log. There is no enforced owner approval step in this workflow. Only users with write access can trigger it, and any such user can cause a deployment from `main`.
 3. Configure the Static Web App application setting `CLAIM_INTERPRETER_PROVIDER=local`. Do not add `FOUNDRY_API_KEY`, `FOUNDRY_OPENAI_BASE_URL`, or `FOUNDRY_MODEL_DEPLOYMENT`.
 4. After the reviewed branch is merged through the normal review process, manually run **Deploy shared preview** from the approved default-branch revision. The workflow builds `apps/web` and `apps/api`; it is not triggered by pushes or pull requests.
 5. In the Static Web App's role management, invite Rob's chosen Microsoft account with role `preview-user`. Share the HTTPS address privately and verify an uninvited account is denied before inviting him.
@@ -59,7 +63,7 @@ Azure CLI and Azure PowerShell modules are not installed in the current workspac
 ### Cost and operational limits
 
 - The Azure Static Web Apps **Free** plan is listed as free, with 100 GB included monthly bandwidth at the subscription level. The managed Functions API is part of the Static Web Apps integration; this proposal adds no standalone Function App, API Management instance, database, or Application Insights resource.
-- With the local interpreter selected, Foundry usage is **$0**. No model calls are part of this deployment. GitHub Actions consumption is separate and depends on the repository's plan and remaining allowance.
+- With the local interpreter selected, Foundry usage is **$0**. No model calls are part of this deployment. GitHub Actions consumption is separate and depends on the organization's plan and remaining allowance. GitHub's current published allowance for GitHub Free for organizations is 2,000 standard-runner minutes/month; confirm the actual organization plan and available balance in its billing settings.
 - Static Web Apps API requests have a documented 45-second maximum duration. Free-plan quotas and current eligibility must be checked in the target subscription before deployment. Pricing and availability vary by region and account; verify in the Azure Pricing Calculator before approving.
 - This role gate limits access to explicitly invited users, but it is not a durable per-user request quota. Do not enable Foundry on this preview until a separately reviewed spend-control design adds enforceable request/token limits and an operational shutdown path. Azure budget alerts alone are notifications, not hard spending caps.
 
@@ -79,3 +83,7 @@ To revoke Rob's access, remove his `preview-user` role assignment in Static Web 
 - [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/)
 - [Azure Functions pricing](https://azure.microsoft.com/pricing/details/functions/)
 - [Microsoft Foundry pricing](https://azure.microsoft.com/pricing/details/microsoft-foundry/)
+- [GitHub environments for deployments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+- [GitHub Actions secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
+- [Manually running a GitHub Actions workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+- [GitHub Actions billing and included minutes](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
