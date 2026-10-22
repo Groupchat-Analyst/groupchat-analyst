@@ -351,6 +351,9 @@ function meaningCategory(text: string): ClaimMeaningCategory {
     return 'coaching-question'
   }
   if (/against the run of play/i.test(text)) return 'historical-circumstance'
+  if (/\bscor(?:e|es|ed)\s+before\s+half[- ]time\b/i.test(text)) {
+    return 'historical-circumstance'
+  }
   if (/\b(?:control(?:led)?|possession|dominat(?:ed|es)?|luck(?:y)?|deserv(?:ed)?|played|perform(?:ed|ance)?|comfortable|better|worse)\b/i.test(text)) {
     return 'performance-judgement'
   }

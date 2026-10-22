@@ -28,6 +28,7 @@ import {
   SYNTHETIC_MATCH_EVENTS,
   TEAMS,
   type MatchEvent,
+  type MatchClock,
   type MatchTeam,
 } from '../../shared/src/match.js'
 import {
@@ -35,7 +36,12 @@ import {
   type InterpretationProvider,
 } from './providers/provider.js'
 import { LocalInterpretationProvider } from './providers/local.js'
-import { parseAnalysisRequest, validateInterpretation } from './validation.js'
+import {
+  isGoalBeforeHalfTimeClaim,
+  normalizeKnownInterpretation,
+  parseAnalysisRequest,
+  validateInterpretation,
+} from './validation.js'
 
 const UNAVAILABLE_EVIDENCE: Partial<Record<EvidenceKind, string>> = {
   'territorial-control':
@@ -66,6 +72,9 @@ function periodLabel(
   selectedPeriodLabel: string,
   events: MatchEvent[],
 ): string {
+  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+    return 'Recorded first-half goal events'
+  }
   if (claim.timePeriod.kind === 'selected') return selectedPeriodLabel
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find((event) => event.id === anchorId)
@@ -77,6 +86,16 @@ function eventsForClaim(
   claim: InterpretedClaim,
   selectedEvents: MatchEvent[],
 ): MatchEvent[] {
+  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+    return selectedEvents.filter(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+  }
   if (claim.timePeriod.kind === 'selected') return selectedEvents
   const anchorId = claim.timePeriod.eventId
   const anchor = selectedEvents.find((event) => event.id === anchorId)
@@ -441,6 +460,18 @@ function evidenceForClaim(
     return [...evidence.values()]
   }
 
+  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+    for (const event of events) {
+      if (event.type === 'shot' && event.outcome === 'goal') {
+        evidence.set(event.id, {
+          role: 'supporting',
+          reference: reference(event),
+        })
+      }
+    }
+    return [...evidence.values()]
+  }
+
   if (claim.intent === 'coaching-question' && availableKinds.has('possession-losses')) {
     const buildUpOnly = claim.requiredEvidence.includes('build-up-phase')
     const eligibleTurnovers = buildUpOnly
@@ -608,7 +639,8 @@ function evidenceForClaim(
       requiredMetrics.some((metric) => matchesMetric(event, metric))
     if (!relevant) continue
 
-    let role: ClaimEvidence['role'] = 'context'
+    let role: ClaimEvidence['role'] =
+      isGoalBeforeHalfTimeClaim(claim.text) ? 'supporting' : 'context'
     const comparison = claim.meaning.comparison
     if (comparison && result !== 'insufficient evidence for a firm conclusion') {
       if (result === 'supported') {
@@ -970,6 +1002,7 @@ function assessOneClaim(
   fixture: SyntheticMatchEvidence,
 ): ClaimResult {
   const evidenceEvents =
+    isGoalBeforeHalfTimeClaim(claim.text) ||
     claim.timePeriod.kind === 'before-event'
       ? eventsForClaim(claim, allSelectedEvents)
       : eventsForClaim(claim, selectedPeriodEvents)
@@ -997,7 +1030,8 @@ function assessOneClaim(
       canRetrieveSubjectEvidence &&
       claim.intent !== 'coaching-question' &&
       claim.intent !== 'unavailable-metric' &&
-      claim.intent !== 'unrecognized-language'
+      claim.intent !== 'unrecognized-language' &&
+      !isGoalBeforeHalfTimeClaim(claim.text)
     ? playerResults(claim, advanced, scopedEvents, fixture)
     : { statistics: [], calculations: [] }
   const statistics: TeamStatistic[] = canRetrieveSubjectEvidence &&
@@ -1144,6 +1178,17 @@ function assessOneClaim(
         ? 'supported'
         : 'contradicted'
     }
+  }
+  if (
+    isGoalBeforeHalfTimeClaim(claim.text) &&
+    evidenceEvents.some(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1,
+    )
+  ) {
+    assessment = 'supported'
   }
 
   return {
@@ -1456,6 +1501,7 @@ function answerForClaim(
   fixture: SyntheticMatchEvidence,
   events: MatchEvent[],
   advanced: EvidenceCalculation,
+  selectedClock: MatchClock,
 ): string {
   const claim = result.claim
   if (claim.clarificationNeeds.length > 0) {
@@ -1467,6 +1513,21 @@ function answerForClaim(
   if (claim.intent === 'unavailable-metric') return result.limitation
   if (claim.intent === 'unrecognized-language') return result.limitation
   if (claim.intent === 'coaching-question') return coachingSentence(result)
+  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+    const goal = events.find(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+    return goal
+      ? `${claim.playerSubject?.name ?? goal.team} scored before half-time at ${formatMatchClock(goal.clock)}.`
+      : selectedClock.period === 1
+        ? `The selected match time is ${formatMatchClock(selectedClock)}; no ${claim.subject ?? 'team'} goal before half-time is recorded yet.`
+        : `The selected synthetic event record contains no recorded ${claim.subject ?? 'team'} goal before half-time.`
+  }
   if (claim.intent === 'statistical-request') {
     const statistics = statisticsSentence(result) ?? result.limitation
     const scope = historicalScope(claim, events)
@@ -1545,13 +1606,14 @@ function createSummary(
   advanced: EvidenceCalculation,
   events: MatchEvent[],
   selectedPeriodLabel: string,
+  selectedClock: MatchClock,
 ): string {
   if (claims.length === 0) {
     return 'Enter an opinion to interpret its claims and retrieve relevant evidence from this synthetic fixture.'
   }
 
   const answers = claims.map((result) =>
-    answerForClaim(result, fixture, events, advanced),
+    answerForClaim(result, fixture, events, advanced, selectedClock),
   )
   return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`
 }
@@ -1765,7 +1827,7 @@ export async function analyzeOpinion(
   let claims: InterpretedClaim[]
   try {
     claims = validateInterpretation(
-      interpreted,
+      normalizeKnownInterpretation(interpreted),
       eventsThroughSelectedTime,
       fixture.players,
       { requireClaims: request.opinion.length > 0 },
@@ -1845,6 +1907,7 @@ export async function analyzeOpinion(
       advanced,
       eventsThroughSelectedTime,
       selectedPeriodLabel,
+      request.selectedClock,
     ),
     selectedTime,
     selectedPeriodLabel,

@@ -204,6 +204,118 @@ function requireStringArray(value: unknown, label: string): string[] {
   return value.map((item) => item.trim())
 }
 
+export function isGoalBeforeHalfTimeClaim(text: string): boolean {
+  return /\bscor(?:e|es|ed)\s+before\s+half[- ]time\b/i.test(text)
+}
+
+export function normalizeKnownInterpretation(value: unknown): unknown {
+  if (!isRecord(value) || !Array.isArray(value.claims)) return value
+  return {
+    ...value,
+    claims: value.claims.map((value) => {
+      if (!isRecord(value)) return value
+      const claim = { ...value }
+      const meaning = isRecord(claim.meaning) ? { ...claim.meaning } : undefined
+      if (!meaning) return claim
+
+      const comparison = isRecord(meaning.comparison)
+        ? meaning.comparison
+        : undefined
+      const comparisonMetric = comparison?.metric
+      const comparisonOperator = comparison?.operator
+      if (
+        comparison &&
+        typeof comparisonMetric === 'string' &&
+        metrics.includes(comparisonMetric as ClaimMetric) &&
+        operators.includes(comparisonOperator as ClaimOperator) &&
+        ['statistical-request', 'factual-claim', 'unavailable-metric'].includes(
+          claim.intent as string,
+        ) &&
+        meaning.category === 'factual-comparison' &&
+        (claim.playerMetric === null ||
+          claim.playerMetric === comparisonMetric)
+      ) {
+        const metric = comparisonMetric as ClaimMetric
+        claim.playerMetric = null
+        claim.requiredEvidence = [evidenceForMetric[metric]]
+        if (claim.intent !== 'unavailable-metric') {
+          claim.intent =
+            comparisonOperator === 'comparison-request'
+              ? 'statistical-request'
+              : 'factual-claim'
+        }
+      }
+
+      const requiredEvidence = Array.isArray(claim.requiredEvidence)
+        ? claim.requiredEvidence
+        : []
+      if (
+        comparison === undefined &&
+        claim.playerMetric === null &&
+        requiredEvidence.includes('build-up-phase') &&
+        requiredEvidence.includes('possession-losses') &&
+        claimIntents.includes(claim.intent as ClaimIntent) &&
+        meaningCategories.includes(meaning.category as ClaimMeaningCategory)
+      ) {
+        claim.intent = 'coaching-question'
+        meaning.category = 'coaching-question'
+      }
+
+      if (
+        meaning.category === 'historical-circumstance' &&
+        typeof claim.text === 'string' &&
+        /against the run of play/i.test(claim.text) &&
+        Object.hasOwn(claim, 'requiredEvidence')
+      ) {
+        claim.requiredEvidence = [
+          'possession',
+          'territorial-control',
+          'attacking-events',
+        ]
+      }
+
+      const metric =
+        comparisonMetric ??
+        (typeof claim.playerMetric === 'string' ? claim.playerMetric : undefined)
+      if (
+        claim.intent === 'unavailable-metric' &&
+        metric === 'running-distance' &&
+        Object.hasOwn(claim, 'requiredEvidence') &&
+        Object.hasOwn(claim, 'timePeriod') &&
+        Object.hasOwn(claim, 'historicalEventAnchor')
+      ) {
+        claim.requiredEvidence = ['physical-measurements']
+        claim.timePeriod = { kind: 'selected' }
+        claim.historicalEventAnchor = null
+      }
+
+      if (
+        typeof claim.text === 'string' &&
+        claim.subject !== null &&
+        isGoalBeforeHalfTimeClaim(claim.text) &&
+        meaning.comparison === null &&
+        claim.playerMetric === null &&
+        claimIntents.includes(claim.intent as ClaimIntent) &&
+        meaningCategories.includes(meaning.category as ClaimMeaningCategory) &&
+        Object.hasOwn(claim, 'requiredEvidence') &&
+        Object.hasOwn(claim, 'timePeriod') &&
+        Object.hasOwn(claim, 'historicalEventAnchor')
+      ) {
+        claim.intent = 'factual-claim'
+        meaning.category = 'historical-circumstance'
+        meaning.comparison = null
+        claim.playerMetric = null
+        claim.requiredEvidence = ['goals']
+        claim.timePeriod = { kind: 'selected' }
+        claim.historicalEventAnchor = null
+      }
+
+      claim.meaning = meaning
+      return claim
+    }),
+  }
+}
+
 export function validateInterpretation(
   value: unknown,
   availableEvents: MatchEvent[],
@@ -469,7 +581,8 @@ export function validateInterpretation(
     if (
       meaning.category === 'historical-circumstance' &&
       clarificationNeeds.length === 0 &&
-      normalizedTimePeriod.kind !== 'before-event'
+      normalizedTimePeriod.kind !== 'before-event' &&
+      !isGoalBeforeHalfTimeClaim(claimText)
     ) {
       throw new Error(`${label} historical circumstance requires an exclusive before-event period or clarification.`)
     }
