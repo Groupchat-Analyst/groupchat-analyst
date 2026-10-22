@@ -165,6 +165,10 @@ In the browser, the pass-comparison response was labelled Foundry. The displayed
 
 The local interpreter is intentionally bounded and is not a general language model. Its clause splitting and supported comparison language are limited. The richer synthetic fixture does not reproduce professional match analysis. Its intervals, pass outcomes, locations, and event references are fabricated for demonstration; partial pressure events are not continuous pressing evidence. Possession percentage is defined over recorded controlled minutes and excludes contested/out-of-play time. Thirds/entries are simple normalized-coordinate definitions. The data cannot establish tactical causes, defensive shape, chance quality, physical workload, or whether possession/dominance means a team played better. There is no video or continuous tracking and no calibrated xG. The Foundry integration has passed a small live acceptance set, not broad model evaluation or production reliability testing.
 
+## Shared preview preparation
+
+The Azure Static Web Apps access configuration and manually triggered deployment workflow are prepared, but no preview is deployed and no Azure resource is confirmed. The initial hosted preview is intended to use the local interpreter only; Foundry credentials and model calls are not configured. See [TEAM_DEMO.md](./TEAM_DEMO.md) for the access plan, walkthrough, known limitations, deployment steps, and cost assumptions.
+
 The project licence remains undecided.
 
 ## Night Match presentation
