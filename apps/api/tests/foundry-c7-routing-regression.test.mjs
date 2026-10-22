@@ -172,13 +172,13 @@ test('captured V01–V03 retain the exclusive 14 of 18 historical passing result
   }
 })
 
-test('build-up evidence does not turn a statistical request into coaching', async () => {
+test('incidental build-up evidence does not create phase scope for a statistical request', async () => {
   const claim = {
     id: 'count-build-up-passes',
     subject: 'Northbridge',
     playerSubject: null,
     playerMetric: null,
-    text: 'Count Northbridge completed passes during build-up.',
+    text: 'How many passes did Northbridge complete?',
     intent: 'statistical-request',
     meaning: {
       category: 'other',
@@ -191,7 +191,7 @@ test('build-up evidence does not turn a statistical request into coaching', asyn
     clarificationNeeds: [],
   }
   const result = await analyzeOpinion(
-    request('How many passes did Northbridge complete during build-up?'),
+    request('How many passes did Northbridge complete?'),
     { name: 'foundry', async interpret() { return { claims: [claim] } } },
   )
 
@@ -202,6 +202,14 @@ test('build-up evidence does not turn a statistical request into coaching', asyn
     'build-up-phase',
     'possession-losses',
   ])
+  assert.equal(
+    result.claims[0].statistics.find(
+      ({ team, metric }) =>
+        team === 'Northbridge' && metric === 'pass-completions',
+    )?.value,
+    30,
+  )
+  assert.match(result.summary, /30 of 38 passes \(78\.9%\)/)
 })
 
 test('build-up evidence does not turn a factual comparison into coaching', async () => {
@@ -238,4 +246,100 @@ test('build-up evidence does not turn a factual comparison into coaching', async
     result.claims[0].claim.meaning.comparison.metric,
     'pass-completion-percentage',
   )
+  assert.equal(result.claims[0].assessment, 'supported')
+  assert.deepEqual(
+    result.claims[0].statistics
+      .filter(({ metric }) => metric === 'pass-completion-percentage')
+      .map(({ team, value }) => [team, value]),
+    [
+      ['Northbridge', 78.9],
+      ['Eastport', 71.9],
+    ],
+  )
+})
+
+test('explicit build-up passing scope never falls back to full-match totals', async () => {
+  const cases = [
+    {
+      input: 'How many passes did Northbridge complete during build-up?',
+      claimText: 'How many passes did Northbridge complete during build-up?',
+      intent: 'statistical-request',
+      category: 'other',
+      comparison: null,
+      evidence: ['passing', 'build-up-phase', 'possession-losses'],
+    },
+    {
+      input: 'What was Northbridge’s pass completion rate during build-up?',
+      claimText: 'Northbridge pass completion rate during build-up.',
+      intent: 'statistical-request',
+      category: 'other',
+      comparison: null,
+      evidence: ['passing', 'build-up-phase'],
+    },
+    {
+      input: 'Did Northbridge complete a higher share of passes than Eastport during build-up?',
+      claimText: 'Northbridge completed a higher share of passes than Eastport during build-up.',
+      intent: 'factual-claim',
+      category: 'factual-comparison',
+      comparison: {
+        opponent: 'Eastport',
+        opponentPlayer: null,
+        metric: 'pass-completion-percentage',
+        operator: 'greater-than',
+      },
+      evidence: ['passing', 'build-up-phase', 'possession-losses'],
+    },
+  ]
+
+  for (const [index, item] of cases.entries()) {
+    const claim = {
+      id: `build-up-pass-${index}`,
+      subject: 'Northbridge',
+      playerSubject: null,
+      playerMetric: null,
+      text: item.claimText,
+      intent: item.intent,
+      meaning: {
+        category: item.category,
+        description: item.claimText,
+        comparison: item.comparison,
+      },
+      requiredEvidence: item.evidence,
+      timePeriod: { kind: 'selected' },
+      historicalEventAnchor: null,
+      clarificationNeeds: [],
+    }
+    const result = await analyzeOpinion(
+      request(item.input),
+      { name: 'foundry', async interpret() { return { claims: [claim] } } },
+    )
+    const answer = result.claims[0]
+
+    assert.equal(answer.assessment, 'unavailable data', item.input)
+    assert.deepEqual(answer.statistics, [], item.input)
+    assert.deepEqual(answer.playerStatistics, [], item.input)
+    assert.deepEqual(answer.calculations, [], item.input)
+    assert.deepEqual(answer.playerCalculations, [], item.input)
+    assert.deepEqual(answer.evidence, [], item.input)
+    assert.doesNotMatch(JSON.stringify(answer), /30 of 38|78\.9%/, item.input)
+    assert.match(answer.limitation, /phase-scoped pass (?:counts|rates|comparisons).*not available/i)
+    assert.equal(
+      answer.evidenceAvailability.find(({ kind }) => kind === 'passing')
+        ?.available,
+      false,
+      item.input,
+    )
+    assert.match(
+      answer.evidenceAvailability.find(({ kind }) => kind === 'passing')
+        ?.detail ?? '',
+      /General match totals are not substituted/i,
+    )
+    assert.equal(
+      answer.claim.requiredEvidence.includes('build-up-phase'),
+      true,
+      item.input,
+    )
+    assert.doesNotMatch(result.summary, /30 of 38|78\.9%|pass completion rate.*recorded/i)
+    assert.match(result.summary, /phase-scoped pass (?:counts|rates|comparisons).*not available/i)
+  }
 })

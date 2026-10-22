@@ -313,6 +313,15 @@ function isBuildUpLossLocationQuestion(value: unknown): boolean {
   )
 }
 
+export function hasExplicitBuildUpPassingScope(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const phaseScope =
+    /\b(?:during|in|within|throughout)\s+(?:the\s+)?build[- ]?up(?:\s+phase)?\b|\bbuild[- ]?up(?:\s+phase)?\s+(?:passes?|passing|pass[- ]completion)\b/i
+  const passingMetric =
+    /\bpasses?\b|\bpassing\b|\bpass[- ]completion(?:\s+(?:rate|percentage|accuracy))?\b/i
+  return phaseScope.test(value) && passingMetric.test(value)
+}
+
 export function normalizeKnownInterpretation(value: unknown): unknown {
   if (!isRecord(value) || !Array.isArray(value.claims)) return value
   return {
@@ -326,6 +335,9 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
       const comparison = isRecord(meaning.comparison)
         ? meaning.comparison
         : undefined
+      const explicitBuildUpPassingScope = hasExplicitBuildUpPassingScope(
+        claim.text,
+      )
       if (
         hasAmbiguousHalfTimeScoringClaim(claim)
       ) {
@@ -350,7 +362,12 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
       ) {
         const metric = comparisonMetric as ClaimMetric
         claim.playerMetric = null
-        claim.requiredEvidence = [evidenceForMetric[metric]]
+        claim.requiredEvidence = [
+          evidenceForMetric[metric],
+          ...(explicitBuildUpPassingScope && evidenceForMetric[metric] === 'passing'
+            ? ['build-up-phase']
+            : []),
+        ]
         if (claim.intent !== 'unavailable-metric') {
           claim.intent =
             comparisonOperator === 'comparison-request'
@@ -362,6 +379,13 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
       const requiredEvidence = Array.isArray(claim.requiredEvidence)
         ? claim.requiredEvidence
         : []
+      if (
+        explicitBuildUpPassingScope &&
+        requiredEvidence.includes('passing') &&
+        !requiredEvidence.includes('build-up-phase')
+      ) {
+        claim.requiredEvidence = [...requiredEvidence, 'build-up-phase']
+      }
       if (
         comparison === undefined &&
         claim.playerMetric === null &&

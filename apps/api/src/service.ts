@@ -38,10 +38,31 @@ import {
 import { LocalInterpretationProvider } from './providers/local.js'
 import {
   goalBeforeHalfTimeAssertion,
+  hasExplicitBuildUpPassingScope,
   normalizeKnownInterpretation,
   parseAnalysisRequest,
   validateInterpretation,
 } from './validation.js'
+
+function isUnsupportedBuildUpPassingScope(claim: InterpretedClaim): boolean {
+  const passMetrics = new Set<ClaimMetric>([
+    'pass-attempts',
+    'pass-completions',
+    'pass-completion-percentage',
+  ])
+  const metric = claim.meaning.comparison?.metric ?? claim.playerMetric
+  return (
+    hasExplicitBuildUpPassingScope(claim.text) &&
+    claim.requiredEvidence.includes('build-up-phase') &&
+    claim.requiredEvidence.includes('passing') &&
+    (claim.intent === 'statistical-request' ||
+      (claim.intent === 'factual-claim' &&
+        claim.meaning.comparison !== null &&
+        passMetrics.has(claim.meaning.comparison.metric)) ||
+      (claim.playerMetric !== null && passMetrics.has(claim.playerMetric))) &&
+    (metric === null || passMetrics.has(metric))
+  )
+}
 
 const UNAVAILABLE_EVIDENCE: Partial<Record<EvidenceKind, string>> = {
   'territorial-control':
@@ -418,6 +439,7 @@ function evidenceForClaim(
   anchorEvent?: MatchEvent,
 ): ClaimEvidence[] {
   if (
+    isUnsupportedBuildUpPassingScope(claim) ||
     claim.clarificationNeeds.length > 0 ||
     (claim.subject === null && claim.meaning.category !== 'coaching-question')
   ) {
@@ -788,6 +810,7 @@ function calculationTraces(
   advanced: EvidenceCalculation,
 ): CalculationTrace[] {
   if (
+    isUnsupportedBuildUpPassingScope(claim) ||
     claim.clarificationNeeds.length > 0 ||
     (claim.subject === null && claim.meaning.category !== 'coaching-question') ||
     (claim.playerSubject !== null && claim.intent !== 'coaching-question')
@@ -960,6 +983,14 @@ function makeLimitation(
       ? unavailable.join(' ')
       : 'The requested metric is not recorded in this synthetic fixture.'
   }
+  if (
+    result === 'unavailable data' &&
+    isUnsupportedBuildUpPassingScope(claim)
+  ) {
+    return unavailable.length > 0
+      ? unavailable.join(' ')
+      : 'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.'
+  }
   if (claim.intent === 'unrecognized-language') {
     return 'The local interpreter cannot reliably identify the requested football evidence. No unrelated statistics or events were selected.'
   }
@@ -1073,6 +1104,7 @@ function assessOneClaim(
         )
         : evidenceEvents
   const availability = availabilityFor(claim.requiredEvidence)
+  const unsupportedBuildUpPassing = isUnsupportedBuildUpPassingScope(claim)
   const canRetrieveSubjectEvidence =
     (claim.subject !== null ||
       claim.meaning.category === 'coaching-question') &&
@@ -1084,11 +1116,13 @@ function assessOneClaim(
       claim.intent !== 'coaching-question' &&
       claim.intent !== 'unavailable-metric' &&
       claim.intent !== 'unrecognized-language' &&
+      !unsupportedBuildUpPassing &&
       goalBeforeHalfTimeAssertion(claim) === undefined
     ? playerResults(claim, advanced, scopedEvents, fixture)
     : { statistics: [], calculations: [] }
   const statistics: TeamStatistic[] = canRetrieveSubjectEvidence &&
     availableForIntent &&
+    !unsupportedBuildUpPassing &&
     !claim.playerSubject
     ? claim.intent === 'statistical-request' &&
         claim.requiredEvidence.includes('passing')
@@ -1143,7 +1177,14 @@ function assessOneClaim(
   const resolvedAvailability =
     canRetrieveSubjectEvidence && claim.intent !== 'unrecognized-language'
       ? availability.map((item) =>
-          item.kind === 'passing' && !advanced.passCoverageComplete
+          item.kind === 'passing' && unsupportedBuildUpPassing
+            ? {
+                ...item,
+                available: false,
+                detail:
+                  'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.',
+              }
+            : item.kind === 'passing' && !advanced.passCoverageComplete
             ? {
                 ...item,
                 available: false,
@@ -1159,7 +1200,12 @@ function assessOneClaim(
     (claim.subject === null && claim.meaning.category !== 'coaching-question')
       ? 'clarification needed'
       : 'insufficient evidence for a firm conclusion'
-  if (assessment !== 'clarification needed' && claim.intent === 'statistical-request') {
+  if (
+    assessment !== 'clarification needed' &&
+    unsupportedBuildUpPassing
+  ) {
+    assessment = 'unavailable data'
+  } else if (assessment !== 'clarification needed' && claim.intent === 'statistical-request') {
     assessment = 'statistics provided'
   } else if (assessment !== 'clarification needed' && claim.intent === 'unavailable-metric') {
     assessment = 'unavailable data'
@@ -1205,6 +1251,7 @@ function assessOneClaim(
             )
   if (
     assessment !== 'clarification needed' &&
+    !unsupportedBuildUpPassing &&
     comparison &&
     claim.intent === 'factual-claim' &&
     comparisonEvidenceKind &&
@@ -1270,7 +1317,7 @@ function assessOneClaim(
     calculations: canRetrieveSubjectEvidence
       ? calculationTraces(claim, advanced)
       : [],
-    limitation: makeLimitation(claim, availability, assessment, advanced),
+    limitation: makeLimitation(claim, resolvedAvailability, assessment, advanced),
   }
 }
 
@@ -1568,6 +1615,7 @@ function answerForClaim(
   if (result.assessment === 'clarification needed') {
     return `Could you clarify who or what you mean by “${claim.text}”?`
   }
+  if (result.assessment === 'unavailable data') return result.limitation
   if (claim.intent === 'unavailable-metric') return result.limitation
   if (claim.intent === 'unrecognized-language') return result.limitation
   if (claim.intent === 'coaching-question') return coachingSentence(result)
