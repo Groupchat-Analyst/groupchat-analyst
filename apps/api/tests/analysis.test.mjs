@@ -40,10 +40,10 @@ test('interprets the exact compound opinion as two distinct evidence requests', 
     kind: 'before-event',
     eventId: 'event-07',
   })
-  assert.match(result.summary, /Claim 1 — Eastport/)
-  assert.match(result.summary, /Claim 2 — Northbridge/)
-  assert.match(result.summary, /event-07 \(Northbridge, 45\+3′\)/)
-  assert.match(result.summary, /not continuous field-position/)
+  assert.match(result.summary, /Eastport had 44%.*Northbridge had 56%/)
+  assert.match(result.summary, /strictly before Northbridge's goal at 45\+3′/)
+  assert.match(result.summary, /no continuous territorial or chance-quality data/i)
+  assert.doesNotMatch(result.summary, /event-07|Claim 1|Claim 2/)
   assert.doesNotMatch(result.summary, /criteria|you did not provide/i)
 })
 
@@ -407,11 +407,9 @@ test('treats a pass-completion comparison as one statistical request across a te
     claim.evidence.filter(({ role }) => role === 'calculation').length,
     result.evidenceFoundation.passReferences.length,
   )
-  assert.match(result.summary, /Northbridge 30\/38 \(78\.9%\)/)
-  assert.match(result.summary, /Eastport 23\/32 \(71\.9%\)/)
-  assert.doesNotMatch(result.summary, /denominator all 38 recorded passes/)
-  assert.match(result.summary, /Example references \(abbreviated\)/)
-  assert.match(result.summary, /statistics provided/)
+  assert.match(result.summary, /Northbridge completed 30 of 38 passes \(78\.9%\)/)
+  assert.match(result.summary, /Eastport completed 23 of 32 passes \(71\.9%\)/)
+  assert.doesNotMatch(result.summary, /denominator|Example references|pass-\d+/)
 })
 
 test('recognizes a running-distance comparison but returns only the specific unavailable-data limitation', async () => {
@@ -472,10 +470,10 @@ test('limits Eastport build-up question evidence to its turnovers and their link
   assert.match(claim.limitation, /do not establish why possession was lost/i)
   assert.match(
     result.summary,
-    /Eastport: defensive-third 0, middle-third 2, final-third 1 \(3 recorded turnovers\)/,
+    /Eastport: defensive third 0, middle third 2, final third 1 \(3 recorded losses\)/,
   )
-  assert.match(result.summary, /Example references \(abbreviated\): turnover-/)
-  assert.match(result.summary, /pass-\d+ \(Eastport,/)
+  assert.match(result.summary, /partial annotated sample/i)
+  assert.doesNotMatch(result.summary, /turnover-\d+|pass-\d+/)
 })
 
 test('identifies Eastport possession counterevidence without reducing broader dominance to possession', async () => {
@@ -838,8 +836,9 @@ test('splits a coordinated unresolved judgement instead of applying the first ve
   assert.deepEqual(result.claims[1].statistics, [])
   assert.deepEqual(result.claims[1].calculations, [])
   assert.deepEqual(result.claims[1].evidence, [])
-  assert.match(result.summary, /Claim 1 — Northbridge: supported/)
-  assert.match(result.summary, /Claim 2 — Unclear subject: clarification needed/)
+  assert.match(result.summary, /Yes — Northbridge recorded 56% possession/)
+  assert.match(result.summary, /Which team is this claim about/)
+  assert.doesNotMatch(result.summary, /Claim 1|Claim 2/)
 })
 
 test('labels turnover counts by team and reports the correct combined total', async () => {
@@ -849,15 +848,15 @@ test('labels turnover counts by team and reports the correct combined total', as
 
   assert.match(
     result.summary,
-    /Northbridge: defensive-third 2, middle-third 2, final-third 1 \(5 recorded turnovers\)/,
+    /Northbridge: defensive third 2, middle third 2, final third 1 \(5 recorded losses\)/,
   )
   assert.match(
     result.summary,
-    /Eastport: defensive-third 0, middle-third 2, final-third 1 \(3 recorded turnovers\)/,
+    /Eastport: defensive third 0, middle third 2, final third 1 \(3 recorded losses\)/,
   )
-  assert.match(result.summary, /8 combined recorded turnovers/)
-  assert.match(result.summary, /selected-sample build-up annotations/i)
-  assert.match(result.summary, /do not establish why possession was lost/i)
+  assert.match(result.summary, /8 losses in total/i)
+  assert.match(result.summary, /partial annotated sample/i)
+  assert.match(result.summary, /not why possession was lost/i)
 })
 
 test('withholds all statistics, evidence and calculation traces until an ambiguous subject is resolved', async () => {
@@ -1658,22 +1657,22 @@ test('withholds all player results while a missing historical goal needs clarifi
 
 test('leads general player summaries with participation and recorded contributions', async () => {
   const saka = await analyzeOpinion(request('How did Saka perform?'))
-  assert.match(saka.summary, /Claim 1 — Bukayo Saka: Recorded 1 goal, 3 shots on target, 2 pass completions from 4 pass attempts/)
-  assert.match(saka.summary, /sparse synthetic records cannot establish an overall performance rating/i)
+  assert.match(saka.summary, /Bukayo Saka scored 1 goal, had 3 shots on target, completed 2 of 4 passes/)
+  assert.match(saka.summary, /sparse synthetic records, not a complete performance measure or overall rating/i)
   assert.doesNotMatch(saka.summary, /2\/4 \(50%\)|2 pass completions from 4 pass attempts.*50%/)
-  assert.match(saka.summary, /event-07/)
+  assert.doesNotMatch(saka.summary, /event-07|Claim 1/)
 
   const notEntered = await analyzeOpinion(
     request('How did Ben White perform?', { period: 2, minute: 64 }),
   )
-  assert.match(notEntered.summary, /Claim 1 — Ben White: has not yet entered the pitch/)
+  assert.match(notEntered.summary, /Ben White had not yet come on/)
   assert.doesNotMatch(notEntered.summary, /0 shots|0 goals|undefined/)
   assert.doesNotMatch(notEntered.summary, /0\/0|rating or ranking/)
 
   const unused = await analyzeOpinion(
     request('How did Karl Darlow perform?'),
   )
-  assert.match(unused.summary, /Claim 1 — Karl Darlow: remained an unused substitute/)
+  assert.match(unused.summary, /Karl Darlow remained an unused substitute/)
   assert.doesNotMatch(unused.summary, /0 shots|0 goals|undefined/)
 })
 
@@ -1681,21 +1680,21 @@ test('uses historical scope and participation in player summaries', async () => 
   const shots = await analyzeOpinion(
     request('How many shots did Saka have before Northbridge scored?'),
   )
-  assert.match(shots.summary, /Period: Recorded match play strictly before 45\+3′/)
-  assert.match(shots.summary, /Evidence excludes anchor event-07/)
-  assert.match(shots.summary, /Claim 1 — Bukayo Saka: statistics provided\. Period: Recorded match play strictly before 45\+3′/)
+  assert.match(shots.summary, /strictly before Northbridge's goal at 45\+3′/)
+  assert.match(shots.summary, /Bukayo Saka: 1 shot/)
+  assert.doesNotMatch(shots.summary, /event-07|Claim 1/)
 
   const ben = await analyzeOpinion(
     request('How did Ben White perform before Northbridge scored?'),
   )
-  assert.match(ben.summary, /Claim 1 — Ben White: has not yet entered the pitch/)
-  assert.match(ben.summary, /Period: Recorded match play strictly before 45\+3′/)
+  assert.match(ben.summary, /Ben White had not yet come on/)
+  assert.match(ben.summary, /Selected period: Match so far/)
   assert.doesNotMatch(ben.summary, /0\/0|Ben White is on the pitch/)
 
   const timber = await analyzeOpinion(
     request('How did Timber perform before Northbridge scored?'),
   )
-  assert.match(timber.summary, /Period: Recorded match play strictly before 45\+3′/)
+  assert.match(timber.summary, /Selected period: Match so far/)
   assert.doesNotMatch(timber.summary, /has since been substituted/)
 })
 
@@ -1727,5 +1726,5 @@ test('treats why build-up questions as bounded coaching queries without inventin
     id.startsWith('turnover-'),
   ), ['turnover-003', 'turnover-016'])
   assert.match(claim.limitation, /do not establish why possession was lost/i)
-  assert.match(result.summary, /not tactical causes/i)
+  assert.match(result.summary, /not why possession was lost/i)
 })
