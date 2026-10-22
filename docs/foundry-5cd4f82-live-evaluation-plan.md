@@ -4,6 +4,7 @@
 
 - Frozen application source: `5de5fce` (`Add opt-in local Foundry output capture`), built from requested baseline `5cd4f82dc66ce0e6ab5fe660b708effde67ffdd7`.
 - The only application change after that baseline is optional local raw-output capture. Request construction, model instructions, metrics, interpretation, calculations, validation, and summaries are unchanged.
+- Frozen `apps/api/src/providers/foundry.ts` SHA-256: `8c342299eb449eaca855bc6040015f0bcf7db84c73f97386ef38fc211f0927de`; exact embedded system-prompt text SHA-256: `497e1bec71f06872ec5bfb97e2d0f62bf1d06c6b0d902edd3225e99c17739e9d`.
 - Provider: `foundry`; deployment expected from ignored local settings: `gpt-5-mini`.
 - Total upstream-call cap: exactly 12 scheduled attempts maximum. No retries, browser submissions, or extra provider calls.
 - Schedule, in fixed order: D01–D03 known development regressions; F01–F06 fresh wording; R01–R03 repeats. Repeats are byte-identical in input, selected clock, and period to D03, F04, and F03 respectively.
