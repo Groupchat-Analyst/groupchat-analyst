@@ -90,6 +90,19 @@ export type AnalysisRequest = {
   period: AnalysisPeriod
 }
 
+export type MatchReplayResponse = {
+  selectedTime: string
+  score: Record<MatchTeam, number>
+  events: Array<{
+    id: string
+    time: string
+    team: MatchTeam
+    description: string
+    type: 'shot' | 'other'
+    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target'
+  }>
+}
+
 export type EvidenceReference = {
   id: string
   time: string
