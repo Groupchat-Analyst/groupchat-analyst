@@ -275,6 +275,244 @@ test('local interpreter scopes a before-half-time scoring assertion to first-hal
   assert.match(result.summary, /Eastport had 44% of recorded possession/)
 })
 
+test('local interpreter preserves before-half-time negation and clarifies unsupported wording', async () => {
+  for (const text of [
+    'Northbridge did not score before half-time.',
+    'Northbridge never scored before half-time.',
+  ]) {
+    const result = await analyzeOpinion(request(text))
+    assert.equal(result.claims[0].assessment, 'contradicted')
+    assert.match(result.summary, /No — Northbridge did score before half-time/i)
+  }
+
+  const unclear = await analyzeOpinion(
+    request('Northbridge could not fail to score before half-time.'),
+  )
+  assert.equal(unclear.claims[0].assessment, 'clarification needed')
+  assert.match(unclear.summary, /rephrase whether the team scored or did not score/i)
+})
+
+test('explicit negated before-half-time claims are contradicted by a recorded goal', async (t) => {
+  for (const text of [
+    'Northbridge did not score before half-time.',
+    'Northbridge never scored before half-time.',
+    'Northbridge have not scored before half-time.',
+  ]) {
+    await t.test(text, async () => {
+      const claim = {
+        id: 'northbridge-no-first-half-goal',
+        subject: 'Northbridge',
+        playerSubject: null,
+        playerMetric: null,
+        text,
+        intent: 'factual-claim',
+        meaning: {
+          category: 'historical-circumstance',
+          description: text,
+          comparison: null,
+        },
+        requiredEvidence: ['goals'],
+        timePeriod: { kind: 'selected' },
+        historicalEventAnchor: null,
+        clarificationNeeds: [],
+      }
+      const result = await analyzeOpinion(
+        request(text),
+        providerWithClaims([claim]),
+      )
+
+      assert.equal(result.claims[0].assessment, 'contradicted')
+      assert.deepEqual(
+        result.claims[0].evidence.map(({ reference }) => reference.id),
+        ['event-07'],
+      )
+      assert.match(result.summary, /No — Northbridge did score before half-time/i)
+    })
+  }
+})
+
+test('before-half-time non-events are assessed only after the first half has ended', async () => {
+  const text = 'Eastport never scored before half-time.'
+  const claim = {
+    id: 'eastport-no-first-half-goal',
+    subject: 'Eastport',
+    playerSubject: null,
+    playerMetric: null,
+    text,
+    intent: 'factual-claim',
+    meaning: {
+      category: 'historical-circumstance',
+      description: text,
+      comparison: null,
+    },
+    requiredEvidence: ['goals'],
+    timePeriod: { kind: 'selected' },
+    historicalEventAnchor: null,
+    clarificationNeeds: [],
+  }
+  const afterHalfTime = await analyzeOpinion(
+    request(text),
+    providerWithClaims([claim]),
+  )
+  assert.equal(afterHalfTime.claims[0].assessment, 'supported')
+  assert.deepEqual(afterHalfTime.claims[0].evidence, [])
+  assert.match(afterHalfTime.summary, /Yes — no Eastport goal before half-time is recorded/i)
+
+  const beforeHalfTime = await analyzeOpinion(
+    request(text, { period: 1, minute: 45, stoppageMinutes: 2 }),
+    providerWithClaims([claim]),
+  )
+  assert.equal(
+    beforeHalfTime.claims[0].assessment,
+    'insufficient evidence for a firm conclusion',
+  )
+  assert.match(beforeHalfTime.summary, /final first-half claim cannot be established/i)
+})
+
+test('unsupported before-half-time scoring wording asks for clarification instead of a guess', async () => {
+  for (const text of [
+    'Northbridge could not fail to score before half-time.',
+    'Northbridge not scored before half-time.',
+  ]) {
+    const claim = {
+      id: 'unclear-northbridge-half-time-claim',
+      subject: 'Northbridge',
+      playerSubject: null,
+      playerMetric: null,
+      text,
+      intent: 'factual-claim',
+      meaning: {
+        category: 'historical-circumstance',
+        description: text,
+        comparison: null,
+      },
+      requiredEvidence: ['goals'],
+      timePeriod: { kind: 'selected' },
+      historicalEventAnchor: null,
+      clarificationNeeds: [],
+    }
+    const result = await analyzeOpinion(
+      request(text),
+      providerWithClaims([claim]),
+    )
+
+    assert.equal(result.claims[0].assessment, 'clarification needed')
+    assert.match(result.summary, /rephrase.*scored or did not score before half-time/i)
+    assert.doesNotMatch(result.summary, /supported|contradicted/i)
+  }
+})
+
+test('before-half-time against-the-run-of-play claims retain exclusive historical scope', async () => {
+  const claim = {
+    id: 'northbridge-goal-run-of-play',
+    subject: 'Northbridge',
+    playerSubject: null,
+    playerMetric: null,
+    text: 'Northbridge scored before half-time against the run of play.',
+    intent: 'factual-claim',
+    meaning: {
+      category: 'historical-circumstance',
+      description: 'Assess the goal against recorded play before it.',
+      comparison: null,
+    },
+    requiredEvidence: [
+      'possession',
+      'territorial-control',
+      'attacking-events',
+    ],
+    timePeriod: { kind: 'before-event', eventId: 'event-07' },
+    historicalEventAnchor: {
+      eventId: 'event-07',
+      relationship: 'Northbridge goal at 45+3′',
+    },
+    clarificationNeeds: [],
+  }
+  const result = await analyzeOpinion(
+    request(claim.text),
+    providerWithClaims([claim]),
+  )
+  const answer = result.claims[0]
+
+  assert.deepEqual(answer.claim.timePeriod, {
+    kind: 'before-event',
+    eventId: 'event-07',
+  })
+  assert.equal(answer.claim.meaning.category, 'historical-circumstance')
+  assert.notEqual(answer.assessment, 'supported')
+  assert.ok(
+    answer.evidence
+      .filter(({ role }) => role !== 'anchor')
+      .every(({ reference }) => reference.id !== 'event-07'),
+  )
+  assert.match(answer.periodLabel, /strictly before 45\+3′/)
+  assert.match(result.summary, /uses play strictly before Northbridge's goal at 45\+3′/)
+})
+
+test('half-time claims requiring clarification cannot receive a factual verdict', async () => {
+  const claim = {
+    id: 'northbridge-half-time-goal-clarification',
+    subject: 'Northbridge',
+    playerSubject: null,
+    playerMetric: null,
+    text: 'Northbridge scored before half-time.',
+    intent: 'factual-claim',
+    meaning: {
+      category: 'historical-circumstance',
+      description: 'Northbridge scored before half-time.',
+      comparison: null,
+    },
+    requiredEvidence: ['goals'],
+    timePeriod: { kind: 'selected' },
+    historicalEventAnchor: null,
+    clarificationNeeds: ['Please clarify which scoring event you mean.'],
+  }
+  const result = await analyzeOpinion(
+    request(claim.text),
+    providerWithClaims([claim]),
+  )
+
+  assert.equal(result.claims[0].assessment, 'clarification needed')
+  assert.deepEqual(result.claims[0].evidence, [])
+  assert.match(result.summary, /Please clarify which scoring event you mean/)
+  assert.doesNotMatch(result.summary, /supported|contradicted/i)
+})
+
+test('historical half-time evidence is labelled separately from the selected last-ten-minute window', async () => {
+  const claim = {
+    id: 'northbridge-first-half-goal',
+    subject: 'Northbridge',
+    playerSubject: null,
+    playerMetric: null,
+    text: 'Northbridge scored before half-time.',
+    intent: 'factual-claim',
+    meaning: {
+      category: 'historical-circumstance',
+      description: 'Northbridge scored before half-time.',
+      comparison: null,
+    },
+    requiredEvidence: ['goals'],
+    timePeriod: { kind: 'selected' },
+    historicalEventAnchor: null,
+    clarificationNeeds: [],
+  }
+  const result = await analyzeOpinion(
+    request(
+      claim.text,
+      { period: 2, minute: 90, stoppageMinutes: 4 },
+      'last-10-minutes',
+    ),
+    providerWithClaims([claim]),
+  )
+
+  assert.equal(result.claims[0].periodLabel, 'Recorded first-half goal events')
+  assert.match(result.summary, /first-half goal events, independently of the selected analysis window/i)
+  assert.match(result.selectedPeriodLabel, /^Last 10 minutes ending 90\+4′$/)
+  assert.deepEqual(
+    result.claims[0].evidence.map(({ reference }) => reference.id),
+    ['event-07'],
+  )
+})
+
 test('A09 repeat evidence is derived canonically while exclusive goal and scorer checks remain strict', async () => {
   const claim = capturedClaim('A09')
   claim.requiredEvidence = ['invalid-captured-repeat-value']

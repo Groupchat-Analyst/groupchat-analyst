@@ -37,7 +37,7 @@ import {
 } from './providers/provider.js'
 import { LocalInterpretationProvider } from './providers/local.js'
 import {
-  isGoalBeforeHalfTimeClaim,
+  goalBeforeHalfTimeAssertion,
   normalizeKnownInterpretation,
   parseAnalysisRequest,
   validateInterpretation,
@@ -72,7 +72,7 @@ function periodLabel(
   selectedPeriodLabel: string,
   events: MatchEvent[],
 ): string {
-  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+  if (goalBeforeHalfTimeAssertion(claim.text)) {
     return 'Recorded first-half goal events'
   }
   if (claim.timePeriod.kind === 'selected') return selectedPeriodLabel
@@ -86,7 +86,7 @@ function eventsForClaim(
   claim: InterpretedClaim,
   selectedEvents: MatchEvent[],
 ): MatchEvent[] {
-  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+  if (goalBeforeHalfTimeAssertion(claim.text)) {
     return selectedEvents.filter(
       (event) =>
         event.type === 'shot' &&
@@ -460,11 +460,19 @@ function evidenceForClaim(
     return [...evidence.values()]
   }
 
-  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  if (halfTimeAssertion) {
     for (const event of events) {
-      if (event.type === 'shot' && event.outcome === 'goal') {
+      if (
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id)
+      ) {
         evidence.set(event.id, {
-          role: 'supporting',
+          role:
+            halfTimeAssertion === 'scored' ? 'supporting' : 'challenging',
           reference: reference(event),
         })
       }
@@ -639,8 +647,12 @@ function evidenceForClaim(
       requiredMetrics.some((metric) => matchesMetric(event, metric))
     if (!relevant) continue
 
-    let role: ClaimEvidence['role'] =
-      isGoalBeforeHalfTimeClaim(claim.text) ? 'supporting' : 'context'
+    const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+    let role: ClaimEvidence['role'] = halfTimeAssertion
+      ? halfTimeAssertion === 'scored'
+        ? 'supporting'
+        : 'challenging'
+      : 'context'
     const comparison = claim.meaning.comparison
     if (comparison && result !== 'insufficient evidence for a firm conclusion') {
       if (result === 'supported') {
@@ -997,12 +1009,13 @@ function assessOneClaim(
   claim: InterpretedClaim,
   selectedPeriodEvents: MatchEvent[],
   selectedPeriodLabel: string,
+  selectedClock: MatchClock,
   allSelectedEvents: MatchEvent[],
   advanced: EvidenceCalculation,
   fixture: SyntheticMatchEvidence,
 ): ClaimResult {
   const evidenceEvents =
-    isGoalBeforeHalfTimeClaim(claim.text) ||
+    goalBeforeHalfTimeAssertion(claim.text) !== undefined ||
     claim.timePeriod.kind === 'before-event'
       ? eventsForClaim(claim, allSelectedEvents)
       : eventsForClaim(claim, selectedPeriodEvents)
@@ -1031,7 +1044,7 @@ function assessOneClaim(
       claim.intent !== 'coaching-question' &&
       claim.intent !== 'unavailable-metric' &&
       claim.intent !== 'unrecognized-language' &&
-      !isGoalBeforeHalfTimeClaim(claim.text)
+      goalBeforeHalfTimeAssertion(claim.text) === undefined
     ? playerResults(claim, advanced, scopedEvents, fixture)
     : { statistics: [], calculations: [] }
   const statistics: TeamStatistic[] = canRetrieveSubjectEvidence &&
@@ -1179,16 +1192,21 @@ function assessOneClaim(
         : 'contradicted'
     }
   }
-  if (
-    isGoalBeforeHalfTimeClaim(claim.text) &&
-    evidenceEvents.some(
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  if (halfTimeAssertion && claim.clarificationNeeds.length === 0) {
+    const goalRecorded = evidenceEvents.some(
       (event) =>
         event.type === 'shot' &&
         event.outcome === 'goal' &&
         event.clock.period === 1,
     )
-  ) {
-    assessment = 'supported'
+    if (goalRecorded) {
+      assessment =
+        halfTimeAssertion === 'scored' ? 'supported' : 'contradicted'
+    } else if (selectedClock.period > 1) {
+      assessment =
+        halfTimeAssertion === 'scored' ? 'contradicted' : 'supported'
+    }
   }
 
   return {
@@ -1513,7 +1531,8 @@ function answerForClaim(
   if (claim.intent === 'unavailable-metric') return result.limitation
   if (claim.intent === 'unrecognized-language') return result.limitation
   if (claim.intent === 'coaching-question') return coachingSentence(result)
-  if (isGoalBeforeHalfTimeClaim(claim.text)) {
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim.text)
+  if (halfTimeAssertion) {
     const goal = events.find(
       (event) =>
         event.type === 'shot' &&
@@ -1522,11 +1541,21 @@ function answerForClaim(
         (!claim.subject || event.team === claim.subject) &&
         (!claim.playerSubject || event.playerId === claim.playerSubject.id),
     )
-    return goal
-      ? `${claim.playerSubject?.name ?? goal.team} scored before half-time at ${formatMatchClock(goal.clock)}.`
-      : selectedClock.period === 1
-        ? `The selected match time is ${formatMatchClock(selectedClock)}; no ${claim.subject ?? 'team'} goal before half-time is recorded yet.`
-        : `The selected synthetic event record contains no recorded ${claim.subject ?? 'team'} goal before half-time.`
+    if (goal) {
+      const teamOrPlayer = claim.playerSubject?.name ?? goal.team
+      const fact = `${teamOrPlayer} scored before half-time at ${formatMatchClock(goal.clock)}.`
+      const conclusion = halfTimeAssertion === 'did-not-score'
+        ? `No — ${teamOrPlayer} did score before half-time at ${formatMatchClock(goal.clock)}; this recorded goal contradicts the claim.`
+        : fact
+      return `${conclusion} This claim is checked against first-half goal events, independently of the selected analysis window.`
+    }
+    const subjectName = claim.playerSubject?.name ?? claim.subject ?? 'team'
+    if (selectedClock.period === 1) {
+      return `The selected match time is ${formatMatchClock(selectedClock)}; no ${subjectName} goal before half-time is recorded yet, so the final first-half claim cannot be established.`
+    }
+    return halfTimeAssertion === 'did-not-score'
+      ? `Yes — no ${subjectName} goal before half-time is recorded. This claim is checked against first-half goal events, independently of the selected analysis window.`
+      : `No — no ${subjectName} goal before half-time is recorded. This claim is checked against first-half goal events, independently of the selected analysis window.`
   }
   if (claim.intent === 'statistical-request') {
     const statistics = statisticsSentence(result) ?? result.limitation
@@ -1868,6 +1897,7 @@ export async function analyzeOpinion(
       claim,
       matchAnalysis.periodEvents,
       selectedPeriodLabel,
+      request.selectedClock,
       eventsThroughSelectedTime,
       claimAdvanced,
       fixture,

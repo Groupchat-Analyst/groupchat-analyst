@@ -204,8 +204,38 @@ function requireStringArray(value: unknown, label: string): string[] {
   return value.map((item) => item.trim())
 }
 
-export function isGoalBeforeHalfTimeClaim(text: string): boolean {
-  return /\bscor(?:e|es|ed)\s+before\s+half[- ]time\b/i.test(text)
+export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
+
+export function goalBeforeHalfTimeAssertion(
+  text: string,
+): GoalBeforeHalfTimeAssertion | undefined {
+  if (/\bagainst the run of play\b/i.test(text)) return undefined
+  if (
+    /\b(?:did\s+not|didn['’]t|never|has\s+not|hasn['’]t|have\s+not|haven['’]t|had\s+not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before\s+half[- ]time\b/i.test(
+      text,
+    )
+  ) {
+    return 'did-not-score'
+  }
+  if (/\bnot\s+scored\s+before\s+half[- ]time\b/i.test(text)) {
+    return undefined
+  }
+  if (/\bscored\s+before\s+half[- ]time\b/i.test(text)) return 'scored'
+  return undefined
+}
+
+function hasUnclearHalfTimeScoringWording(text: string): boolean {
+  if (goalBeforeHalfTimeAssertion(text) || /\bagainst the run of play\b/i.test(text)) {
+    return false
+  }
+  return (
+    /\b(?:score|scores|scored|scoring|goal|goals)\b.{0,48}\bbefore half[- ]time\b/i.test(
+      text,
+    ) ||
+    /\bbefore half[- ]time\b.{0,48}\b(?:score|scores|scored|scoring|goal|goals)\b/i.test(
+      text,
+    )
+  )
 }
 
 export function normalizeKnownInterpretation(value: unknown): unknown {
@@ -221,6 +251,27 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
       const comparison = isRecord(meaning.comparison)
         ? meaning.comparison
         : undefined
+      if (
+        typeof claim.text === 'string' &&
+        claim.subject !== null &&
+        comparison === undefined &&
+        meaning.comparison === null &&
+        claim.playerMetric === null &&
+        hasUnclearHalfTimeScoringWording(claim.text) &&
+        ['factual-claim', 'statistical-request', 'unrecognized-language'].includes(
+          claim.intent as string,
+        ) &&
+        ['historical-circumstance', 'other'].includes(
+          meaning.category as string,
+        ) &&
+        Array.isArray(claim.clarificationNeeds) &&
+        claim.clarificationNeeds.length === 0
+      ) {
+        claim.clarificationNeeds = [
+          'Please rephrase whether the team scored or did not score before half-time.',
+        ]
+      }
+
       const comparisonMetric = comparison?.metric
       const comparisonOperator = comparison?.operator
       if (
@@ -292,10 +343,11 @@ export function normalizeKnownInterpretation(value: unknown): unknown {
       if (
         typeof claim.text === 'string' &&
         claim.subject !== null &&
-        isGoalBeforeHalfTimeClaim(claim.text) &&
+        goalBeforeHalfTimeAssertion(claim.text) !== undefined &&
+        !/against the run of play/i.test(claim.text) &&
         meaning.comparison === null &&
         claim.playerMetric === null &&
-        claimIntents.includes(claim.intent as ClaimIntent) &&
+        ['statistical-request', 'factual-claim'].includes(claim.intent as string) &&
         meaningCategories.includes(meaning.category as ClaimMeaningCategory) &&
         Object.hasOwn(claim, 'requiredEvidence') &&
         Object.hasOwn(claim, 'timePeriod') &&
@@ -582,7 +634,7 @@ export function validateInterpretation(
       meaning.category === 'historical-circumstance' &&
       clarificationNeeds.length === 0 &&
       normalizedTimePeriod.kind !== 'before-event' &&
-      !isGoalBeforeHalfTimeClaim(claimText)
+      goalBeforeHalfTimeAssertion(claimText) === undefined
     ) {
       throw new Error(`${label} historical circumstance requires an exclusive before-event period or clarification.`)
     }
