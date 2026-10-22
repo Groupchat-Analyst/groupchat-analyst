@@ -21,7 +21,7 @@ function mockedFoundry(responseContent, onRequest = () => {}) {
       onRequest(String(input), init)
       return new Response(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify(responseContent) } }],
+          choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(responseContent) } }],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
@@ -49,11 +49,12 @@ function response(body, status = 200) {
 
 test('serializes strict schema and selected scorer context through the actual provider', async () => {
   let serializedBody
-  const provider = mockedFoundry({ claims: [] }, (_url, init) => {
+  const valid = await analyzeOpinion(request('How many shots did Eastport have?'))
+  const provider = mockedFoundry({ claims: [valid.claims[0].claim] }, (_url, init) => {
     serializedBody = JSON.parse(init.body)
   })
 
-  await analyzeOpinion(request('Explain the event at 58 minutes.'), provider)
+  await analyzeOpinion(request('How many shots did Eastport have?'), provider)
 
   const claimsSchema = serializedBody.response_format.json_schema.schema
     .properties.claims
@@ -152,7 +153,7 @@ test('classifies transport, throttling, refusal, incomplete, schema, and semanti
       category: 'schema',
       request: async () =>
         response({
-          choices: [{ message: { content: '{"claims":' } }],
+          choices: [{ finish_reason: 'stop', message: { content: '{"claims":' } }],
         }),
       message: /not valid structured JSON/,
     },
@@ -160,7 +161,7 @@ test('classifies transport, throttling, refusal, incomplete, schema, and semanti
       category: 'semantic-validation',
       request: async () =>
         response({
-          choices: [{ message: { content: JSON.stringify({ claims: [{}] }) } }],
+          choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ claims: [{}] }) } }],
         }),
       message: /missing or unexpected fields/,
     },
@@ -228,6 +229,7 @@ test('uses one bounded 30-second request and reports provider token usage when r
   let callCount = 0
   let requestSignal
   const reportedUsage = []
+  const valid = await analyzeOpinion(request('How many shots did Eastport have?'))
   const provider = new FoundryInterpretationProvider(
     {
       baseUrl: 'https://example.invalid/openai/v1',
@@ -238,14 +240,14 @@ test('uses one bounded 30-second request and reports provider token usage when r
       callCount += 1
       requestSignal = init.signal
       return response({
-        choices: [{ message: { content: JSON.stringify({ claims: [] }) } }],
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ claims: [valid.claims[0].claim] }) } }],
         usage: { prompt_tokens: 120, completion_tokens: 34, total_tokens: 154 },
       })
     },
     (usage) => reportedUsage.push(usage),
   )
 
-  await analyzeOpinion(request('Explain this claim.'), provider)
+  await analyzeOpinion(request('How many shots did Eastport have?'), provider)
 
   assert.equal(callCount, 1)
   assert.ok(requestSignal instanceof AbortSignal)

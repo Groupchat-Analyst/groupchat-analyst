@@ -60,16 +60,16 @@ The 30-request live budget is exhausted. No further live requests were made afte
 | Set | First attempt / repeat outcomes | Interpretation |
 |---|---:|---|
 | Initial H01–H12 | 9/12 correct on first attempt | H02 returned statistics instead of the negated factual comparison; H08 failed semantic validation; H11 asked for clarification instead of qualifying the broad opinion. These three cases became development cases and are excluded from the final holdout rate. |
-| Eligible initial holdouts | 9/9 correct | Supported statistical/comparison and historical cases H01, H03–H06, H09–H10 and H12: 8/8. Ambiguous-name handling H07: 1/1. |
+| Post-hoc subset of initial cases not used to inform fixes | 9/9 correct | This is a selected subset, not an unbiased accuracy estimate. The original first-attempt result remains **9/12**. The subset comprises supported statistical/comparison and historical cases H01, H03–H06, H09–H10 and H12 (8/8), plus ambiguous-name handling H07 (1/1). |
 | Initial repeats R01, R06, R07 | 3/3 correct | All three repeated requests returned correct semantics. |
 | Development retests after first prompt changes | 1/3 correct | H11 passed; H02 and H08 still failed semantic validation. |
 | Fresh H13–H18 first attempts | 6/6 correct | This set included supported statistics, aliases, a compound historical claim, a broad opinion, and a strict 57′ boundary. |
 | Repeats R13, R14, R17 | 1/3 correct | R17 passed; H13 and H14 repeats failed semantic validation despite passing first attempts. |
 | Final development retests | 3/3 correct | H02 and H08 passed after the final prompt/validation changes; the repeated unavailable-distance case H14 also passed. |
 
-Across all 30 requests, 23 were semantically correct, five returned HTTP 502 after semantic validation rejected provider output, and two returned HTTP 200 with incorrect semantics (the first H02 and H11 attempts). The five 502s were classified as `semantic-validation`; there were no live failures classified as transport, throttling, refusal, incomplete output, or upstream schema rejection. HTTP success is not used as a correctness proxy.
+Across all 30 requests, the run summary recorded 23 semantically correct responses, five HTTP 502 responses attributed to semantic validation, and two HTTP 200 responses with incorrect semantics (the first H02 and H11 attempts). HTTP success is not used as a correctness proxy. The retained per-call response file does not contain error bodies or `failureType`; therefore the five individual failure classifications and the absence of other live failure categories cannot be independently re-audited from that file.
 
-Supported statistical requests were answered accurately in the eligible initial holdouts (8/8); ambiguous Bruno was correctly clarified (1/1). The initial unavailable-distance request failed validation, but its two development retests were handled correctly without fabricated distance values. Repeated behavior was not fully stable: H13/H14 passed first attempts and failed repeats, and H14 passed only after the final correction.
+Supported statistical requests were answered accurately in the selected initial subset (8/8); ambiguous Bruno was correctly clarified (1/1). The initial unavailable-distance request and its first development retest failed validation. The final development retest for that wording and the final H14 repeat were reported as passing; those final three calls are not present in the retained per-call output file. Repeated behaviour was not fully stable: H13/H14 passed first attempts and failed repeats, and H14 passed only after the final correction.
 
 ### Final-fix holdout status
 
@@ -80,8 +80,9 @@ H02, H08, and H14 are development cases because their failures informed the fina
 - Live calls: 30/30; maximum permitted: 30. Automatic retries: none.
 - Elapsed time: approximately 5.5–17.4 seconds per call.
 - Provider-reported token usage: 98,622 prompt, 31,524 completion, 130,146 total tokens across the set.
+- A local response file retained 27 of the 30 per-call response records. Its per-call fields include input, request period/minute, provider, latency, summary and validated interpretation/evidence, but not code/prompt revision, failure bodies/categories or per-call token usage. The final development retest for H02, final development retest for H08, and final H14 repeat are absent. See the redacted retained-record ledger in [foundry-reliability-call-ledger.json](./foundry-reliability-call-ledger.json). Missing historical output has not been reconstructed.
 - Mocked tests exercise each failure category, bounded timeout behavior, token telemetry, and explicit API failure responses. This is mocked verification, not live testing of every failure mode.
 - A browser check used intercepted mock responses only: it loaded a prior answer, returned a mocked 502 for the next request, and verified the previous answer was cleared, the error was shown, and no stale summary remained. No live model request was used for this check.
 - Desktop and 390-pixel mobile screenshots were captured from the running interface. The API response for the screenshot session was mocked; screenshots are visual checks, not evidence of a live model answer.
 
-The local Functions host emitted an `AzureWebJobsStorage` health warning during evaluation, although the analysis route remained available. The provider remains bounded by a 30-second timeout and no automatic retries. Repeated semantic variability and the absence of a post-final-fix holdout set remain the primary reliability limitations.
+The local Functions host emitted an `AzureWebJobsStorage` health warning during evaluation, although the analysis route remained available. The provider remains bounded by a 30-second timeout and no automatic retries. Repeated semantic variability, the incomplete per-call historical record, and the absence of a post-final-fix holdout set remain primary reliability limitations.

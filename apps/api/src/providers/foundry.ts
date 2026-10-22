@@ -321,9 +321,18 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
     try {
       result = await response.json()
     } catch (error) {
+      const timedOut =
+        timeoutSignal.aborted ||
+        (error instanceof Error && error.name === 'TimeoutError')
+      const interrupted =
+        timedOut || (error instanceof Error && error.name === 'AbortError')
       throw new InterpretationProviderError(
-        'schema',
-        'Microsoft Foundry returned invalid JSON.',
+        interrupted ? 'transport' : 'schema',
+        timedOut
+          ? 'Microsoft Foundry interpretation timed out after 30 seconds.'
+          : interrupted
+            ? 'Microsoft Foundry response transfer was interrupted.'
+            : 'Microsoft Foundry returned invalid JSON.',
         error,
       )
     }
@@ -355,9 +364,10 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
 
     const message = firstChoice.message
     if (
-      'refusal' in message &&
-      typeof message.refusal === 'string' &&
-      message.refusal.length > 0
+      ('refusal' in message &&
+        typeof message.refusal === 'string' &&
+        message.refusal.length > 0) ||
+      ('finish_reason' in firstChoice && firstChoice.finish_reason === 'content_filter')
     ) {
       throw new InterpretationProviderError(
         'refusal',
@@ -371,6 +381,12 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
       throw new InterpretationProviderError(
         'incomplete-output',
         'Microsoft Foundry output was truncated.',
+      )
+    }
+    if (!('finish_reason' in firstChoice) || firstChoice.finish_reason !== 'stop') {
+      throw new InterpretationProviderError(
+        'incomplete-output',
+        'Microsoft Foundry did not finish a complete structured interpretation.',
       )
     }
     if (

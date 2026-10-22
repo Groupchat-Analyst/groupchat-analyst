@@ -136,7 +136,10 @@ function matchesMetric(event: MatchEvent, metric: ClaimMetric): boolean {
   if (metric === 'possession-percentage') return false
   if (metric === 'shots') return true
   if (metric === 'goals') return event.outcome === 'goal'
-  return event.outcome === 'goal' || event.outcome === 'saved'
+  if (metric === 'shots-on-target') {
+    return event.outcome === 'goal' || event.outcome === 'saved'
+  }
+  return false
 }
 
 function statValue(
@@ -153,9 +156,13 @@ function statValue(
   if (metric === 'pass-completion-percentage') {
     return advanced.teams[team].passCompletionPercentage
   }
-  return events.filter(
-    (event) => event.team === team && matchesMetric(event, metric),
-  ).length
+  if (metric === 'shots' || metric === 'shots-on-target' || metric === 'goals') {
+    return events.filter(
+      (event) => event.team === team && matchesMetric(event, metric),
+    ).length
+  }
+  // An unsupported metric must never inherit a shot count.
+  return null
 }
 
 function selectedPlayerEntities(claim: InterpretedClaim): PlayerEntityReference[] {
@@ -1112,8 +1119,7 @@ function assessOneClaim(
   if (
     assessment !== 'clarification needed' &&
     comparison &&
-    claim.intent !== 'statistical-request' &&
-    claim.intent !== 'unavailable-metric' &&
+    claim.intent === 'factual-claim' &&
     comparisonEvidenceKind &&
     resolvedAvailability.some(
       (item) => item.kind === comparisonEvidenceKind && item.available,
@@ -1762,6 +1768,7 @@ export async function analyzeOpinion(
       interpreted,
       eventsThroughSelectedTime,
       fixture.players,
+      { requireClaims: request.opinion.length > 0 },
     )
   } catch (error) {
     if (provider.name === 'foundry') {

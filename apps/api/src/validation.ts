@@ -70,6 +70,19 @@ const evidenceForMetric: Record<ClaimMetric, EvidenceKind> = {
   recoveries: 'player-events',
   'pressure-observations': 'player-events',
 }
+// These team metrics have deterministic calculators. Other listed metrics are
+// player-only until a team definition and calculation trace are implemented.
+const teamComparisonMetrics = new Set<ClaimMetric>([
+  'shots',
+  'shots-on-target',
+  'goals',
+  'possession-percentage',
+  'pass-attempts',
+  'pass-completions',
+  'pass-completion-percentage',
+  'running-distance', // Supported as an explicit unavailable-data response.
+])
+
 const operators: ClaimOperator[] = [
   'greater-than',
   'less-than',
@@ -195,6 +208,7 @@ export function validateInterpretation(
   value: unknown,
   availableEvents: MatchEvent[],
   availablePlayers: Array<PlayerEntityReference> = [],
+  options: { requireClaims?: boolean } = {},
 ): InterpretedClaim[] {
   const root = requireRecord(value, 'Interpretation')
   if (!hasExactKeys(root, ['claims']) || !Array.isArray(root.claims)) {
@@ -203,6 +217,10 @@ export function validateInterpretation(
   if (root.claims.length > 8) {
     throw new Error('Interpretation may contain at most eight claims.')
   }
+  if (options.requireClaims && root.claims.length === 0) {
+    throw new Error('A non-empty opinion must produce at least one claim or clarification.')
+  }
+  const claimIds = new Set<string>()
   const eventIds = new Set(availableEvents.map((event) => event.id))
   const playersById = new Map(availablePlayers.map((player) => [player.id, player]))
 
@@ -243,6 +261,11 @@ export function validateInterpretation(
     if (!hasExactKeys(claim, claimKeys)) {
       throw new Error(`${label} has missing or unexpected fields.`)
     }
+    const id = requireString(claim.id, `${label} ID`, 64)
+    if (claimIds.has(id)) {
+      throw new Error(`${label} ID must be unique within an interpretation.`)
+    }
+    claimIds.add(id)
     const claimText = requireString(claim.text, `${label} text`, 500)
 
     const subject = claim.subject
@@ -362,6 +385,24 @@ export function validateInterpretation(
     ) {
       throw new Error(`${label} intent does not match its evidence request.`)
     }
+    if (
+      comparison &&
+      !['factual-claim', 'statistical-request', 'unavailable-metric'].includes(
+        claim.intent as string,
+      )
+    ) {
+      throw new Error(`${label} comparison is incompatible with its declared intent.`)
+    }
+    if (comparison && !playerSubject && !teamComparisonMetrics.has(comparison.metric)) {
+      throw new Error(`${label} metric does not have a supported team comparison calculator.`)
+    }
+    if (
+      playerSubject &&
+      (playerMetric === 'possession-percentage' ||
+        comparison?.metric === 'possession-percentage')
+    ) {
+      throw new Error(`${label} possession percentage is defined for teams, not individual players.`)
+    }
     const timePeriod = requireRecord(claim.timePeriod, `${label} time period`)
     let normalizedTimePeriod: InterpretedClaim['timePeriod']
     if (
@@ -422,6 +463,16 @@ export function validateInterpretation(
       claim.clarificationNeeds,
       `${label} clarification needs`,
     )
+    if (historicalEventAnchor && normalizedTimePeriod.kind !== 'before-event') {
+      throw new Error(`${label} historical anchor must use its exclusive before-event period.`)
+    }
+    if (
+      meaning.category === 'historical-circumstance' &&
+      clarificationNeeds.length === 0 &&
+      normalizedTimePeriod.kind !== 'before-event'
+    ) {
+      throw new Error(`${label} historical circumstance requires an exclusive before-event period or clarification.`)
+    }
     if (
       subject === null &&
       clarificationNeeds.length === 0 &&
@@ -466,7 +517,7 @@ export function validateInterpretation(
     }
 
     return {
-      id: requireString(claim.id, `${label} ID`, 64),
+      id,
       subject: subject as InterpretedClaim['subject'],
       playerSubject,
       playerMetric,
