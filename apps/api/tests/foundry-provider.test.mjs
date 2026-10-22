@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { analyzeOpinion } from '../dist/api/src/service.js'
-import { FoundryInterpretationProvider } from '../dist/api/src/providers/foundry.js'
+import {
+  createFoundryProvider,
+  FoundryInterpretationProvider,
+} from '../dist/api/src/providers/foundry.js'
 import { createAnalyzeHandler } from '../dist/api/src/functions/analyze.js'
 
 const request = (opinion, minute = 58) => ({
@@ -92,6 +98,159 @@ test('serializes strict schema and selected scorer context through the actual pr
     userContext.availablePlayers.find(({ id }) => id === 'north-player-09').id,
     'north-player-09',
   )
+})
+
+test('optional raw capture preserves successful and validation-rejected outputs without credentials', async () => {
+  const question = 'How many shots did Eastport have?'
+  const responseFor = async (content) =>
+    new Response(
+      JSON.stringify({
+        choices: [
+          { finish_reason: 'stop', message: { content } },
+        ],
+        usage: {
+          prompt_tokens: 17,
+          completion_tokens: 9,
+          total_tokens: 26,
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  const localResult = await analyzeOpinion(request(question))
+  const successfulOutput = JSON.stringify({
+    claims: [localResult.claims[0].claim],
+  })
+  const successfulCaptures = []
+  const successfulUsage = []
+  const successfulProvider = new FoundryInterpretationProvider(
+    {
+      baseUrl: 'https://example.invalid/openai/v1',
+      apiKey: 'test-secret-do-not-capture',
+      deployment: 'mock-deployment',
+    },
+    async () => responseFor(successfulOutput),
+    (usage) => successfulUsage.push(usage),
+    (capture) => successfulCaptures.push(capture),
+  )
+
+  const successfulResult = await analyzeOpinion(
+    request(question),
+    successfulProvider,
+  )
+  assert.equal(successfulResult.summary, localResult.summary)
+  assert.deepEqual(successfulResult.claims, localResult.claims)
+  assert.deepEqual(successfulCaptures, [
+    {
+      structuredOutput: successfulOutput,
+      usage: {
+        promptTokens: 17,
+        completionTokens: 9,
+        totalTokens: 26,
+      },
+    },
+  ])
+  assert.deepEqual(successfulUsage, [
+    { promptTokens: 17, completionTokens: 9, totalTokens: 26 },
+  ])
+
+  const rejectedOutput = JSON.stringify({ claims: [{}] })
+  const rejectedCaptures = []
+  const rejectedProvider = new FoundryInterpretationProvider(
+    {
+      baseUrl: 'https://example.invalid/openai/v1',
+      apiKey: 'test-secret-do-not-capture',
+      deployment: 'mock-deployment',
+    },
+    async () => responseFor(rejectedOutput),
+    undefined,
+    (capture) => rejectedCaptures.push(capture),
+  )
+  await assert.rejects(
+    analyzeOpinion(request('How did Saka perform?'), rejectedProvider),
+    (error) => error.category === 'semantic-validation',
+  )
+  assert.deepEqual(rejectedCaptures, [
+    {
+      structuredOutput: rejectedOutput,
+      usage: {
+        promptTokens: 17,
+        completionTokens: 9,
+        totalTokens: 26,
+      },
+    },
+  ])
+  assert.doesNotMatch(
+    JSON.stringify([...successfulCaptures, ...rejectedCaptures]),
+    /test-secret-do-not-capture|authorization|api-key/i,
+  )
+})
+
+test('raw file capture is opt-in and stores only structured output and usage', async () => {
+  const originalCwd = process.cwd()
+  const originalFetch = globalThis.fetch
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), 'groupchat-capture-'))
+  let responseContent = JSON.stringify({ claims: [] })
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        choices: [
+          { finish_reason: 'stop', message: { content: responseContent } },
+        ],
+        usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+
+  try {
+    process.chdir(temporaryDirectory)
+    const environment = {
+      FOUNDRY_OPENAI_BASE_URL: 'https://example.invalid/openai/v1',
+      FOUNDRY_API_KEY: 'test-secret-do-not-capture',
+      FOUNDRY_MODEL_DEPLOYMENT: 'mock-deployment',
+      FOUNDRY_CAPTURE_RAW_OUTPUT: 'true',
+    }
+    const provider = createFoundryProvider(environment, () => {})
+    const context = {
+      events: [],
+      selectedClock: { period: 2, minute: 58 },
+      selectedTime: '58′',
+      period: 'match-so-far',
+      capabilities: [],
+      players: [],
+    }
+    await provider.interpret('offline test only', context)
+    const capturePath = join(
+      temporaryDirectory,
+      '.local-captures',
+      'foundry-raw-output.jsonl',
+    )
+    const contents = await readFile(capturePath, 'utf8')
+    const record = JSON.parse(contents.trim())
+
+    assert.equal(record.structuredOutput, responseContent)
+    assert.deepEqual(record.usage, {
+      promptTokens: 3,
+      completionTokens: 2,
+      totalTokens: 5,
+    })
+    assert.equal(typeof record.capturedAt, 'string')
+    assert.doesNotMatch(contents, /test-secret-do-not-capture|authorization|api-key/i)
+
+    responseContent = JSON.stringify({ claims: [{ ignored: true }] })
+    await createFoundryProvider(
+      {
+        FOUNDRY_OPENAI_BASE_URL: 'https://example.invalid/openai/v1',
+        FOUNDRY_API_KEY: 'test-secret-do-not-capture',
+        FOUNDRY_MODEL_DEPLOYMENT: 'mock-deployment',
+      },
+      () => {},
+    ).interpret('offline test only', context)
+    assert.equal((await readFile(capturePath, 'utf8')).trim().split('\n').length, 1)
+  } finally {
+    globalThis.fetch = originalFetch
+    process.chdir(originalCwd)
+    await rm(temporaryDirectory, { recursive: true, force: true })
+  }
 })
 
 test('server rejects a wrong-scorer provider anchor even with neutral claim wording', async () => {

@@ -12,6 +12,7 @@ local.settings.json
 .azurite/
 *.log
 npm-debug.log*
+apps/api/.local-captures/
 
 # Editor and operating-system files
 .vscode/*

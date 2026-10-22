@@ -3,12 +3,23 @@ import type {
   InterpretationProvider,
 } from './provider.js'
 import { InterpretationProviderError } from './provider.js'
+import { appendFile, mkdir } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 
 type FoundryUsage = {
   promptTokens?: number
   completionTokens?: number
   totalTokens?: number
 }
+
+type FoundryRawCapture = {
+  structuredOutput: string | null
+  usage: FoundryUsage
+}
+
+type FoundryRawCaptureHandler = (
+  capture: FoundryRawCapture,
+) => void | Promise<void>
 
 type FoundryConfiguration = {
   baseUrl: string
@@ -207,15 +218,18 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
   private readonly configuration: FoundryConfiguration
   private readonly request: typeof fetch
   private readonly onUsage?: (usage: FoundryUsage) => void
+  private readonly onRawCapture?: FoundryRawCaptureHandler
 
   constructor(
     configuration: FoundryConfiguration,
     request: typeof fetch = fetch,
     onUsage?: (usage: FoundryUsage) => void,
+    onRawCapture?: FoundryRawCaptureHandler,
   ) {
     this.configuration = configuration
     this.request = request
     this.onUsage = onUsage
+    this.onRawCapture = onRawCapture
   }
 
   async interpret(
@@ -366,6 +380,44 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
     }
 
     const message = firstChoice.message
+    const rawUsage =
+      'usage' in result && typeof result.usage === 'object' && result.usage !== null
+        ? result.usage
+        : undefined
+    const capturedUsage: FoundryUsage = {}
+    if (
+      rawUsage &&
+      'prompt_tokens' in rawUsage &&
+      typeof rawUsage.prompt_tokens === 'number' &&
+      Number.isInteger(rawUsage.prompt_tokens)
+    ) {
+      capturedUsage.promptTokens = rawUsage.prompt_tokens
+    }
+    if (
+      rawUsage &&
+      'completion_tokens' in rawUsage &&
+      typeof rawUsage.completion_tokens === 'number' &&
+      Number.isInteger(rawUsage.completion_tokens)
+    ) {
+      capturedUsage.completionTokens = rawUsage.completion_tokens
+    }
+    if (
+      rawUsage &&
+      'total_tokens' in rawUsage &&
+      typeof rawUsage.total_tokens === 'number' &&
+      Number.isInteger(rawUsage.total_tokens)
+    ) {
+      capturedUsage.totalTokens = rawUsage.total_tokens
+    }
+    if (this.onRawCapture) {
+      await this.onRawCapture({
+        structuredOutput:
+          'content' in message && typeof message.content === 'string'
+            ? message.content
+            : null,
+        usage: capturedUsage,
+      })
+    }
     if (
       ('refusal' in message &&
         typeof message.refusal === 'string' &&
@@ -403,8 +455,7 @@ For a claim about circumstances before a goal, use intent factual-claim, meaning
       )
     }
 
-    if ('usage' in result && typeof result.usage === 'object' && result.usage !== null) {
-      const rawUsage = result.usage
+    if (rawUsage) {
       const usage: FoundryUsage = {}
       if (
         'prompt_tokens' in rawUsage &&
@@ -463,9 +514,31 @@ export function createFoundryProvider(
     )
   }
 
+  const captureEnabled =
+    environment.FOUNDRY_CAPTURE_RAW_OUTPUT?.trim().toLowerCase() === 'true'
+  const onRawCapture: FoundryRawCaptureHandler | undefined = captureEnabled
+    ? async (capture) => {
+        const captureFile = resolve(
+          process.cwd(),
+          '.local-captures',
+          'foundry-raw-output.jsonl',
+        )
+        await mkdir(dirname(captureFile), { recursive: true })
+        await appendFile(
+          captureFile,
+          `${JSON.stringify({
+            capturedAt: new Date().toISOString(),
+            ...capture,
+          })}\n`,
+          { encoding: 'utf8', mode: 0o600 },
+        )
+      }
+    : undefined
+
   return new FoundryInterpretationProvider(
     { baseUrl, apiKey, deployment },
     fetch,
     onUsage,
+    onRawCapture,
   )
 }
