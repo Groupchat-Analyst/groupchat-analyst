@@ -4,6 +4,8 @@
 
 - Application source commit: `c7bdc56cdf8577649616e30405ddbf8b993a9699`.
 - This verification branch is created from that commit. Only this plan and the eventual verification ledger may be added; application code, provider prompt, fixture values, and calculation/validation behavior remain frozen.
+- Frozen `apps/api/src/providers/foundry.ts` SHA-256: `dc0f565e510ef96cb6fe394f5ffdf7555b901ebc2ef58e2d3f9f024f7c5d2085`; embedded system-prompt text SHA-256: `c6cfb1c6f7e0bdc1dce9022d4f02d6bfb8015edcdd6ce180f5acd051c3588b17`.
+- API TypeScript build passed before calls. Local settings were validated in memory as provider `foundry`, deployment `gpt-5-mini`, valid `/openai/v1` endpoint suffix, and a configured credential; no settings values or credentials are recorded.
 - Provider configuration expected from ignored local settings: `foundry`, deployment `gpt-5-mini`, Azure OpenAI-compatible `/openai/v1` base URL. Do not record settings values or credentials.
 - Run at selected clock `90+4′`, period `match-so-far`, for all four attempts.
 - Hard limit: four upstream calls total, sequentially, exactly one per scheduled case. No retry, browser submission, fallback provider request, or other upstream call. Stop if any hidden retry or additional request is observed.
