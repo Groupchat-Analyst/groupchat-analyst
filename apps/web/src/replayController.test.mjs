@@ -105,6 +105,41 @@ test('initial load displays the requested frame only when it arrives', async () 
   assert.equal(snapshot.status, 'ready')
 })
 
+test('initial load survives a React StrictMode start, dispose, start sequence', async () => {
+  const harness = createHarness()
+  harness.controller.start()
+  harness.controller.dispose()
+  harness.controller.start()
+  await harness.flush()
+  assert.deepEqual(harness.calls, ['57′', '57′'])
+  assert.equal(harness.controller.getSnapshot().status, 'loading')
+
+  // The first request was aborted by dispose; only the restarted request can settle the display.
+  harness.pending.splice(0, 1)
+  await harness.resolve('57′')
+  const snapshot = harness.controller.getSnapshot()
+  assert.equal(snapshot.displayed.selectedTime, '57′')
+  assert.equal(snapshot.status, 'ready')
+  assert.equal(snapshot.error, '')
+
+  harness.controller.seek(at(2, 58))
+  await harness.resolve('58′')
+  assert.equal(harness.controller.getSnapshot().displayed.selectedTime, '58′')
+})
+
+test('a disposed controller can still be restarted after its request was aborted', async () => {
+  const harness = createHarness()
+  harness.controller.start()
+  harness.controller.dispose()
+  await harness.flush()
+  assert.equal(harness.controller.getSnapshot().status, 'loading')
+  assert.equal(harness.controller.getSnapshot().error, '')
+  harness.controller.start()
+  harness.pending.splice(0, 1)
+  await harness.resolve('57′')
+  assert.equal(harness.controller.getSnapshot().displayed.selectedTime, '57′')
+})
+
 test('a delayed response keeps the previous coherent frame displayed', async () => {
   const harness = createHarness()
   harness.controller.start()

@@ -754,8 +754,8 @@ function App() {
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title">Big take. <span>Bring the receipts.</span></h1>
-          <p className="intro-description">Pick a moment in a fictional match, ask about it, and see what the record supports.</p>
+          <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
+          <p className="intro-description">Drop your football take. Check it against the match. Get the receipts.</p>
         </div>
 
         <div className="workspace-grid">
