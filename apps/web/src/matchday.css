@@ -5,6 +5,13 @@
 .page-intro { margin-bottom: 16px; }
 .page-intro h1 { font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -.045em; line-height: 1.1; }
 .intro-description { margin: 6px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.intro-short { display: none; }
+.share-preview { margin-top: 10px; }
+.visible-limitations:empty { display: none; }
+.share-preview > summary { min-height: 40px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; }
+.share-preview > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.share-preview > summary::before { content: '▸'; margin-right: 8px; color: var(--accent); font-size: 11px; }
+.share-preview[open] > summary::before { content: '▾'; }
 
 .workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
 .match-column, .conversation-column { min-width: 0; }
@@ -96,7 +103,7 @@
 .result-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .result-title-row h2 { margin: 0; font-size: 20px; }
 .detail-help { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.answer-ready { position: fixed; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; pointer-events: none; z-index: 20; }
+.answer-ready { position: fixed; left: 0; right: 0; top: 10px; display: flex; justify-content: center; pointer-events: none; z-index: 20; }
 .answer-ready button { pointer-events: auto; min-height: 44px; padding: 0 18px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent); color: #10160b; font-size: 14px; font-weight: 700; box-shadow: 0 6px 24px #000a; cursor: pointer; }
 .answer-ready button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
@@ -131,7 +138,9 @@
 .technical-record code { font-size: 11px; }
 
 @media (max-width: 899px) {
-  .intro-description { display: none; }
+  .answer-ready { top: 78px; }
+  .intro-long { display: none; }
+  .intro-short { display: inline; }
   .page-intro { margin-bottom: 10px; }
   .match-header { padding: 12px; }
   .score { font-size: 28px; }

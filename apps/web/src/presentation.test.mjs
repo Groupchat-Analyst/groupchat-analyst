@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  GENERIC_STATISTICS_LIMITATION,
   INTERNAL_ID_PATTERN,
   buildShareCardModel,
   describeEvidence,
   describePeriodLabel,
+  isGenericStatisticsLimitation,
   selectRelevantEvidence,
   shareCardBlocks,
   shareCardText,
@@ -156,6 +158,67 @@ test('multiple claims with long text use the extended card and keep every limita
   for (const n of [1, 2]) {
     assert.ok(blocks.some((b) => b.text.endsWith(`${long} ${n}`)))
   }
+})
+
+test('statistical cards omit the verdict heading and generic mechanics but keep data limitations', () => {
+  const generic = { ...shotsResult(), limitation: GENERIC_STATISTICS_LIMITATION }
+  const genericModel = buildShareCardModel('How many shots did Eastport have?', analysisOf([generic], 'Eastport recorded 8 shots.'))
+  const genericText = shareCardText(genericModel)
+  assert.doesNotMatch(genericText, /Verdict:|Statistics only|truth verdict|Limitation:/)
+  assert.equal(genericModel.claims[0].verdict, null)
+
+  const partial = {
+    ...generic,
+    limitation: 'Pass counts describe the recorded subset only. Pass-completion percentage is unavailable because pass coverage is incomplete.',
+  }
+  const partialText = shareCardText(buildShareCardModel('Passes?', analysisOf([partial], 'Some passes.')))
+  assert.doesNotMatch(partialText, /Verdict:/)
+  assert.match(partialText, /Limitation: Pass counts describe the recorded subset only/)
+  assert.match(partialText, /pass coverage is incomplete/)
+  assert.equal(isGenericStatisticsLimitation(generic), true)
+  assert.equal(isGenericStatisticsLimitation(partial), false)
+})
+
+test('assessed claims keep their verdict even with the generic wording', () => {
+  const supported = {
+    ...shotsResult(),
+    assessment: 'supported',
+    limitation: GENERIC_STATISTICS_LIMITATION,
+  }
+  assert.equal(isGenericStatisticsLimitation(supported), false)
+  const text = shareCardText(buildShareCardModel('Claim', analysisOf([supported], 'Yes.')))
+  assert.match(text, /Verdict: Supported/)
+  assert.match(text, /Limitation: Descriptive statistics/)
+})
+
+test('aggregate statistics are separated from selected recorded moments with the omitted count', () => {
+  const evidence = Array.from({ length: 8 }, (_, index) => ({
+    role: 'context',
+    reference: ref(`event-${index}`, `${10 + index}′`, 'Eastport', 'Shot saved. Shooter: Matheus Cunha (east-player-10).'),
+  }))
+  const result = { ...shotsResult(), evidence }
+  const blocks = shareCardBlocks(buildShareCardModel('How many shots did Eastport have?', analysisOf([result], 'Eastport recorded 8 shots.')))
+  const kinds = blocks.map((block) => `${block.kind}:${block.text}`)
+  const factsAt = kinds.indexOf('label:Key facts')
+  const momentsAt = kinds.indexOf('label:Selected recorded moments')
+  assert.ok(factsAt > -1 && momentsAt > factsAt)
+  assert.equal(blocks[factsAt + 1].text, 'Eastport: 8 shots')
+  assert.equal(blocks[factsAt + 2].kind, 'label')
+  assert.equal(blocks.slice(momentsAt + 1).filter((block) => block.kind === 'bullet').length, 3)
+  assert.ok(blocks.some((block) => block.text === '5 more recorded moments are in the full record.'))
+})
+
+test('multi-claim headings leave the verdict off statistical claims only', () => {
+  const stat = { ...shotsResult(), limitation: GENERIC_STATISTICS_LIMITATION }
+  const assessed = {
+    ...shotsResult(),
+    assessment: 'contradicted',
+    claim: { ...claimBase, id: 'claim-2', subject: 'Eastport', text: 'Eastport dominated.' },
+  }
+  const headings = shareCardBlocks(buildShareCardModel('Both', analysisOf([stat, assessed], 'Both.')))
+    .filter((block) => block.kind === 'heading')
+    .map((block) => block.text)
+  assert.deepEqual(headings, ['1. How many shots did Eastport have', '2. Eastport dominated. — Contradicted'])
 })
 
 test('summary trailer is removed only when it is the trailing paragraph', () => {

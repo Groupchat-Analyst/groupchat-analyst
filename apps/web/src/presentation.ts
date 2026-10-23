@@ -104,10 +104,23 @@ export function selectRelevantEvidence(
   return byTeam
 }
 
+/** Server wording that only explains why a statistical request has no verdict; it carries no data limitation. */
+export const GENERIC_STATISTICS_LIMITATION =
+  'Descriptive statistics are provided from the recorded synthetic events; this request does not receive a supported/contradicted truth verdict.'
+
+export function isGenericStatisticsLimitation(result: ClaimResult): boolean {
+  return (
+    result.assessment === 'statistics provided' &&
+    result.limitation === GENERIC_STATISTICS_LIMITATION
+  )
+}
+
 export type ShareCardClaim = {
   text: string
-  verdict: string
+  /** Null for statistical requests, which have no verdict to show. */
+  verdict: string | null
   facts: string[]
+  moments: string[]
   counter: string[]
   limitations: string[]
   omitted: number
@@ -174,16 +187,18 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
 
   return {
     text: result.claim.text,
-    verdict: ASSESSMENT_LABELS[result.assessment],
-    facts: [
-      ...stats,
-      ...playerStats,
-      ...shown.map(({ reference }) => eventLine(reference, roster)),
-    ],
+    verdict:
+      result.assessment === 'statistics provided'
+        ? null
+        : ASSESSMENT_LABELS[result.assessment],
+    facts: [...stats, ...playerStats],
+    moments: shown.map(({ reference }) => eventLine(reference, roster)),
     counter: shownCounter.map(({ reference }) => eventLine(reference, roster)),
     limitations: dedupe([
       ...result.claim.clarificationNeeds,
-      describeEvidence(result.limitation, roster),
+      ...(isGenericStatisticsLimitation(result)
+        ? []
+        : [describeEvidence(result.limitation, roster)]),
     ]),
     omitted,
   }
@@ -205,7 +220,12 @@ export function buildShareCardModel(
   const lines =
     claims.reduce(
       (total, claim) =>
-        total + claim.facts.length + claim.counter.length + claim.limitations.length + 2,
+        total +
+        claim.facts.length +
+        claim.moments.length +
+        claim.counter.length +
+        claim.limitations.length +
+        2,
       0,
     )
   return {
@@ -249,15 +269,20 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
     { kind: 'answer', text: model.answer },
   )
   model.claims.forEach((claim, index) => {
-    blocks.push({
-      kind: 'heading',
-      text:
-        model.claims.length > 1
-          ? `${index + 1}. ${claim.text} — ${claim.verdict}`
-          : `Verdict: ${claim.verdict}`,
-    })
+    if (model.claims.length > 1) {
+      blocks.push({
+        kind: 'heading',
+        text: `${index + 1}. ${claim.text}${claim.verdict ? ` — ${claim.verdict}` : ''}`,
+      })
+    } else if (claim.verdict) {
+      blocks.push({ kind: 'heading', text: `Verdict: ${claim.verdict}` })
+    }
     if (claim.facts.length > 0) blocks.push({ kind: 'label', text: 'Key facts' })
     for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact })
+    if (claim.moments.length > 0) {
+      blocks.push({ kind: 'label', text: 'Selected recorded moments' })
+    }
+    for (const moment of claim.moments) blocks.push({ kind: 'bullet', text: moment })
     if (claim.counter.length > 0) blocks.push({ kind: 'label', text: 'Evidence against' })
     for (const item of claim.counter) blocks.push({ kind: 'bullet', text: item })
     if (claim.omitted > 0) {

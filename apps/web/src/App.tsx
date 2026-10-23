@@ -31,6 +31,7 @@ import {
   buildShareCardModel,
   describeEvidence,
   describePeriodLabel,
+  isGenericStatisticsLimitation,
   shareCardBlocks,
   shareCardText,
   type ShareCardModel,
@@ -755,7 +756,7 @@ function App() {
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
           <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
-          <p className="intro-description">Drop your football take. Check it against the match. Get the receipts.</p>
+          <p className="intro-description"><span className="intro-long">Drop your football take. Check it against the match. Get the receipts.</span><span className="intro-short">Football takes. Match evidence.</span></p>
         </div>
 
         <div className="workspace-grid">
@@ -844,32 +845,37 @@ function App() {
                   <p className="server-summary">{analysis.summary}</p>
                   <div className="answer-attribution"><span>Synthetic match</span><span>Submitted at {formatMatchClock(submittedContext.selectedClock)}</span><span>{submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</span><span>{analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'}</span></div>
                   <div className="visible-limitations">
-                    {analysis.claims.flatMap(({ claim, limitation }) => [
-                      ...claim.clarificationNeeds.map((need) => ({
-                        key: `${claim.id}-${need}`,
+                    {analysis.claims.flatMap((result) => [
+                      ...result.claim.clarificationNeeds.map((need) => ({
+                        key: `${result.claim.id}-${need}`,
                         text: need,
                         title: 'Clarification',
                       })),
-                      { key: `${claim.id}-limitation`, text: limitation, title: 'Limitation' },
+                      ...(isGenericStatisticsLimitation(result)
+                        ? []
+                        : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
                     ])
                       .map((item) => <p key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
                     {analysis.claims.length === 0 && (
                       <p><strong>Limitation:</strong> The request was not interpreted as a supported claim.</p>
                     )}
                   </div>
-                  {shareModel && (
-                    <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
-                      {shareCardBlocks(shareModel).map((block, index) => (
-                        <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
-                      ))}
-                    </section>
-                  )}
                   <div className="share-row">
                     <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
                     <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
                     <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
                     <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
                   </div>
+                  {shareModel && (
+                    <details className="share-preview">
+                      <summary>Preview share card</summary>
+                      <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
+                        {shareCardBlocks(shareModel).map((block, index) => (
+                          <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+                        ))}
+                      </section>
+                    </details>
+                  )}
                   {analysis.claims.length > 0 ? view === 'fan' ? (
                     <details className="answer-breakdown"><summary>Check the reasoning <span>{analysis.claims.length} {analysis.claims.length === 1 ? 'claim' : 'claims'}</span></summary>{claimBreakdown}</details>
                   ) : <div className="analyst-breakdown"><p className="section-label">CLAIMS & EVIDENCE</p>{claimBreakdown}</div>
