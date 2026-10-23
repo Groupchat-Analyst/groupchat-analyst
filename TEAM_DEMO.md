@@ -23,6 +23,26 @@ Suggested walkthrough:
 
 Explicit build-up phase-scoped passing counts, rates, and comparisons are unsupported. The build-up-loss annotations cover only a partial sample. Possession, shots, sparse player actions, and these annotations cannot establish overall performance, territorial control, tactical causes, or a complete player rating. Past live evaluations were small and do not establish production reliability.
 
+## Matchday experience demo (under two minutes)
+
+1. Start at `57′`, point out that the score is 1–0, and submit the locally supported question “Northbridge scored before half-time.” Show the goal reference and the limitation that it says nothing by itself about the run of play.
+2. Jump to `58′`. The score changes to 1–1 and the equaliser appears in the replay timeline; no analysis is sent until you explicitly submit again.
+3. Switch Fan to Analyst. The same submitted answer and verdict remain; Analyst opens the calculation and historical details. Toggle back to Fan to show the concise presentation and visible limitation.
+4. Copy the reply, then copy the card text or download the card image (PNG). Point out the question, assessed time/window, answer, key facts, limitation and the single synthetic-data label. Multi-claim questions produce a clearly labelled extended card.
+
+## Proposed final live verification (not run)
+
+If a later task authorizes live Foundry requests, freeze the exact source and prompt first, then make at most four sequential calls, without retries:
+
+| # | Exact input at 90+4′, Match so far | Expected result |
+|---|---|---|
+| 1 | `How many shots did Eastport have?` | Statistical answer of 8 shots, with matching shot records; no overall-performance claim |
+| 2 | `Northbridge scored before half-time.` | Supported only by event-07 at 45+3′; no inference about performance before the goal |
+| 3 | `Before Northbridge scored at 45+3, how many passes had they completed?` | Statistical request, exclusive event-07 cutoff, 14/18 completed (77.8%), with matching trace |
+| 4 | `Did Eastport's goal at 58 minutes come against the run of play?` | Historical judgement anchored before event-10, qualified from relevant earlier context, with no definitive verdict |
+
+Stop before the first request if the source/prompt identity or sanitized capture is unavailable, the provider is not explicitly configured for Foundry, or the output budget cannot be enforced. Stop the run immediately on any failed request, unexpected scope, unsupported definitive verdict, missing raw-output capture, or evidence of an extra/retried request; do not retry or repair during the run. Score meaning, entities, metric, polarity, scope, calculation, evidence and limitations separately. These proposed checks would be a small verification only, not evidence of production reliability.
+
 ## Reporting a problem
 
 Send the report privately to the project owner; do not include credentials, access tokens, or personal information beyond what is necessary.

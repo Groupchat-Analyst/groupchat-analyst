@@ -14,7 +14,7 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
   const passes = foundation.passRecords.filter((pass) => pass.team === team)
   const selected = passes.find((pass) => pass.id === selectedId)
   const playerName = (id: string) =>
-    foundation.players.find((player) => player.id === id)?.name ?? id
+    foundation.players.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   const x = (value: number) => 8 + value * 1.04
   const y = (value: number) => 8 + value * 0.64
 
@@ -78,13 +78,13 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
             <select id={selectId} value={selected?.id ?? ''} onChange={(event) => setSelectedId(event.currentTarget.value)}>
               <option value="">All returned passes for {team}</option>
               {passes.map((pass) => (
-                <option key={pass.id} value={pass.id}>{pass.time} · {playerName(pass.playerId)} · {pass.outcome} · {pass.id}</option>
+                <option key={pass.id} value={pass.id}>{pass.time} · {playerName(pass.playerId)} · {pass.outcome}</option>
               ))}
             </select>
             {selected && (
               <p className="selected-pass" role="status">
                 <strong>{selected.time} · {playerName(selected.playerId)} → {playerName(selected.receiverId)}</strong>
-                <span>{selected.outcome} · {selected.id} · {selected.possessionId}</span>
+                <span>{selected.outcome === 'complete' ? 'Completed pass' : 'Incomplete pass'}</span>
               </p>
             )}
           </>
