@@ -585,6 +585,7 @@ function WhatChanged({
         </div>
       )}
       {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
+      {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
         <summary>Earlier answer · {result.earlierTime} · {earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</summary>
         <p className="server-summary">{snapshotReply(earlier)}</p>
@@ -711,8 +712,8 @@ function App() {
         }
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
-          const snapshot =           createSnapshot(requestId, active.context, payload)
-                    const baseline = active.baseline
+          const snapshot = createSnapshot(requestId, active.context, payload)
+          const baseline = active.baseline
           setShown(snapshot)
           setComparisonState(
             baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,

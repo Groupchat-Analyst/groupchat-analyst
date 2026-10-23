@@ -40,7 +40,8 @@ test('the supported fixture case flips from contradicted at 57′ to supported a
   assert.equal(comparison.pairs[0].accounting, 'complete')
   const text = [comparison.headline, ...comparison.lines, ...comparison.caveats].join('\n')
   assert.match(text, /Shots on target: Northbridge 2, Eastport 2 → 3\./)
-  assert.match(text, /does not say the match moving on caused the difference/)
+  assert.match(text, /tally, not a reason/)
+  assert.doesNotMatch(text, /moving on caused/)
   assert.doesNotMatch(text, INTERNAL_ID_PATTERN)
 })
 
@@ -138,7 +139,7 @@ test('the what-changed card has both times, both assessments, figures, one synth
   assert.match(text, /58′ \(Match so far through 58′\): Supported/)
   assert.match(text, /Shots on target: Northbridge 2, Eastport 2 → 3\./)
   assert.match(text, /New recorded moments/)
-  assert.match(text, /does not say the match moving on caused the difference/)
+  assert.match(text, /tally, not a reason/)
   assert.equal(text.match(/Synthetic data/g)?.length, 1)
   assert.equal(text.match(/Groupchat Analyst/g)?.length, 1)
   assert.doesNotMatch(text, INTERNAL_ID_PATTERN)
@@ -165,4 +166,97 @@ test('only forward movement offers a recheck, and the pass map is limited to pas
   const passing = load('sot-58')
   passing.claims[0].claim.requiredEvidence = ['passing']
   assert.equal(needsPassMap(passing), true)
+})
+
+test('a limitation on the earlier answer only survives in the panel, copied text and card with its time', () => {
+  const earlierData = load('sot-57')
+  earlierData.claims[0].limitation = 'Only part of the first half was recorded.'
+  earlierData.claims[0].evidenceAvailability[0].available = false
+  earlierData.claims[0].evidenceAvailability[0].detail = 'Shot-on-target events are partly missing.'
+  const earlier = createSnapshot(1, context(57), earlierData)
+  const later = snap(2, 58, 'sot-58')
+  const comparison = compareSnapshots(earlier, later)
+  assert.deepEqual(comparison.qualifications, [
+    'At 57′: Only part of the first half was recorded.',
+    'At 57′: Shot-on-target events are partly missing.',
+  ])
+  const text = changeCardText(buildChangeCard(OPINION, earlier, later, comparison))
+  assert.match(text, /Limitation: At 57′: Only part of the first half was recorded\./)
+  assert.match(text, /Limitation: At 57′: Shot-on-target events are partly missing\./)
+  assert.equal(comparison.pairs[0].accounting, 'incomplete')
+  assert.match(comparison.caveats.join(' '), /aren't fully recorded/)
+})
+
+test('identical qualifications from both answers are merged without a time label', () => {
+  const [a, b] = [load('sot-57'), load('sot-58')]
+  for (const data of [a, b]) data.claims[0].limitation = 'Only part of the first half was recorded.'
+  const earlier = createSnapshot(1, context(57), a)
+  const later = createSnapshot(2, context(58), b)
+  assert.deepEqual(compareSnapshots(earlier, later).qualifications, ['Only part of the first half was recorded.'])
+  b.claims[0].limitation = 'Different later note.'
+  const split = compareSnapshots(earlier, createSnapshot(3, context(58), b)).qualifications
+  assert.deepEqual(split, ['At 57′: Only part of the first half was recorded.', 'At 58′: Different later note.'])
+})
+
+test('coverage warnings that matter to the claim are kept from either answer', () => {
+  const earlierData = load('sot-57')
+  for (const data of [earlierData]) {
+    data.claims[0].claim.requiredEvidence = ['possession']
+    data.evidenceFoundation.possessionCoverageComplete = false
+    data.evidenceFoundation.missingCoveragePeriods = ['12′ to 14′']
+  }
+  const later = load('sot-58')
+  later.claims[0].claim.requiredEvidence = ['possession']
+  const comparison = compareSnapshots(createSnapshot(1, context(57), earlierData), createSnapshot(2, context(58), later))
+  assert.equal(comparison.status, 'comparable')
+  assert.deepEqual(comparison.qualifications, ['At 57′: Possession coverage is partial: missing 12′ to 14′.'])
+})
+
+test('different dataset versions or identities are never compared directly', () => {
+  const earlier = snap(1, 57, 'sot-57')
+  for (const change of [
+    (dataset) => { dataset.version = '3.1.0' },
+    (dataset) => { dataset.id = 'another-fixture' },
+  ]) {
+    const other = load('sot-58')
+    change(other.evidenceFoundation.dataset)
+    const later = createSnapshot(2, context(58), other)
+    const comparison = compareSnapshots(earlier, later)
+    assert.equal(comparison.status, 'not-comparable')
+    assert.equal(comparison.pairs.length, 0)
+    assert.match(comparison.headline, /different match data/)
+    assert.match(comparison.caveats.join(' '), /version 3\.0\.0.*version 3\.1\.0|different data/)
+    assert.equal(buildChangeCard(OPINION, earlier, later, comparison), null)
+  }
+})
+
+test('a record only counts as accounting for a change if its team, metric and coverage fit', () => {
+  const earlier = snap(1, 57, 'sot-57')
+  const wrongTeam = load('sot-58')
+  wrongTeam.claims[0].evidence.find(({ reference }) => reference.id === 'event-10').reference.team = 'Northbridge'
+  assert.equal(compareSnapshots(earlier, createSnapshot(2, context(58), wrongTeam)).pairs[0].accounting, 'partial')
+
+  const wrongMetric = load('sot-58')
+  wrongMetric.claims[0].claim.requiredEvidence = ['possession']
+  const earlierWrong = load('sot-57')
+  earlierWrong.claims[0].claim.requiredEvidence = ['possession']
+  assert.equal(
+    compareSnapshots(createSnapshot(1, context(57), earlierWrong), createSnapshot(2, context(58), wrongMetric)).pairs[0].accounting,
+    'partial',
+  )
+
+  const extra = load('sot-58')
+  extra.claims[0].evidence.push({
+    role: 'supporting',
+    reference: { id: 'event-99', time: '58′', team: 'Northbridge', description: 'Northbridge hit the post.' },
+  })
+  assert.equal(compareSnapshots(earlier, createSnapshot(2, context(58), extra)).pairs[0].accounting, 'partial')
+})
+
+test('the changed-answer text never implies a tactical or match-moving cause', () => {
+  const earlier = snap(1, 57, 'sot-57')
+  const later = snap(2, 58, 'sot-58')
+  const comparison = compareSnapshots(earlier, later)
+  const text = [comparison.headline, ...comparison.lines, ...comparison.caveats].join(' ')
+  assert.doesNotMatch(text, /because|caused|due to|thanks to|momentum|pressure/i)
 })

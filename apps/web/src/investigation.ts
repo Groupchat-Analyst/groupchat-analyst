@@ -1,6 +1,7 @@
 import type {
   AnalysisResponse,
   ClaimResult,
+  EvidenceReference,
 } from '../../shared/src/apiContracts'
 import {
   elapsedMatchMinute,
@@ -138,7 +139,7 @@ export type PairChange = {
   added: string[]
   removed: string[]
   /** Whether the listed record changes account for the change in the counted figures. */
-  accounting: 'complete' | 'partial' | 'rate' | 'unchanged'
+  accounting: 'complete' | 'partial' | 'incomplete' | 'rate' | 'unchanged'
 }
 
 export type Comparison = {
@@ -150,9 +151,67 @@ export type Comparison = {
   headline: string
   /** Fan-facing sentences. */
   lines: string[]
-  /** Material qualifications, kept in every output. */
+  /** Comparison-specific qualifications, kept in every output. */
   caveats: string[]
+  /** Material data qualifications from both snapshots; time-specific ones are labelled. */
+  qualifications: string[]
   pairs: PairChange[]
+}
+
+const COUNT_EVIDENCE: Record<string, string> = {
+  shots: 'shots',
+  'shots-on-target': 'shots-on-target',
+  goals: 'goals',
+}
+
+const COVERAGE_FLAGS: Array<[string, 'possessionCoverageComplete' | 'passCoverageComplete' | 'turnoverCoverageComplete', string]> = [
+  ['possession', 'possessionCoverageComplete', 'Possession coverage is partial'],
+  ['passing', 'passCoverageComplete', 'Pass coverage is partial'],
+  ['possession-losses', 'turnoverCoverageComplete', 'Turnover coverage is partial'],
+]
+
+/** Material limitations one answer carries: clarification needs, data gaps and coverage warnings. */
+function qualificationsOf(snapshot: AnswerSnapshot): string[] {
+  const { analysis } = snapshot
+  const roster = analysis.evidenceFoundation.players
+  const found = new Set<string>()
+  for (const result of analysis.claims) {
+    for (const need of result.claim.clarificationNeeds) found.add(need)
+    if (!isRoutineLimitation(result)) found.add(describeEvidence(result.limitation, roster))
+    for (const item of result.evidenceAvailability) {
+      if (!item.available) found.add(describeEvidence(item.detail, roster))
+    }
+    for (const [kind, flag, text] of COVERAGE_FLAGS) {
+      if (result.claim.requiredEvidence.includes(kind as never) && !analysis.evidenceFoundation[flag]) {
+        const missing = analysis.evidenceFoundation.missingCoveragePeriods
+        found.add(missing.length > 0 ? `${text}: missing ${missing.join(', ')}.` : `${text}.`)
+      }
+    }
+  }
+  return [...found].filter(Boolean)
+}
+
+/** Qualifications from both snapshots. Identical ones are merged; others are labelled with their time. */
+function combinedQualifications(
+  earlier: AnswerSnapshot,
+  later: AnswerSnapshot,
+  earlierTime: string,
+  laterTime: string,
+): string[] {
+  const before = qualificationsOf(earlier)
+  const after = qualificationsOf(later)
+  const both = before.filter((text) => after.includes(text))
+  const sameTime = earlierTime === laterTime
+  return [
+    ...both,
+    ...before.filter((text) => !both.includes(text)).map((text) => `At ${earlierTime}: ${text}`),
+    ...after.filter((text) => !both.includes(text)).map((text) => (sameTime ? text : `At ${laterTime}: ${text}`)),
+  ]
+}
+
+function datasetOf(snapshot: AnswerSnapshot): string {
+  const { id, version } = snapshot.analysis.evidenceFoundation.dataset
+  return `${id}@${version}`
 }
 
 const STATE_PHRASE: Record<ClaimResult['assessment'], [string, string]> = {
@@ -207,19 +266,34 @@ function pairChange(
   const moved = figures.filter((figure) => figure.before !== figure.after)
   const teamOf = (entity: string) =>
     figuresOf(after).find((item) => item.entity === entity)?.team
+  const earlierRoster = earlier.analysis.evidenceFoundation.players
+  const laterRoster = later.analysis.evidenceFoundation.players
+  const attributed = (record: EvidenceReference, entity: string, roster: typeof laterRoster) =>
+    record.team === teamOf(entity) &&
+    (!roster.some(({ name }) => name === entity) ||
+      describeEvidence(record.description, roster).includes(entity))
+  const availabilityGap = [before, after].some((result) =>
+    result.evidenceAvailability.some(({ available }) => !available),
+  )
   let accounting: PairChange['accounting'] = 'unchanged'
   if (moved.length > 0) {
     if (moved.some(({ metric }) => RATE_METRICS.has(metric))) accounting = 'rate'
     else {
-      const explained = moved.every(({ entity, before: from, after: to }) => {
-        if (from === null || to === null) return false
-        const team = teamOf(entity)
+      const relevantMetric = (metric: string) =>
+        COUNT_EVIDENCE[metric] !== undefined &&
+        after.claim.requiredEvidence.includes(COUNT_EVIDENCE[metric] as never)
+      const netMatches = moved.every(({ entity, metric, before: from, after: to }) => {
+        if (from === null || to === null || !relevantMetric(metric)) return false
         const net =
-          added.filter((record) => record.team === team).length -
-          removed.filter((record) => record.team === team).length
+          added.filter((record) => attributed(record, entity, laterRoster)).length -
+          removed.filter((record) => attributed(record, entity, earlierRoster)).length
         return net === to - from
       })
-      accounting = explained ? 'complete' : 'partial'
+      const everyRecordAttributed =
+        added.every((record) => moved.some(({ entity }) => attributed(record, entity, laterRoster))) &&
+        removed.every((record) => moved.some(({ entity }) => attributed(record, entity, earlierRoster)))
+      if (availabilityGap) accounting = 'incomplete'
+      else accounting = netMatches && everyRecordAttributed ? 'complete' : 'partial'
     }
   }
   return {
@@ -255,9 +329,10 @@ function figureSentence(pair: PairChange): string {
 }
 
 const ACCOUNTING_CAVEAT: Record<PairChange['accounting'], string | null> = {
-  complete: null,
+  complete: "The listed moments match the change in the count. That's a tally, not a reason: the records can't say why it happened.",
   unchanged: null,
   partial: "The records listed don't fully account for the change in these figures.",
+  incomplete: "Some of the records behind these figures aren't fully recorded, so the ones listed may not be the whole story.",
   rate: "This is a rate or share, so the records listed don't add up to the change directly.",
 }
 
@@ -269,15 +344,30 @@ function windowOf(snapshot: AnswerSnapshot): string {
 export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot): Comparison {
   const earlierTime = formatMatchClock(earlier.context.selectedClock)
   const laterTime = formatMatchClock(later.context.selectedClock)
+  const qualifications = combinedQualifications(earlier, later, earlierTime, laterTime)
   const base = {
     earlierTime,
     laterTime,
     earlierWindow: windowOf(earlier),
     laterWindow: windowOf(later),
     pairs: [] as PairChange[],
+    qualifications,
   }
   const a = earlier.analysis.claims
   const b = later.analysis.claims
+  if (datasetOf(earlier) !== datasetOf(later)) {
+    const [first, second] = [earlier, later].map((snapshot) => {
+      const { label, version } = snapshot.analysis.evidenceFoundation.dataset
+      return `${label.split('.')[0]} (version ${version})`
+    })
+    return {
+      ...base,
+      status: 'not-comparable',
+      headline: "These two checks used different match data, so I'm not lining them up.",
+      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
+      caveats: [`The ${earlierTime} check used ${first}; the ${laterTime} check used ${second}. Figures from different data can't be compared like for like.`],
+    }
+  }
   if (a.length === 0 || a.length !== b.length || a.some((result, i) => claimKey(result) !== claimKey(b[i]))) {
     return {
       ...base,
@@ -326,7 +416,6 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
       `Rolling windows: ${base.earlierWindow} against ${base.laterWindow}, so earlier moments can drop out.`,
     )
   }
-  caveats.push('This compares two answers. It does not say the match moving on caused the difference.')
   const headline = multiple
     ? `${pairs.length} claims rechecked: here's how each one moved.`
     : lines[0]
@@ -348,7 +437,7 @@ const EXTENDED_LINES = 20
 export function buildChangeCard(
   take: string,
   _earlier: AnswerSnapshot,
-  later: AnswerSnapshot,
+  _later: AnswerSnapshot,
   comparison: Comparison,
 ): ChangeCard | null {
   if (comparison.status !== 'comparable') return null
@@ -387,13 +476,7 @@ export function buildChangeCard(
     }
   })
   for (const caveat of comparison.caveats) blocks.push({ kind: 'note', text: `Note: ${caveat}` })
-  const roster = later.analysis.evidenceFoundation.players
-  const qualifications = new Set<string>()
-  later.analysis.claims.forEach((result) => {
-    for (const need of result.claim.clarificationNeeds) qualifications.add(need)
-    if (!isRoutineLimitation(result)) qualifications.add(describeEvidence(result.limitation, roster))
-  })
-  for (const text of qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
+  for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
   blocks.push({ kind: 'footer', text: SYNTHETIC_LABEL })
   return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
