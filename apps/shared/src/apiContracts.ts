@@ -298,6 +298,8 @@ export type AnalysisResponse = {
   provider: 'local' | 'foundry'
   providerLabel: string
   summary: string
+  /** Canonical conversational Fan reply: the answer only, without the scope and synthetic-data trailer. */
+  fanReply?: string
   selectedTime: string
   selectedPeriodLabel: string
   score: Record<MatchTeam, number>

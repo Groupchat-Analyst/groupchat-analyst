@@ -29,14 +29,28 @@ import {
 } from './matchday'
 import {
   buildShareCardModel,
+  canonicalReply,
   describeEvidence,
   describePeriodLabel,
-  isGenericStatisticsLimitation,
+  isRoutineLimitation,
   shareCardBlocks,
   shareCardText,
   type ShareCardModel,
 } from './presentation'
-import { createShareCardImage, svgToPngBlob } from './shareCardImage'
+import {
+  buildChangeCard,
+  changeCardText,
+  checkedAgainst,
+  compareSnapshots,
+  createSnapshot,
+  isLaterClock,
+  needsPassMap,
+  snapshotReply,
+  type AnswerSnapshot,
+  type ChangeCard,
+  type Comparison,
+} from './investigation'
+import { createBlocksImage, createShareCardImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
 import { getQuestionSuggestions } from './suggestions'
@@ -71,6 +85,7 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
     (value.provider === 'local' || value.provider === 'foundry') &&
     'claims' in value &&
     Array.isArray(value.claims) &&
+    (!('fanReply' in value) || value.fanReply === undefined || typeof value.fanReply === 'string') &&
     'periodEvents' in value &&
     Array.isArray(value.periodEvents) &&
     'score' in value &&
@@ -529,6 +544,71 @@ function ArrowIcon() {
   return <svg viewBox="0 0 20 20" width="20" height="20" fill="none" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
+function WhatChanged({
+  comparison,
+  view,
+  changeCard,
+  onCopy,
+  onDownload,
+}: {
+  comparison: { earlier: AnswerSnapshot; later: AnswerSnapshot; result: Comparison }
+  view: 'fan' | 'analyst'
+  changeCard: ChangeCard | null
+  onCopy: () => void
+  onDownload: () => void
+}) {
+  const { earlier, later, result } = comparison
+  const separate = result.status !== 'comparable'
+  return (
+    <section className="what-changed" aria-labelledby="what-changed-title">
+      <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
+      <p className="change-headline">{result.headline}</p>
+      {result.lines.map((line) => <p className="change-line" key={line}>{line}</p>)}
+      {view === 'analyst' && !separate && (
+        <div className="change-analyst">
+          <p><strong>Windows</strong> {result.earlierTime}: {result.earlierWindow} · {result.laterTime}: {result.laterWindow}</p>
+          {result.pairs.map((pair) => (
+            <div key={pair.text}>
+              <p><strong>Definition</strong> {later.analysis.claims.find(({ claim }) => claim.text === pair.text)?.claim.meaning.description ?? pair.text}</p>
+              <table className="change-table">
+                <thead><tr><th scope="col">Figure</th><th scope="col">{result.earlierTime}</th><th scope="col">{result.laterTime}</th></tr></thead>
+                <tbody>
+                  {pair.figures.map((figure) => (
+                    <tr key={`${figure.entity}-${figure.metric}`}><th scope="row">{figure.entity} · {figure.label}</th><td>{figure.before ?? 'n/a'}</td><td>{figure.after ?? 'n/a'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <p><strong>Assessments</strong> {result.earlierTime}: {pair.beforeLabel} · {result.laterTime}: {pair.afterLabel}</p>
+            </div>
+          ))}
+          <p className="change-note">Calculation traces and coverage are in the claim details below.</p>
+        </div>
+      )}
+      {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
+      <details className="earlier-answer" open={separate}>
+        <summary>Earlier answer · {result.earlierTime} · {earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</summary>
+        <p className="server-summary">{snapshotReply(earlier)}</p>
+        {checkedAgainst(earlier.analysis).length > 0 && <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(earlier.analysis).join('; ')}</p>}
+        <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
+      </details>
+      {changeCard && (
+        <details className="share-preview change-share">
+          <summary>Share what changed</summary>
+          <div className="share-row">
+            <button className="secondary-button" type="button" onClick={onCopy}>Copy what-changed text</button>
+            <button className="secondary-button" type="button" onClick={onDownload}>{changeCard.extended ? 'Download extended card' : 'Download card image'}</button>
+          </div>
+          <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
+            {changeCard.blocks.map((block, index) => (
+              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+            ))}
+          </section>
+        </details>
+      )}
+    </section>
+  )
+}
+
 function App() {
   const replay = useMemo(
     () =>
@@ -548,8 +628,16 @@ function App() {
   const [submittedRequest, setSubmittedRequest] = useState<{
     id: number
     context: SubmissionContext
+    baseline: AnswerSnapshot | null
   } | null>(null)
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
+  // The last successful answer is an immutable snapshot; failed requests never replace it.
+  const [shown, setShown] = useState<AnswerSnapshot | null>(null)
+  const [comparisonState, setComparisonState] = useState<{
+    earlier: AnswerSnapshot
+    later: AnswerSnapshot
+    result: Comparison
+  } | null>(null)
+  const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
@@ -559,11 +647,21 @@ function App() {
   const analysisRequestId = useRef(0)
   const answerRef = useRef<HTMLElement>(null)
   const isLoadingSubmit = isLoading && submittedRequest !== null
-  const submittedContext = submittedRequest?.context
+  const submittedContext = shown?.context
   const submittedOpinion = submittedContext?.opinion ?? ''
   const hasMovedSinceAnswer = Boolean(
     submittedContext &&
       !isSubmissionScopeCurrent(submittedContext, selectedClock, period),
+  )
+  const displayedClock = replaySnapshot.displayedClock
+  const canCheckAgain = Boolean(
+    shown && displayedClock && !isLoadingSubmit &&
+      isLaterClock(displayedClock, shown.context.selectedClock),
+  )
+  const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
+  const changeCard = useMemo<ChangeCard | null>(
+    () => (comparison ? buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result) : null),
+    [comparison],
   )
   const hasUnresolvedSubject = Boolean(analysis?.claims.some(({ claim, assessment }) =>
     claim.subject === null && assessment === 'clarification needed'))
@@ -584,13 +682,13 @@ function App() {
 
   useEffect(() => {
     if (!submittedRequest) return
+    const active = submittedRequest
     const controller = new AbortController()
-    const requestId = submittedRequest.id
-    const request = createAnalysisRequest(submittedRequest.context)
+    const requestId = active.id
+    const request = createAnalysisRequest(active.context)
     async function loadAnalysis() {
       setIsLoading(true)
       setRequestError('')
-      setAnalysis(null)
       setCopyMessage('')
       setShareMessage('')
       try {
@@ -612,7 +710,14 @@ function App() {
           throw new Error(message)
         }
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
-        if (isLatestRequest(requestId, analysisRequestId.current)) setAnalysis(payload)
+        if (isLatestRequest(requestId, analysisRequestId.current)) {
+          const snapshot =           createSnapshot(requestId, active.context, payload)
+                    const baseline = active.baseline
+          setShown(snapshot)
+          setComparisonState(
+            baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
+          )
+        }
       } catch (error) {
         if (
           !controller.signal.aborted &&
@@ -676,24 +781,38 @@ function App() {
     const trimmedOpinion = opinion.trim()
     if (!trimmedOpinion) return
     const id = ++analysisRequestId.current
-    setAnalysis(null)
+    setShown(null)
+    setComparisonState(null)
     setRequestError('')
     setSubmittedRequest({
       id,
       context: createSubmissionContext(trimmedOpinion, selectedClock, period),
+      baseline: null,
+    })
+  }
+
+  // Re-checks the saved take at the committed, displayed moment; never the pending replay position.
+  function checkAgain() {
+    if (!shown || !displayedClock || !canCheckAgain) return
+    const id = ++analysisRequestId.current
+    setRequestError('')
+    setSubmittedRequest({
+      id,
+      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period),
+      baseline: shown,
     })
   }
 
   function retryAnalysis() {
-    if (!submittedContext) return
+    if (!submittedRequest) return
     const id = ++analysisRequestId.current
-    setSubmittedRequest({ id, context: submittedContext })
+    setSubmittedRequest({ ...submittedRequest, id })
   }
 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(analysis.summary)
+      await navigator.clipboard.writeText(canonicalReply(analysis))
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -710,14 +829,22 @@ function App() {
     }
   }
 
-  async function downloadShareCard() {
-    if (!shareModel) return
-    const image = createShareCardImage(shareModel)
+  async function copyChangeCard() {
+    if (!changeCard) return
+    try {
+      await navigator.clipboard.writeText(changeCardText(changeCard))
+      setShareMessage('What-changed text copied.')
+    } catch {
+      setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
+    }
+  }
+
+  async function downloadImage(image: ShareCardImage, extended: boolean, name: string) {
     const save = (blob: Blob, extension: string) => {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `groupchat-analyst-card.${extension}`
+      link.download = `${name}.${extension}`
       document.body.append(link)
       link.click()
       link.remove()
@@ -725,7 +852,7 @@ function App() {
     }
     try {
       save(await svgToPngBlob(image, 2), 'png')
-      setShareMessage(shareModel.extended ? 'Extended card image downloaded.' : 'Card image downloaded.')
+      setShareMessage(extended ? 'Extended card image downloaded.' : 'Card image downloaded.')
     } catch {
       try {
         save(new Blob([image.svg], { type: 'image/svg+xml;charset=utf-8' }), 'svg')
@@ -734,6 +861,14 @@ function App() {
         setShareMessage('Image download is unavailable. Copy the card text instead.')
       }
     }
+  }
+
+  function downloadShareCard() {
+    if (shareModel) void downloadImage(createShareCardImage(shareModel), shareModel.extended, 'groupchat-analyst-card')
+  }
+
+  function downloadChangeCard() {
+    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks), changeCard.extended, 'groupchat-analyst-what-changed')
   }
 
   const claimBreakdown = analysis && (
@@ -818,7 +953,7 @@ function App() {
             </form>
 
             <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
-              {isLoadingSubmit && submittedOpinion && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />Checking the submitted match moment…</p>}
+              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same take again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
               {requestError && (
                 <div className="api-error" role="alert">
                   <strong>We couldn’t check that take.</strong><p>{requestError}</p>
@@ -839,10 +974,20 @@ function App() {
                       ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
                       : 'Analyst view opens the reasoning, evidence and pass map. The answer, verdict and limitations are the same as in Fan view.'}
                   </p>
+                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} />}
                   <p className="checked-question">{submittedOpinion}</p>
-                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the take above. Check your edited wording to update it.</p>}
+                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved take above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
                   {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
-                  <p className="server-summary">{analysis.summary}</p>
+                  {canCheckAgain && displayedClock && (
+                    <div className="check-again">
+                      <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
+                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved take, not your edit' : ''}.</span>
+                    </div>
+                  )}
+                  <p className="server-summary">{canonicalReply(analysis)}</p>
+                  {checkedAgainst(analysis).length > 0 && (
+                    <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(analysis).join('; ')}</p>
+                  )}
                   <div className="answer-attribution"><span>Synthetic match</span><span>Submitted at {formatMatchClock(submittedContext.selectedClock)}</span><span>{submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</span><span>{analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'}</span></div>
                   <div className="visible-limitations">
                     {analysis.claims.flatMap((result) => [
@@ -851,7 +996,7 @@ function App() {
                         text: need,
                         title: 'Clarification',
                       })),
-                      ...(isGenericStatisticsLimitation(result)
+                      ...(isRoutineLimitation(result)
                         ? []
                         : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
                     ])
@@ -884,7 +1029,7 @@ function App() {
               )}
             </div>
 
-            {analysis && view === 'analyst' && !hasUnresolvedSubject && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
+            {analysis && view === 'analyst' && !hasUnresolvedSubject && needsPassMap(analysis) && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
             {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />}
             {analysis && !hasUnresolvedSubject && (
               <details className="all-evidence match-events"><summary>Explore match events <span>{analysis.periodEvents.length} recorded</span></summary>{referenceList(analysis.periodEvents, analysis.evidenceFoundation.players)}</details>

@@ -109,6 +109,26 @@
 
 .site-footer { margin-top: 24px; }
 
+/* What changed: a compact comparison above the latest answer. */
+.what-changed { margin: 4px 0 14px; padding: 12px 14px; border: 1px solid #4b5f2a; border-left: 4px solid var(--accent); border-radius: 12px; background: #1a2314; }
+.what-changed h3 { margin: 0 0 6px; font-size: 15px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.what-changed h3 span { color: var(--accent); font-size: 13px; font-weight: 600; }
+.change-headline { margin: 0 0 6px; font-size: 16px; font-weight: 700; line-height: 1.4; }
+.change-line, .change-caveat, .change-analyst p, .change-note { margin: 4px 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.change-caveat, .change-note { color: var(--muted); font-size: 13px; }
+.change-table { width: 100%; margin: 6px 0; border-collapse: collapse; font-size: 13px; }
+.change-table th, .change-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; font-weight: 400; }
+.change-table thead th { color: var(--muted); font-size: 12px; }
+.earlier-answer, .change-share { margin-top: 8px; }
+.earlier-answer > summary, .change-share > summary { min-height: 40px; display: flex; align-items: center; cursor: pointer; font-size: 14px; }
+.check-again { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.check-again span { color: var(--muted); font-size: 13px; }
+.checked-against { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.checked-against strong { color: var(--accent); font-weight: 600; margin-right: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .what-changed { animation: moment-in 240ms ease-out; }
+}
+
 /* Share card preview mirrors the exported image. */
 .share-card { margin: 16px 0 12px; padding: 18px 18px 14px; border: 1px solid #39453a; border-radius: 14px; background: var(--surface); }
 .share-block { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }

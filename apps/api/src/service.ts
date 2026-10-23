@@ -1758,6 +1758,170 @@ function createSummary(
   return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`
 }
 
+function fanScope(claim: InterpretedClaim, events: MatchEvent[]): string {
+  if (claim.timePeriod.kind !== 'before-event') return ''
+  const anchorId = claim.timePeriod.eventId
+  const anchor = events.find(({ id }) => id === anchorId)
+  if (!anchor) throw new Error('Validated historical event anchor was not found.')
+  return `That counts play strictly before ${anchor.team}'s goal at ${formatMatchClock(anchor.clock)}, leaving the goal itself out.`
+}
+
+function fanComparison(result: ClaimResult): string | undefined {
+  const metric = result.claim.meaning.comparison?.metric
+  const [subject, opponent] = comparisonValues(result)
+  if (!metric || !subject || !opponent) return undefined
+  const lead =
+    result.assessment === 'supported'
+      ? 'Yes — '
+      : result.assessment === 'contradicted'
+        ? 'No — '
+        : "The records can't settle this one: "
+  if (subject.value === null || opponent.value === null) {
+    return `${lead}${subject.name}'s ${metricName(metric)} ${subject.value === null ? "isn't" : 'is'} available${opponent.value === null ? ` and neither is ${opponent.name}'s` : `, and ${opponent.name}'s is ${formatCount(metric, opponent.value)}`}.`
+  }
+  if (metric === 'pass-completion-percentage') {
+    return `${lead}${subject.name} completed ${subject.completions} of ${subject.attempts} passes (${subject.value}%) to ${opponent.name}'s ${opponent.completions} of ${opponent.attempts} (${opponent.value}%).`
+  }
+  if (metric === 'possession-percentage') {
+    return `${lead}${subject.name} had ${subject.value}% of recorded possession to ${opponent.name}'s ${opponent.value}%.`
+  }
+  if (subject.value === opponent.value) {
+    return `${lead}${subject.name} and ${opponent.name} are level on ${formatCount(metric, subject.value)} each.`
+  }
+  return `${lead}${subject.name} have ${formatCount(metric, subject.value)} to ${opponent.name}'s ${opponent.value}.`
+}
+
+/** Conversational, meaning-preserving Fan reply, built deterministically from the validated results. */
+function fanAnswerForClaim(
+  result: ClaimResult,
+  fixture: SyntheticMatchEvidence,
+  events: MatchEvent[],
+  advanced: EvidenceCalculation,
+  selectedClock: MatchClock,
+): string {
+  const claim = result.claim
+  const quote = claim.text.replace(/[.!?]+$/, '')
+  if (claim.clarificationNeeds.length > 0) return claim.clarificationNeeds.join(' ')
+  if (result.assessment === 'clarification needed') {
+    return `Quick check first — who or what do you mean by “${claim.text}”?`
+  }
+  if (result.assessment === 'unavailable data' || claim.intent === 'unavailable-metric') {
+    return `I can't tell you that one. ${result.limitation}`
+  }
+  if (claim.intent === 'unrecognized-language') {
+    return "I couldn't match that to something I can check in this match, and I haven't picked out unrelated figures instead. Try naming a team or player and what you want to know."
+  }
+  if (claim.intent === 'coaching-question') return coachingSentence(result)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    const goal = events.find(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+    const who = claim.playerSubject?.name ?? claim.subject ?? 'The team'
+    const basis = "That's judged on first-half goals, whichever window is selected."
+    if (goal) {
+      const when = formatMatchClock(goal.clock)
+      return halfTimeAssertion === 'did-not-score'
+        ? `No — ${who} did score before half-time, at ${when}. ${basis}`
+        : `Yes — ${who} scored before half-time, at ${when}. ${basis}`
+    }
+    if (selectedClock.period === 1) {
+      return `We're only at ${formatMatchClock(selectedClock)} and there's no ${who} goal in the first half yet, so the half-time claim can't be settled.`
+    }
+    return halfTimeAssertion === 'did-not-score'
+      ? `Yes — there's no ${who} goal before half-time in the records. ${basis}`
+      : `No — there's no ${who} goal before half-time in the records. ${basis}`
+  }
+  if (claim.intent === 'statistical-request') {
+    const statistics = statisticsSentence(result) ?? result.limitation
+    const limitation = passDataLimitation(result)
+    const scope = fanScope(claim, events)
+    return `${statistics}${limitation ? ` ${limitation}` : ''}${scope ? ` ${scope}` : ''}`
+  }
+  if (
+    claim.meaning.category === 'historical-circumstance' &&
+    claim.playerSubject &&
+    !/against the run of play/i.test(claim.text)
+  ) {
+    const player = broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))
+    return `${player} ${fanScope(claim, events)} It's thin data, so it's no rating of ${claim.playerSubject.name}'s overall game.`.replace(/\s{2,}/g, ' ')
+  }
+  if (claim.intent === 'factual-claim' && claim.meaning.category === 'factual-comparison') {
+    const comparison = fanComparison(result)
+    if (comparison) {
+      const note =
+        claim.meaning.comparison?.metric === 'possession-percentage'
+          ? " Possession only counts recorded controlled time, so it doesn't show territorial control or overall performance."
+          : passDataLimitation(result)
+            ? ` ${passDataLimitation(result)}`
+            : ''
+      return `${comparison}${note}`
+    }
+  }
+  if (claim.meaning.category === 'historical-circumstance') {
+    const supported = result.assessment === 'supported'
+    const isRunOfPlay = /against the run of play/i.test(claim.text) && claim.subject !== null
+    const own = isRunOfPlay
+      ? result.calculations.find(({ team, metric }) => team === claim.subject && metric === 'possession-percentage')
+      : undefined
+    const other = isRunOfPlay
+      ? result.calculations.find(({ team, metric }) => team !== claim.subject && metric === 'possession-percentage')
+      : undefined
+    const possession =
+      own && own.value !== null && other && other.value !== null
+        ? ` Before the goal, ${own.team} had ${own.value}% of recorded possession to ${other.team}'s ${other.value}% (${own.denominator} recorded minutes of controlled play).`
+        : ''
+    const limitation = result.limitation.includes('territory') || result.limitation.includes('chance quality')
+      ? "There's no continuous territorial or chance-quality data to go on."
+      : result.limitation
+    return `${supported ? `The records back that up: ${quote}.` : `The records can't settle whether ${quote}.`}${possession} ${fanScope(claim, events)} ${limitation}`.replace(/\s{2,}/g, ' ').trim()
+  }
+  if (claim.intent === 'subjective-judgement' && claim.requiredEvidence.includes('possession') && claim.subject) {
+    const own = result.statistics.find(({ team }) => team === claim.subject)?.value
+    const opponentStat = result.statistics.find(({ team }) => team !== claim.subject)
+    const opponent = opponentStat?.value
+    if (own !== undefined && own !== null && opponent !== undefined && opponent !== null) {
+      const aspect = own > opponent
+        ? 'That backs up the possession part of the take.'
+        : own < opponent
+          ? 'That goes against the possession part of the take.'
+          : "They were level on possession."
+      return `${claim.subject} had ${own}% of recorded possession to ${opponentStat?.team}'s ${opponent}%. ${aspect} Possession alone doesn't settle overall dominance.`
+    }
+  }
+  if (claim.playerSubject) {
+    const answer = broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))
+    return `${answer} That's sparse data, so it isn't a full read on ${claim.playerSubject.name}'s game.`
+  }
+  if (claim.intent === 'subjective-judgement') {
+    return `That's a bigger football opinion than the match events can settle: “${quote}”. I can only report what's recorded.`
+  }
+  if (result.assessment === 'insufficient evidence for a firm conclusion') {
+    return `The records don't settle whether ${quote}. ${result.limitation}`
+  }
+  return answerForClaim(result, fixture, events, advanced, selectedClock)
+}
+
+function createFanReply(
+  claims: ClaimResult[],
+  fixture: SyntheticMatchEvidence,
+  advanced: EvidenceCalculation,
+  events: MatchEvent[],
+  selectedClock: MatchClock,
+): string {
+  if (claims.length === 0) {
+    return "I couldn't find a football claim in that. Try naming a team or player and what you want to know."
+  }
+  return claims
+    .map((result) => fanAnswerForClaim(result, fixture, events, advanced, selectedClock))
+    .join(' ')
+}
+
 function evidenceReference(
   id: string,
   time: string,
@@ -2048,6 +2212,13 @@ export async function analyzeOpinion(
       advanced,
       eventsThroughSelectedTime,
       selectedPeriodLabel,
+      request.selectedClock,
+    ),
+    fanReply: createFanReply(
+      results,
+      fixture,
+      advanced,
+      eventsThroughSelectedTime,
       request.selectedClock,
     ),
     selectedTime,

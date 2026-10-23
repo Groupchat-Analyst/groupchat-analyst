@@ -81,7 +81,11 @@ function layout(blocks: CardBlock[]): { lines: PlacedLine[]; height: number } {
 export type ShareCardImage = { svg: string; width: number; height: number }
 
 export function createShareCardImage(model: ShareCardModel): ShareCardImage {
-  const { lines, height } = layout(shareCardBlocks(model))
+  return createBlocksImage(shareCardBlocks(model))
+}
+
+export function createBlocksImage(blocks: CardBlock[]): ShareCardImage {
+  const { lines, height } = layout(blocks)
   const body = lines
     .map(({ text, x, y, style }) => {
       const spacing = style.spacing ? ` letter-spacing="${style.spacing}"` : ''

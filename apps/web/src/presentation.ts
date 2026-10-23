@@ -115,6 +115,18 @@ export function isGenericStatisticsLimitation(result: ClaimResult): boolean {
   )
 }
 
+const GENERIC_COMPARISON_LIMITATION =
+  'This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance.'
+
+/** Boilerplate that explains verdict mechanics rather than a data gap; it stays in the detailed reasoning. */
+export function isRoutineLimitation(result: ClaimResult): boolean {
+  return (
+    isGenericStatisticsLimitation(result) ||
+    ((result.assessment === 'supported' || result.assessment === 'contradicted') &&
+      result.limitation === GENERIC_COMPARISON_LIMITATION)
+  )
+}
+
 export type ShareCardClaim = {
   text: string
   /** Null for statistical requests, which have no verdict to show. */
@@ -139,7 +151,7 @@ const MAX_COUNTER = 3
 const EXTENDED_CLAIM_COUNT = 2
 const EXTENDED_LINE_BUDGET = 22
 
-function eventLine(reference: EvidenceReference, roster: Roster): string {
+export function eventLine(reference: EvidenceReference, roster: Roster): string {
   const description = describeEvidence(reference.description, roster)
   const named = reference.team === 'Shared play' || description.startsWith(reference.team)
   return `${reference.time} · ${named ? '' : `${reference.team}: `}${description}`
@@ -196,7 +208,7 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
     counter: shownCounter.map(({ reference }) => eventLine(reference, roster)),
     limitations: dedupe([
       ...result.claim.clarificationNeeds,
-      ...(isGenericStatisticsLimitation(result)
+      ...(isRoutineLimitation(result)
         ? []
         : [describeEvidence(result.limitation, roster)]),
     ]),
@@ -209,6 +221,11 @@ const SYNTHETIC_TRAILER = /\n\s*\n\s*Selected period:[^\n]*$/
 /** The server summary without its trailing scope-and-disclaimer paragraph, which the card states once. */
 export function summaryBody(summary: string): string {
   return summary.replace(SYNTHETIC_TRAILER, '').trim()
+}
+
+/** The canonical Fan reply: the server's conversational reply, or its summary when an older server sends none. */
+export function canonicalReply(analysis: Pick<AnalysisResponse, 'fanReply' | 'summary'>): string {
+  return analysis.fanReply ?? analysis.summary
 }
 
 export function buildShareCardModel(
@@ -231,7 +248,10 @@ export function buildShareCardModel(
   return {
     take: opinion,
     scope: describePeriodLabel(analysis.selectedPeriodLabel),
-    answer: describeEvidence(summaryBody(analysis.summary), roster),
+    answer: describeEvidence(
+      analysis.fanReply ?? summaryBody(analysis.summary),
+      roster,
+    ),
     claims,
     extended: claims.length >= EXTENDED_CLAIM_COUNT || lines > EXTENDED_LINE_BUDGET,
   }
@@ -299,8 +319,8 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
   return blocks
 }
 
-export function shareCardText(model: ShareCardModel): string {
-  return shareCardBlocks(model)
+export function blocksToText(blocks: CardBlock[]): string {
+  return blocks
     .map(({ kind, text }) => {
       if (kind === 'bullet') return `• ${text}`
       if (kind === 'heading' || kind === 'label') return `\n${text}`
@@ -309,4 +329,8 @@ export function shareCardText(model: ShareCardModel): string {
     })
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
+}
+
+export function shareCardText(model: ShareCardModel): string {
+  return blocksToText(shareCardBlocks(model))
 }
