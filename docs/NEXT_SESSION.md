@@ -1,6 +1,6 @@
 # Next-session handoff
 
-Application code at `feature/take-investigation` commit `<TOKEN_CEILING_COMMIT>` (timeout fix `41edbc8`, handoff `8f2bbaf`, comparison safeguards `ed7d5c7`). All match data is fictional/synthetic.
+Application code at `feature/take-investigation` commit `76e3037` (timeout fix `41edbc8`, handoff `8f2bbaf`, comparison safeguards `ed7d5c7`). All match data is fictional/synthetic.
 
 - Comparison: https://github.com/Groupchat-Analyst/groupchat-analyst/compare/feature/matchday-experience...feature/take-investigation
 - Baseline review branch: `feature/matchday-experience` (unchanged; its PR is separate).
