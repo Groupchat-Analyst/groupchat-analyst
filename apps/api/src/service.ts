@@ -28,11 +28,41 @@ import {
   SYNTHETIC_MATCH_EVENTS,
   TEAMS,
   type MatchEvent,
+  type MatchClock,
   type MatchTeam,
 } from '../../shared/src/match.js'
-import type { InterpretationProvider } from './providers/provider.js'
+import {
+  InterpretationProviderError,
+  type InterpretationProvider,
+} from './providers/provider.js'
 import { LocalInterpretationProvider } from './providers/local.js'
-import { parseAnalysisRequest, validateInterpretation } from './validation.js'
+import {
+  goalBeforeHalfTimeAssertion,
+  hasExplicitBuildUpPassingScope,
+  normalizeKnownInterpretation,
+  parseAnalysisRequest,
+  validateInterpretation,
+} from './validation.js'
+
+function isUnsupportedBuildUpPassingScope(claim: InterpretedClaim): boolean {
+  const passMetrics = new Set<ClaimMetric>([
+    'pass-attempts',
+    'pass-completions',
+    'pass-completion-percentage',
+  ])
+  const metric = claim.meaning.comparison?.metric ?? claim.playerMetric
+  return (
+    hasExplicitBuildUpPassingScope(claim.text) &&
+    claim.requiredEvidence.includes('build-up-phase') &&
+    claim.requiredEvidence.includes('passing') &&
+    (claim.intent === 'statistical-request' ||
+      (claim.intent === 'factual-claim' &&
+        claim.meaning.comparison !== null &&
+        passMetrics.has(claim.meaning.comparison.metric)) ||
+      (claim.playerMetric !== null && passMetrics.has(claim.playerMetric))) &&
+    (metric === null || passMetrics.has(metric))
+  )
+}
 
 const UNAVAILABLE_EVIDENCE: Partial<Record<EvidenceKind, string>> = {
   'territorial-control':
@@ -63,6 +93,9 @@ function periodLabel(
   selectedPeriodLabel: string,
   events: MatchEvent[],
 ): string {
+  if (goalBeforeHalfTimeAssertion(claim)) {
+    return 'Recorded first-half goal events'
+  }
   if (claim.timePeriod.kind === 'selected') return selectedPeriodLabel
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find((event) => event.id === anchorId)
@@ -74,6 +107,16 @@ function eventsForClaim(
   claim: InterpretedClaim,
   selectedEvents: MatchEvent[],
 ): MatchEvent[] {
+  if (goalBeforeHalfTimeAssertion(claim)) {
+    return selectedEvents.filter(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+  }
   if (claim.timePeriod.kind === 'selected') return selectedEvents
   const anchorId = claim.timePeriod.eventId
   const anchor = selectedEvents.find((event) => event.id === anchorId)
@@ -133,7 +176,10 @@ function matchesMetric(event: MatchEvent, metric: ClaimMetric): boolean {
   if (metric === 'possession-percentage') return false
   if (metric === 'shots') return true
   if (metric === 'goals') return event.outcome === 'goal'
-  return event.outcome === 'goal' || event.outcome === 'saved'
+  if (metric === 'shots-on-target') {
+    return event.outcome === 'goal' || event.outcome === 'saved'
+  }
+  return false
 }
 
 function statValue(
@@ -150,9 +196,13 @@ function statValue(
   if (metric === 'pass-completion-percentage') {
     return advanced.teams[team].passCompletionPercentage
   }
-  return events.filter(
-    (event) => event.team === team && matchesMetric(event, metric),
-  ).length
+  if (metric === 'shots' || metric === 'shots-on-target' || metric === 'goals') {
+    return events.filter(
+      (event) => event.team === team && matchesMetric(event, metric),
+    ).length
+  }
+  // An unsupported metric must never inherit a shot count.
+  return null
 }
 
 function selectedPlayerEntities(claim: InterpretedClaim): PlayerEntityReference[] {
@@ -389,6 +439,7 @@ function evidenceForClaim(
   anchorEvent?: MatchEvent,
 ): ClaimEvidence[] {
   if (
+    isUnsupportedBuildUpPassingScope(claim) ||
     claim.clarificationNeeds.length > 0 ||
     (claim.subject === null && claim.meaning.category !== 'coaching-question')
   ) {
@@ -427,6 +478,26 @@ function evidenceForClaim(
           description: `${pass.outcome === 'complete' ? 'Completed' : 'Incomplete'} pass by ${pass.playerId}, intended for ${pass.receiverId}.`,
         },
       })
+    }
+    return [...evidence.values()]
+  }
+
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    for (const event of events) {
+      if (
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id)
+      ) {
+        evidence.set(event.id, {
+          role:
+            halfTimeAssertion === 'scored' ? 'supporting' : 'challenging',
+          reference: reference(event),
+        })
+      }
     }
     return [...evidence.values()]
   }
@@ -598,7 +669,12 @@ function evidenceForClaim(
       requiredMetrics.some((metric) => matchesMetric(event, metric))
     if (!relevant) continue
 
-    let role: ClaimEvidence['role'] = 'context'
+    const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+    let role: ClaimEvidence['role'] = halfTimeAssertion
+      ? halfTimeAssertion === 'scored'
+        ? 'supporting'
+        : 'challenging'
+      : 'context'
     const comparison = claim.meaning.comparison
     if (comparison && result !== 'insufficient evidence for a firm conclusion') {
       if (result === 'supported') {
@@ -734,6 +810,7 @@ function calculationTraces(
   advanced: EvidenceCalculation,
 ): CalculationTrace[] {
   if (
+    isUnsupportedBuildUpPassingScope(claim) ||
     claim.clarificationNeeds.length > 0 ||
     (claim.subject === null && claim.meaning.category !== 'coaching-question') ||
     (claim.playerSubject !== null && claim.intent !== 'coaching-question')
@@ -752,9 +829,13 @@ function calculationTraces(
         : claim.intent === 'subjective-judgement' &&
             claim.requiredEvidence.includes('possession')
           ? TEAMS
-            : claim.requiredEvidence.includes('possession')
-              ? TEAMS
-            : []
+            : claim.intent === 'statistical-request' &&
+                claim.requiredEvidence.includes('passing') &&
+                claim.subject
+              ? [claim.subject]
+              : claim.requiredEvidence.includes('possession')
+                ? TEAMS
+              : []
   const traces: CalculationTrace[] = []
 
   for (const team of teams) {
@@ -778,6 +859,26 @@ function calculationTraces(
         numeratorRecordIds: completed.map(({ id }) => id),
         denominatorRecordIds: passes.map(({ id }) => id),
         denominatorDescription: `All ${passes.length} recorded pass attempts for ${team} in ${advanced.startElapsed}–${advanced.endElapsed} played minutes; the percentage is unavailable when there are no attempts or pass coverage is incomplete.`,
+      })
+      continue
+    }
+
+    if (
+      claim.intent === 'statistical-request' &&
+      !claim.meaning.comparison &&
+      claim.requiredEvidence.includes('passing')
+    ) {
+      const passes = advanced.passes.filter((pass) => pass.team === team)
+      const completed = passes.filter((pass) => pass.outcome === 'complete')
+      traces.push({
+        team,
+        metric: 'pass-completions',
+        value: completed.length,
+        numerator: completed.length,
+        denominator: passes.length,
+        numeratorRecordIds: completed.map(({ id }) => id),
+        denominatorRecordIds: passes.map(({ id }) => id),
+        denominatorDescription: `${completed.length} completed passes among ${passes.length} recorded attempts for ${team} in the claim's calculated period; any exclusive historical cutoff is applied.`,
       })
       continue
     }
@@ -882,8 +983,32 @@ function makeLimitation(
       ? unavailable.join(' ')
       : 'The requested metric is not recorded in this synthetic fixture.'
   }
+  if (
+    result === 'unavailable data' &&
+    isUnsupportedBuildUpPassingScope(claim)
+  ) {
+    return unavailable.length > 0
+      ? unavailable.join(' ')
+      : 'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.'
+  }
   if (claim.intent === 'unrecognized-language') {
     return 'The local interpreter cannot reliably identify the requested football evidence. No unrelated statistics or events were selected.'
+  }
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    if (
+      result === 'supported' ||
+      result === 'contradicted'
+    ) {
+      const goalRecorded =
+        (halfTimeAssertion === 'scored') === (result === 'supported')
+      const recordedFact = goalRecorded
+        ? `${claim.subject} have a recorded first-half goal`
+        : `No ${claim.subject} first-half goal is recorded`
+      const verdict = result === 'supported' ? 'supports' : 'contradicts'
+      return `${recordedFact}; this ${verdict} the half-time scoring assertion. The conclusion is limited to recorded first-half goal events in this synthetic fixture and does not assess broader performance.`
+    }
+    return `The selected-time evidence does not settle whether ${claim.subject} will score before half-time; only recorded first-half goal events are considered.`
   }
   if (claim.intent === 'statistical-request') {
     if (claim.requiredEvidence.includes('passing')) {
@@ -921,6 +1046,7 @@ function makeLimitation(
   if (
     claim.intent === 'subjective-judgement' &&
     claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
     claim.subject
   ) {
     const opponent = TEAMS.find((team) => team !== claim.subject)!
@@ -955,11 +1081,13 @@ function assessOneClaim(
   claim: InterpretedClaim,
   selectedPeriodEvents: MatchEvent[],
   selectedPeriodLabel: string,
+  selectedClock: MatchClock,
   allSelectedEvents: MatchEvent[],
   advanced: EvidenceCalculation,
   fixture: SyntheticMatchEvidence,
 ): ClaimResult {
   const evidenceEvents =
+    goalBeforeHalfTimeAssertion(claim) !== undefined ||
     claim.timePeriod.kind === 'before-event'
       ? eventsForClaim(claim, allSelectedEvents)
       : eventsForClaim(claim, selectedPeriodEvents)
@@ -977,6 +1105,7 @@ function assessOneClaim(
         )
         : evidenceEvents
   const availability = availabilityFor(claim.requiredEvidence)
+  const unsupportedBuildUpPassing = isUnsupportedBuildUpPassingScope(claim)
   const canRetrieveSubjectEvidence =
     (claim.subject !== null ||
       claim.meaning.category === 'coaching-question') &&
@@ -987,11 +1116,14 @@ function assessOneClaim(
       canRetrieveSubjectEvidence &&
       claim.intent !== 'coaching-question' &&
       claim.intent !== 'unavailable-metric' &&
-      claim.intent !== 'unrecognized-language'
+      claim.intent !== 'unrecognized-language' &&
+      !unsupportedBuildUpPassing &&
+      goalBeforeHalfTimeAssertion(claim) === undefined
     ? playerResults(claim, advanced, scopedEvents, fixture)
     : { statistics: [], calculations: [] }
   const statistics: TeamStatistic[] = canRetrieveSubjectEvidence &&
     availableForIntent &&
+    !unsupportedBuildUpPassing &&
     !claim.playerSubject
     ? claim.intent === 'statistical-request' &&
         claim.requiredEvidence.includes('passing')
@@ -1046,7 +1178,14 @@ function assessOneClaim(
   const resolvedAvailability =
     canRetrieveSubjectEvidence && claim.intent !== 'unrecognized-language'
       ? availability.map((item) =>
-          item.kind === 'passing' && !advanced.passCoverageComplete
+          item.kind === 'passing' && unsupportedBuildUpPassing
+            ? {
+                ...item,
+                available: false,
+                detail:
+                  'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.',
+              }
+            : item.kind === 'passing' && !advanced.passCoverageComplete
             ? {
                 ...item,
                 available: false,
@@ -1062,7 +1201,12 @@ function assessOneClaim(
     (claim.subject === null && claim.meaning.category !== 'coaching-question')
       ? 'clarification needed'
       : 'insufficient evidence for a firm conclusion'
-  if (assessment !== 'clarification needed' && claim.intent === 'statistical-request') {
+  if (
+    assessment !== 'clarification needed' &&
+    unsupportedBuildUpPassing
+  ) {
+    assessment = 'unavailable data'
+  } else if (assessment !== 'clarification needed' && claim.intent === 'statistical-request') {
     assessment = 'statistics provided'
   } else if (assessment !== 'clarification needed' && claim.intent === 'unavailable-metric') {
     assessment = 'unavailable data'
@@ -1108,9 +1252,9 @@ function assessOneClaim(
             )
   if (
     assessment !== 'clarification needed' &&
+    !unsupportedBuildUpPassing &&
     comparison &&
-    claim.intent !== 'statistical-request' &&
-    claim.intent !== 'unavailable-metric' &&
+    claim.intent === 'factual-claim' &&
     comparisonEvidenceKind &&
     resolvedAvailability.some(
       (item) => item.kind === comparisonEvidenceKind && item.available,
@@ -1136,6 +1280,22 @@ function assessOneClaim(
         : 'contradicted'
     }
   }
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion && claim.clarificationNeeds.length === 0) {
+    const goalRecorded = evidenceEvents.some(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1,
+    )
+    if (goalRecorded) {
+      assessment =
+        halfTimeAssertion === 'scored' ? 'supported' : 'contradicted'
+    } else if (selectedClock.period > 1) {
+      assessment =
+        halfTimeAssertion === 'scored' ? 'contradicted' : 'supported'
+    }
+  }
 
   return {
     claim,
@@ -1158,16 +1318,8 @@ function assessOneClaim(
     calculations: canRetrieveSubjectEvidence
       ? calculationTraces(claim, advanced)
       : [],
-    limitation: makeLimitation(claim, availability, assessment, advanced),
+    limitation: makeLimitation(claim, resolvedAvailability, assessment, advanced),
   }
-}
-
-function formatPlayerStatistic(statistic: PlayerStatistic): string {
-  if (statistic.value === null) return `${metricName(statistic.metric)} unavailable`
-  const value = statistic.metric.includes('percentage')
-    ? `${statistic.value}%`
-    : String(statistic.value)
-  return `${value} ${metricName(statistic.metric, statistic.value)}`
 }
 
 function metricName(metric: ClaimMetric, value?: number): string {
@@ -1202,18 +1354,6 @@ function playerParticipation(
   return participationStatus(record, fixture, endElapsed)
 }
 
-function playerParticipationText(
-  player: Pick<PlayerEntityReference, 'id' | 'name' | 'team'>,
-  fixture: SyntheticMatchEvidence,
-  endElapsed: number,
-): string {
-  const status = playerParticipation(player, fixture, endElapsed)
-  if (status === 'not-yet-on-pitch') return 'has not yet entered the pitch'
-  if (status === 'unused-substitute') return 'remained an unused substitute'
-  if (status === 'participated') return 'participated and has since been substituted'
-  return 'is on the pitch'
-}
-
 function claimEndElapsed(
   claim: InterpretedClaim,
   events: MatchEvent[],
@@ -1226,231 +1366,593 @@ function claimEndElapsed(
   return elapsedMatchMinute(anchor.clock) - 0.000001
 }
 
+function formatCount(metric: ClaimMetric, value: number | null): string {
+  if (value === null) return `${metricName(metric)} is unavailable`
+  if (metric === 'possession-percentage') return `${value}% possession`
+  if (metric === 'pass-completion-percentage') return `${value}%`
+  return `${value} ${metricName(metric, value)}`
+}
+
+function joinNaturally(items: string[]): string {
+  if (items.length < 2) return items[0] ?? ''
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
+}
+
+function comparisonValues(result: ClaimResult): Array<{
+  name: string
+  value: number | null
+  attempts?: number | null
+  completions?: number | null
+}> {
+  const comparison = result.claim.meaning.comparison
+  if (!comparison) return []
+  if (comparison.opponentPlayer && result.claim.playerSubject) {
+    return [result.claim.playerSubject, comparison.opponentPlayer].map((player) => {
+      const statistic = (metric: ClaimMetric) =>
+        result.playerStatistics.find(
+          (item) => item.playerId === player.id && item.metric === metric,
+        )?.value ?? null
+      return {
+        name: player.name,
+        value: statistic(comparison.metric),
+        attempts: statistic('pass-attempts'),
+        completions: statistic('pass-completions'),
+      }
+    })
+  }
+  if (!result.claim.subject) return []
+  return [result.claim.subject, comparison.opponent].map((team) => {
+    const statistic = (metric: ClaimMetric) =>
+      result.statistics.find(
+        (item) => item.team === team && item.metric === metric,
+      )?.value ?? null
+    const passTrace = result.calculations.find(
+      (item) => item.team === team &&
+        item.metric === 'pass-completion-percentage',
+    )
+    return {
+      name: team,
+      value: statistic(comparison.metric) ?? passTrace?.value ?? null,
+      attempts: statistic('pass-attempts') ?? passTrace?.denominator ?? null,
+      completions: statistic('pass-completions') ?? passTrace?.numerator ?? null,
+    }
+  })
+}
+
+function comparisonSentence(result: ClaimResult): string | undefined {
+  const metric = result.claim.meaning.comparison?.metric
+  const [subject, opponent] = comparisonValues(result)
+  if (!metric || !subject || !opponent) return undefined
+  const lead =
+    result.assessment === 'supported'
+      ? 'Yes — '
+      : result.assessment === 'contradicted'
+        ? 'No — '
+        : 'The recorded figures do not settle this comparison: '
+  const comparison =
+    metric === 'pass-completion-percentage'
+      ? subject.value === null || opponent.value === null
+        ? `${subject.name}'s pass completion rate is unavailable; ${opponent.name}'s rate is ${opponent.value === null ? 'also unavailable' : `${opponent.value}%`}`
+        : `${subject.name} completed ${subject.completions} of ${subject.attempts} passes (${subject.value}%), compared with ${opponent.name}'s ${opponent.completions} of ${opponent.attempts} passes (${opponent.value}%)`
+      : subject.value === null || opponent.value === null
+        ? `${subject.name}'s ${metricName(metric)} is unavailable; ${opponent.name}'s ${metricName(metric)} is ${opponent.value === null ? 'also unavailable' : formatCount(metric, opponent.value)}`
+        : `${subject.name} recorded ${formatCount(metric, subject.value)}, compared with ${opponent.name}'s ${formatCount(metric, opponent.value)}`
+  return `${lead}${comparison}.`
+}
+
+function statisticsSentence(result: ClaimResult): string | undefined {
+  const playerStatistics = result.playerStatistics
+  if (playerStatistics.length > 0) {
+    const metrics = [...new Set(playerStatistics.map(({ metric }) => metric))]
+    const players = [...new Map(
+      playerStatistics.map(({ playerId, playerName, team }) => [
+        playerId,
+        { id: playerId, name: playerName, team },
+      ]),
+    ).values()]
+    const statements = players.map((player) => {
+      const get = (metric: ClaimMetric) =>
+        playerStatistics.find(
+          (item) => item.playerId === player.id && item.metric === metric,
+        )?.value ?? null
+      if (metrics.includes('pass-completion-percentage')) {
+        const attempts = get('pass-attempts')
+        const completions = get('pass-completions')
+        const rate = get('pass-completion-percentage')
+        return `${player.name} completed ${completions} of ${attempts} passes (${rate === null ? 'rate unavailable' : `${rate}%`})`
+      }
+      const values = metrics
+        .map((metric) => get(metric))
+        .filter((value): value is number | null => value !== undefined)
+        .map((value, index) => formatCount(metrics[index], value))
+      return `${player.name}: ${values.join(', ')}`
+    })
+    return statements.length ? `${joinNaturally(statements)}.` : undefined
+  }
+  if (result.statistics.length === 0) return undefined
+  const teams = [...new Set(result.statistics.map(({ team }) => team))]
+  const statements = teams.map((team) => {
+    const teamStatistics = result.statistics.filter((item) => item.team === team)
+    if (teamStatistics.some(({ metric }) => metric === 'pass-completion-percentage')) {
+      const attempts = teamStatistics.find(({ metric }) => metric === 'pass-attempts')?.value
+      const completions = teamStatistics.find(({ metric }) => metric === 'pass-completions')?.value
+      const rate = teamStatistics.find(
+        ({ metric }) => metric === 'pass-completion-percentage',
+      )?.value
+      return `${team} completed ${completions ?? 'an unavailable number of'} of ${attempts ?? 'an unavailable number of'} passes (${rate === null || rate === undefined ? 'rate unavailable' : `${rate}%`})`
+    }
+    const values = teamStatistics.map(
+      ({ metric, value }) => `recorded ${formatCount(metric, value)}`,
+    )
+    return `${team} ${values.join(' and ')}`
+  })
+  return statements.length ? `${joinNaturally(statements)}.` : undefined
+}
+
+function broadPlayerSentence(
+  result: ClaimResult,
+  fixture: SyntheticMatchEvidence,
+  endElapsed: number,
+): string {
+  const player = result.claim.playerSubject
+  if (!player) return ''
+  const participation = playerParticipation(player, fixture, endElapsed)
+  if (participation === 'not-yet-on-pitch') {
+    return `${player.name} had not yet come on by the end of this period.`
+  }
+  if (participation === 'unused-substitute') {
+    return `${player.name} remained an unused substitute in this period.`
+  }
+
+  const values = new Map(
+    result.playerStatistics.map(({ metric, value }) => [metric, value]),
+  )
+  const contributions: string[] = []
+  const goals = values.get('goals')
+  const onTarget = values.get('shots-on-target')
+  const shots = values.get('shots')
+  if (typeof goals === 'number' && goals > 0) {
+    contributions.push(`scored ${formatCount('goals', goals)}`)
+  }
+  if (typeof onTarget === 'number' && onTarget > 0) {
+    contributions.push(`had ${formatCount('shots-on-target', onTarget)}`)
+  } else if (typeof shots === 'number' && shots > 0) {
+    contributions.push(`had ${formatCount('shots', shots)}`)
+  }
+  const attempts = values.get('pass-attempts')
+  const completions = values.get('pass-completions')
+  if (typeof attempts === 'number' && attempts > 0 && typeof completions === 'number') {
+    contributions.push(`completed ${completions} of ${attempts} passes`)
+  }
+  for (const metric of ['recoveries', 'pressure-observations'] as const) {
+    const count = values.get(metric)
+    if (typeof count === 'number' && count > 0) {
+      contributions.push(`made ${formatCount(metric, count)}`)
+    }
+  }
+  const minutes = values.get('minutes-played')
+  if (typeof minutes === 'number' && minutes > 0 && minutes < 90) {
+    contributions.push(`played ${minutes} minutes in the selected period`)
+  }
+  if (contributions.length === 0) {
+    return `${player.name} participated, but no player-attributed actions are recorded for this period.`
+  }
+  return `${player.name} ${contributions.join(', ')}.`
+}
+
+function coachingSentence(result: ClaimResult): string {
+  const buildUpOnly = result.claim.requiredEvidence.includes('build-up-phase')
+  const losses = result.calculations.filter(
+    ({ metric }) => metric === 'possession-losses-by-area',
+  )
+  const teams = [...new Set(losses.map(({ team }) => team))]
+  if (losses.length === 0) {
+    return result.limitation
+  }
+  const summaries = teams.map((team) => {
+    const teamLosses = losses.filter((item) => item.team === team)
+    const areas = teamLosses
+      .map(({ area, value }) => `${area?.replaceAll('-', ' ')} ${value ?? 'unavailable'}`)
+      .join(', ')
+    return `${team}: ${areas} (${teamLosses[0].denominator} recorded losses)`
+  })
+  const total = teams.reduce(
+    (sum, team) =>
+      sum + (losses.find((item) => item.team === team)?.denominator ?? 0),
+    0,
+  )
+  const phase = buildUpOnly ? 'the annotated build-up sample' : 'the recorded passes'
+  const findings = `${phase}, ${summaries.join('; ')}; ${total} losses in total.`
+  const limitation = buildUpOnly
+    ? 'This is a partial annotated sample, not a match-wide count. Linked passes and any recorded pressure show context, not why possession was lost.'
+    : 'This covers recorded pass turnovers only, not every way possession can change. The records do not show why the ball was lost.'
+  return `${findings} ${limitation}`
+}
+
+function historicalScope(
+  claim: InterpretedClaim,
+  events: MatchEvent[],
+): string {
+  if (claim.timePeriod.kind !== 'before-event') return ''
+  const anchorId = claim.timePeriod.eventId
+  const anchor = events.find(({ id }) => id === anchorId)
+  if (!anchor) throw new Error('Validated historical event anchor was not found.')
+  return `This uses play strictly before ${anchor.team}'s goal at ${formatMatchClock(anchor.clock)}; the goal is a separate time anchor.`
+}
+
+function passDataLimitation(result: ClaimResult): string {
+  if (!result.claim.requiredEvidence.includes('passing')) return ''
+  const passingAvailability = result.evidenceAvailability.find(
+    ({ kind }) => kind === 'passing',
+  )
+  if (passingAvailability && !passingAvailability.available) {
+    return passingAvailability.detail
+  }
+  const attempts = [
+    ...result.statistics
+      .filter(({ metric }) => metric === 'pass-attempts')
+      .map(({ value }) => value),
+    ...result.playerStatistics
+      .filter(({ metric }) => metric === 'pass-attempts')
+      .map(({ value }) => value),
+  ]
+  return attempts.length > 0 && attempts.every((value) => value === 0)
+    ? 'No pass attempts were recorded, so a completion rate cannot be calculated.'
+    : ''
+}
+
+function answerForClaim(
+  result: ClaimResult,
+  fixture: SyntheticMatchEvidence,
+  events: MatchEvent[],
+  advanced: EvidenceCalculation,
+  selectedClock: MatchClock,
+): string {
+  const claim = result.claim
+  if (claim.clarificationNeeds.length > 0) {
+    return claim.clarificationNeeds.join(' ')
+  }
+  if (result.assessment === 'clarification needed') {
+    return `Could you clarify who or what you mean by “${claim.text}”?`
+  }
+  if (result.assessment === 'unavailable data') return result.limitation
+  if (claim.intent === 'unavailable-metric') return result.limitation
+  if (claim.intent === 'unrecognized-language') return result.limitation
+  if (claim.intent === 'coaching-question') return coachingSentence(result)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    const goal = events.find(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+    if (goal) {
+      const teamOrPlayer = claim.playerSubject?.name ?? goal.team
+      const fact = `${teamOrPlayer} scored before half-time at ${formatMatchClock(goal.clock)}.`
+      const conclusion = halfTimeAssertion === 'did-not-score'
+        ? `No — ${teamOrPlayer} did score before half-time at ${formatMatchClock(goal.clock)}; this recorded goal contradicts the claim.`
+        : fact
+      return `${conclusion} This claim is checked against first-half goal events, independently of the selected analysis window.`
+    }
+    const subjectName = claim.playerSubject?.name ?? claim.subject ?? 'team'
+    if (selectedClock.period === 1) {
+      return `The selected match time is ${formatMatchClock(selectedClock)}; no ${subjectName} goal before half-time is recorded yet, so the final first-half claim cannot be established.`
+    }
+    return halfTimeAssertion === 'did-not-score'
+      ? `Yes — no ${subjectName} goal before half-time is recorded. This claim is checked against first-half goal events, independently of the selected analysis window.`
+      : `No — no ${subjectName} goal before half-time is recorded. This claim is checked against first-half goal events, independently of the selected analysis window.`
+  }
+  if (claim.intent === 'statistical-request') {
+    const statistics = statisticsSentence(result) ?? result.limitation
+    const scope = historicalScope(claim, events)
+    const limitation = passDataLimitation(result)
+    return `${statistics}${limitation ? ` ${limitation}` : ''}${scope ? ` ${scope}` : ''}`
+  }
+  if (
+    claim.meaning.category === 'historical-circumstance' &&
+    claim.playerSubject &&
+    !/against the run of play/i.test(claim.text)
+  ) {
+    return `${broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))} ${historicalScope(claim, events)} These sparse synthetic records cannot establish an overall performance rating.`
+  }
+  if (
+    claim.intent === 'factual-claim' &&
+    claim.meaning.category === 'factual-comparison'
+  ) {
+    const comparison = comparisonSentence(result)
+    if (comparison) {
+      const limitation =
+        result.claim.meaning.comparison?.metric === 'possession-percentage'
+          ? ' Possession is calculated from recorded controlled time only; it does not show territorial control or overall performance.'
+          : passDataLimitation(result)
+            ? ` ${passDataLimitation(result)}`
+            : ''
+      return `${comparison}${limitation}`
+    }
+  }
+  if (claim.meaning.category === 'historical-circumstance') {
+    const scope = historicalScope(claim, events)
+    const conclusion =
+      result.assessment === 'supported'
+        ? `The recorded evidence supports the view that ${claim.text.replace(/[.!?]+$/, '')}.`
+        : `The available evidence cannot establish whether ${claim.text.replace(/[.!?]+$/, '')}.`
+    const isRunOfPlayJudgement =
+      /against the run of play/i.test(claim.text) && claim.subject !== null
+    const subjectPossession =
+      isRunOfPlayJudgement
+        ? result.calculations.find(
+            ({ team, metric }) =>
+              team === claim.subject && metric === 'possession-percentage',
+          )
+        : undefined
+    const opponentPossession =
+      isRunOfPlayJudgement
+        ? result.calculations.find(
+            ({ team, metric }) =>
+              team !== claim.subject && metric === 'possession-percentage',
+          )
+        : undefined
+    const possessionContext =
+      subjectPossession &&
+      subjectPossession.value !== null &&
+      opponentPossession &&
+      opponentPossession.value !== null
+        ? ` Before the goal, ${subjectPossession.team} accounted for ${subjectPossession.value}% and ${opponentPossession.team} ${opponentPossession.value}% of recorded controlled-possession time (${subjectPossession.denominator} recorded minutes; contested and out-of-play intervals are excluded).`
+        : ''
+    const limitation = result.limitation.includes('territory') ||
+      result.limitation.includes('chance quality')
+      ? 'The fixture has no continuous territorial or chance-quality data.'
+      : result.limitation
+    return `${conclusion}${possessionContext} ${scope} ${limitation}`
+  }
+  if (
+    claim.intent === 'subjective-judgement' &&
+    claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
+    claim.subject
+  ) {
+    const own =  result.statistics.find(({ team }) => team === claim.subject)?.value
+    const opponentStat = result.statistics.find(({ team }) => team !== claim.subject)
+    const opponent = opponentStat?.value
+    if (own !== undefined && own !== null && opponent !== undefined && opponent !== null) {
+      const supports = own > opponent
+      const aspect = supports
+        ? 'This supports the possession-majority part of the claim.'
+        : own < opponent
+          ? 'This challenges the possession-majority part of the claim.'
+          : 'The recorded shares are equal.'
+      return `${claim.subject} had ${own}% of recorded possession; ${opponentStat?.team} had ${opponent}%. ${aspect} Possession share alone cannot establish overall dominance.`
+    }
+  }
+  if (claim.playerSubject) {
+    const endElapsed = claimEndElapsed(claim, events, advanced)
+    const answer = broadPlayerSentence(result, fixture, endElapsed)
+    return `${answer} These are sparse synthetic records, not a complete performance measure or overall rating.`
+  }
+  if (claim.intent === 'subjective-judgement') {
+    return `The available match events do not establish the broader judgement: “${claim.text}”.`
+  }
+  if (result.assessment === 'insufficient evidence for a firm conclusion') {
+    return `The available evidence does not settle whether ${claim.text}. ${result.limitation}`
+  }
+  return `${result.assessment}. ${result.limitation}`
+}
+
 function createSummary(
   claims: ClaimResult[],
   fixture: SyntheticMatchEvidence,
   advanced: EvidenceCalculation,
   events: MatchEvent[],
+  selectedPeriodLabel: string,
+  selectedClock: MatchClock,
 ): string {
   if (claims.length === 0) {
     return 'Enter an opinion to interpret its claims and retrieve relevant evidence from this synthetic fixture.'
   }
 
+  const answers = claims.map((result) =>
+    answerForClaim(result, fixture, events, advanced, selectedClock),
+  )
+  return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`
+}
+
+const possessionControlPattern = /possess|domina|in control|controll?ed|ran the (?:game|match)|bossed|outplay|had the ball/i
+const defensiveShapePattern = /park(?:ed|ing) the bus|low block|sat (?:deep|back)|defen[cs]\w*|deep|compact|shape|back (?:five|four|three)/i
+
+function concernsPossessionOrControl(claim: InterpretedClaim): boolean {
+  return possessionControlPattern.test(claim.text) && !defensiveShapePattern.test(claim.text)
+}
+
+function concernsDefensiveShape(claim: InterpretedClaim): boolean {
+  return defensiveShapePattern.test(claim.text)
+}
+
+function fanScope(claim: InterpretedClaim, events: MatchEvent[]): string {
+  if (claim.timePeriod.kind !== 'before-event') return ''
+  const anchorId = claim.timePeriod.eventId
+  const anchor = events.find(({ id }) => id === anchorId)
+  if (!anchor) throw new Error('Validated historical event anchor was not found.')
+  return `That counts play strictly before ${anchor.team}'s goal at ${formatMatchClock(anchor.clock)}, leaving the goal itself out.`
+}
+
+function fanComparison(result: ClaimResult): string | undefined {
+  const metric = result.claim.meaning.comparison?.metric
+  const [subject, opponent] = comparisonValues(result)
+  if (!metric || !subject || !opponent) return undefined
+  const lead =
+    result.assessment === 'supported'
+      ? 'Yes — '
+      : result.assessment === 'contradicted'
+        ? 'No — '
+        : "The records can't settle this one: "
+  if (subject.value === null || opponent.value === null) {
+    return `${lead}${subject.name}'s ${metricName(metric)} ${subject.value === null ? "isn't" : 'is'} available${opponent.value === null ? ` and neither is ${opponent.name}'s` : `, and ${opponent.name}'s is ${formatCount(metric, opponent.value)}`}.`
+  }
+  if (metric === 'pass-completion-percentage') {
+    return `${lead}${subject.name} completed ${subject.completions} of ${subject.attempts} passes (${subject.value}%) to ${opponent.name}'s ${opponent.completions} of ${opponent.attempts} (${opponent.value}%).`
+  }
+  if (metric === 'possession-percentage') {
+    return `${lead}${subject.name} had ${subject.value}% of recorded possession to ${opponent.name}'s ${opponent.value}%.`
+  }
+  if (subject.value === opponent.value) {
+    return `${lead}${subject.name} and ${opponent.name} are level on ${formatCount(metric, subject.value)} each.`
+  }
+  return `${lead}${subject.name} have ${formatCount(metric, subject.value)} to ${opponent.name}'s ${opponent.value}.`
+}
+
+/** Conversational, meaning-preserving Fan reply, built deterministically from the validated results. */
+function fanAnswerForClaim(
+  result: ClaimResult,
+  fixture: SyntheticMatchEvidence,
+  events: MatchEvent[],
+  advanced: EvidenceCalculation,
+  selectedClock: MatchClock,
+  userWording?: string,
+): string {
+  const claim = result.claim
+  const quote = (userWording ?? claim.text).replace(/[.!?]+$/, '')
+  if (claim.clarificationNeeds.length > 0) return claim.clarificationNeeds.join(' ')
+  if (result.assessment === 'clarification needed') {
+    return `Quick check first — who or what do you mean by “${quote}”?`
+  }
+  if (result.assessment === 'unavailable data' || claim.intent === 'unavailable-metric') {
+    return `I can't tell you that one. ${result.limitation}`
+  }
+  if (claim.intent === 'unrecognized-language') {
+    return "I couldn't match that to something I can check in this match, and I haven't picked out unrelated figures instead. Try naming a team or player and what you want to know."
+  }
+  if (claim.intent === 'coaching-question') return coachingSentence(result)
+  const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
+  if (halfTimeAssertion) {
+    const goal = events.find(
+      (event) =>
+        event.type === 'shot' &&
+        event.outcome === 'goal' &&
+        event.clock.period === 1 &&
+        (!claim.subject || event.team === claim.subject) &&
+        (!claim.playerSubject || event.playerId === claim.playerSubject.id),
+    )
+    const who = claim.playerSubject?.name ?? claim.subject ?? 'The team'
+    const basis = "That's judged on first-half goals, whichever window is selected."
+    if (goal) {
+      const when = formatMatchClock(goal.clock)
+      return halfTimeAssertion === 'did-not-score'
+        ? `No — ${who} did score before half-time, at ${when}. ${basis}`
+        : `Yes — ${who} scored before half-time, at ${when}. ${basis}`
+    }
+    if (selectedClock.period === 1) {
+      return `We're only at ${formatMatchClock(selectedClock)} and there's no ${who} goal in the first half yet, so the half-time claim can't be settled.`
+    }
+    return halfTimeAssertion === 'did-not-score'
+      ? `Yes — there's no ${who} goal before half-time in the records. ${basis}`
+      : `No — there's no ${who} goal before half-time in the records. ${basis}`
+  }
+  if (claim.intent === 'statistical-request') {
+    const statistics = statisticsSentence(result) ?? result.limitation
+    const limitation = passDataLimitation(result)
+    const scope = fanScope(claim, events)
+    return `${statistics}${limitation ? ` ${limitation}` : ''}${scope ? ` ${scope}` : ''}`
+  }
+  if (
+    claim.meaning.category === 'historical-circumstance' &&
+    claim.playerSubject &&
+    !/against the run of play/i.test(claim.text)
+  ) {
+    const player = broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))
+    return `${player} ${fanScope(claim, events)} It's thin data, so it's no rating of ${claim.playerSubject.name}'s overall game.`.replace(/\s{2,}/g, ' ')
+  }
+  if (claim.intent === 'factual-claim' && claim.meaning.category === 'factual-comparison') {
+    const comparison = fanComparison(result)
+    if (comparison) {
+      const note =
+        claim.meaning.comparison?.metric === 'possession-percentage'
+          ? " Possession only counts recorded controlled time, so it doesn't show territorial control or overall performance."
+          : passDataLimitation(result)
+            ? ` ${passDataLimitation(result)}`
+            : ''
+      return `${comparison}${note}`
+    }
+  }
+  if (claim.meaning.category === 'historical-circumstance') {
+    const supported = result.assessment === 'supported'
+    const isRunOfPlay = /against the run of play/i.test(claim.text) && claim.subject !== null
+    const own = isRunOfPlay
+      ? result.calculations.find(({ team, metric }) => team === claim.subject && metric === 'possession-percentage')
+      : undefined
+    const other = isRunOfPlay
+      ? result.calculations.find(({ team, metric }) => team !== claim.subject && metric === 'possession-percentage')
+      : undefined
+    const possession =
+      own && own.value !== null && other && other.value !== null
+        ? ` Before the goal, ${own.team} had ${own.value}% of recorded possession to ${other.team}'s ${other.value}% (${own.denominator} recorded minutes of controlled play).`
+        : ''
+    const limitation = result.limitation.includes('territory') || result.limitation.includes('chance quality')
+      ? "There's no continuous territorial or chance-quality data to go on."
+      : result.limitation
+    return `${supported ? `The records back that up: ${quote}.` : `The records can't settle whether ${quote}.`}${possession} ${fanScope(claim, events)} ${limitation}`.replace(/\s{2,}/g, ' ').trim()
+  }
+  if (
+    claim.intent === 'subjective-judgement' &&
+    claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
+    claim.subject
+  ) {
+    const own = result.statistics.find(({ team }) => team === claim.subject)?.value
+    const opponentStat = result.statistics.find(({ team }) => team !== claim.subject)
+    const opponent = opponentStat?.value
+    if (own !== undefined && own !== null && opponent !== undefined && opponent !== null) {
+      const aspect = own > opponent
+        ? 'That backs up the possession part of the take.'
+        : own < opponent
+          ? 'That goes against the possession part of the take.'
+          : "They were level on possession."
+      return `${claim.subject} had ${own}% of recorded possession to ${opponentStat?.team}'s ${opponent}%. ${aspect} Possession alone doesn't settle overall dominance.`
+    }
+  }
+  if (claim.playerSubject) {
+    const answer = broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))
+    return `${answer} That's sparse data, so it isn't a full read on ${claim.playerSubject.name}'s game.`
+  }
+  if (claim.intent === 'subjective-judgement') {
+    const shape = concernsDefensiveShape(claim)
+      ? " Nothing here records defensive shape or positioning, and possession share doesn't tell you how a side set up."
+      : ''
+    return `That's a bigger football opinion than the match events can settle: “${quote}”. I can only report what's recorded.${shape}`
+  }
+  if (result.assessment === 'insufficient evidence for a firm conclusion') {
+    return `The records don't settle whether ${quote}. ${result.limitation}`
+  }
+  return answerForClaim(result, fixture, events, advanced, selectedClock)
+}
+
+function createFanReply(
+  claims: ClaimResult[],
+  fixture: SyntheticMatchEvidence,
+  advanced: EvidenceCalculation,
+  events: MatchEvent[],
+  selectedClock: MatchClock,
+  opinion = '',
+): string {
+  if (claims.length === 0) {
+    return "I couldn't find a football claim in that. Try naming a team or player and what you want to know."
+  }
+  const original = opinion.trim()
+  // Only the user's own words may be quoted back; a lone claim is the whole take.
+  const wordingFor = (result: ClaimResult): string | undefined =>
+    claims.length === 1 && original !== ''
+      ? original
+      : original.toLowerCase().includes(result.claim.text.trim().toLowerCase())
+        ? result.claim.text
+        : undefined
   return claims
-    .map((result, index) => {
-      const effectiveEndElapsed = claimEndElapsed(result.claim, events, advanced)
-      const subject =
-        result.claim.playerSubject?.name ??
-        result.claim.subject ??
-        (result.claim.meaning.category === 'coaching-question'
-          ? 'Both teams'
-          : 'Unclear subject')
-      const evidenceExamples =
-        result.claim.intent === 'coaching-question'
-          ? (() => {
-              const turnover = result.evidence.find(({ reference: item }) =>
-                item.id.startsWith('turnover-'),
-              )
-              const linkedPassId = turnover?.reference.description.match(
-                /linked pass (pass-\d+)/i,
-              )?.[1]
-              const linkedPass = result.evidence.find(
-                ({ reference: item }) => item.id === linkedPassId,
-              )
-              return [turnover, linkedPass].filter(
-                (item): item is ClaimEvidence => item !== undefined,
-              )
-            })()
-          : result.claim.intent === 'statistical-request'
-            ? selectedPlayerEntities(result.claim).length
-              ? selectedPlayerEntities(result.claim).map((player) =>
-                  result.evidence.find(({ reference: item }) =>
-                    item.description.includes(player.id),
-                  ),
-                ).filter((item): item is ClaimEvidence => item !== undefined)
-              : TEAMS.map((team) =>
-                  result.evidence.find(({ reference: item }) => item.team === team),
-                ).filter((item): item is ClaimEvidence => item !== undefined)
-            : result.claim.playerSubject &&
-                !result.claim.playerMetric &&
-                !result.claim.meaning.comparison?.opponentPlayer
-              ? [
-                  ...result.evidence.filter(({ reference: item }) =>
-                    /(?:goal|saved) shot by/i.test(item.description),
-                  ),
-                  ...result.evidence.filter(({ reference: item }) =>
-                    /shot by/i.test(item.description) &&
-                    !/(?:goal|saved) shot by/i.test(item.description),
-                  ),
-                ].slice(0, 2)
-            : [
-                  ...result.evidence.filter(({ role }) => role === 'anchor'),
-                  ...result.evidence.filter(({ role }) => role !== 'anchor'),
-                ].slice(0, 2)
-      const references = evidenceExamples.map(
-        ({ reference: item }) => `${item.id} (${item.team}, ${item.time})`,
-      )
-      const referenceText = references.length
-        ? ` Example references (abbreviated): ${references.join(', ')}.`
-        : ''
-      const statistics = result.statistics
-        .map(
-          ({ team, metric, value }) =>
-            `${team} ${value === null ? 'not available' : `${value}${metric.includes('percentage') ? '%' : ''}`} ${metric.replaceAll('-', ' ')}`,
-        )
-        .join('; ')
-      const playerStatsById = new Map<string, PlayerStatistic[]>()
-      for (const statistic of result.playerStatistics) {
-        const records = playerStatsById.get(statistic.playerId) ?? []
-        records.push(statistic)
-        playerStatsById.set(statistic.playerId, records)
-      }
-      const playerStatisticsText = [...playerStatsById.values()]
-        .map((items) => {
-          const player = items[0]
-          const get = (metric: PlayerStatistic['metric']) =>
-            items.find((item) => item.metric === metric)?.value
-          const attempts = get('pass-attempts')
-          const completed = get('pass-completions')
-          const percentage = get('pass-completion-percentage')
-          const explicitMetric =
-            result.claim.playerMetric ??
-            (result.claim.meaning.comparison?.opponentPlayer
-              ? result.claim.meaning.comparison.metric
-              : null)
-          if (explicitMetric) {
-            if (explicitMetric === 'pass-completion-percentage') {
-              return `${player.playerName}: ${completed ?? 'not available'}/${attempts ?? 'not available'} passes (${percentage === null ? 'rate unavailable' : `${percentage}%`})`
-            }
-            const values = items
-              .filter(({ metric }) => metric === explicitMetric)
-              .map(formatPlayerStatistic)
-            return `${player.playerName}: ${values.join(', ') || 'not available'}`
-          }
-          const participation = playerParticipation(
-            { id: player.playerId, name: player.playerName, team: player.team },
-            fixture,
-            effectiveEndElapsed,
-          )
-          if (participation === 'not-yet-on-pitch') {
-            return playerParticipationText(
-              { id: player.playerId, name: player.playerName, team: player.team },
-              fixture,
-              effectiveEndElapsed,
-            )
-          }
-          if (participation === 'unused-substitute') {
-            return playerParticipationText(
-              { id: player.playerId, name: player.playerName, team: player.team },
-              fixture,
-              effectiveEndElapsed,
-            )
-          }
-          const contributions: string[] = []
-          const goals = get('goals')
-          const shotsOnTarget = get('shots-on-target')
-          const shots = get('shots')
-          if (typeof goals === 'number' && goals > 0) contributions.push(`${goals} ${metricName('goals', goals)}`)
-          if (typeof shotsOnTarget === 'number' && shotsOnTarget > 0) {
-            contributions.push(`${shotsOnTarget} ${metricName('shots-on-target')}`)
-          } else if (typeof shots === 'number' && shots > 0) {
-            contributions.push(`${shots} ${metricName('shots')}`)
-          }
-          if (typeof attempts === 'number' && attempts > 0 && typeof completed === 'number') {
-            contributions.push(
-              `${completed} ${metricName('pass-completions', completed)} from ${attempts} ${metricName('pass-attempts', attempts)}`,
-            )
-          }
-          for (const metric of ['recoveries', 'pressure-observations'] as const) {
-            const value = get(metric)
-            if (typeof value === 'number' && value > 0) {
-              contributions.push(`${value} ${metricName(metric, value)}`)
-            }
-          }
-          const selectedMinutes = get('minutes-played')
-          if (typeof selectedMinutes === 'number' && selectedMinutes > 0) {
-            contributions.push(`${selectedMinutes} selected-window ${selectedMinutes === 1 ? 'minute' : 'minutes'}`)
-          }
-          return contributions.length > 0
-            ? `Recorded ${contributions.slice(0, 4).join(', ')}`
-            : 'Participated; no player-attributed actions are recorded in this period'
-        })
-        .join('; ')
-      const passCalculations = result.calculations.filter(
-        ({ metric }) => metric === 'pass-completion-percentage',
-      )
-      const lossCalculations = result.calculations.filter(
-        ({ metric }) => metric === 'possession-losses-by-area',
-      )
-      const buildUpOnly = result.claim.requiredEvidence.includes('build-up-phase')
-      const lossLead = lossCalculations.length
-        ? ` ${buildUpOnly ? 'Sampled build-up' : 'All-pass'} turnover locations: ${TEAMS
-            .map((team) => {
-              const teamCalculations = lossCalculations.filter(
-                (calculation) => calculation.team === team,
-              )
-              if (teamCalculations.length === 0) return ''
-              const areas = teamCalculations
-                .map(({ area, value }) => `${area} ${value ?? 'not available'}`)
-                .join(', ')
-              const denominator = teamCalculations[0].denominator
-              return `${team}: ${areas} (${denominator} recorded turnovers)`
-            })
-            .filter(Boolean)
-            .join('; ')} (${[...new Set(lossCalculations.map(({ team }) => team))]
-            .reduce((total, team) =>
-              total + (lossCalculations.find((trace) => trace.team === team)?.denominator ?? 0), 0)} combined recorded turnovers).`
-        : ''
-      const teamPassSummary = passCalculations.length
-        ? passCalculations
-            .map(({ team, numerator, denominator, value }) =>
-              `${team} ${numerator}/${denominator} (${value === null ? 'rate unavailable' : `${value}%`})`,
-            )
-            .join('; ')
-        : ''
-      const statisticsText = playerStatisticsText
-        ? result.claim.playerSubject &&
-            !result.claim.playerMetric &&
-            !result.claim.meaning.comparison?.opponentPlayer
-          ? ''
-          : ` Recorded player statistics: ${playerStatisticsText}.`
-        : teamPassSummary
-          ? ` Recorded statistics: ${teamPassSummary}.`
-        : statistics
-          ? ` Recorded statistics: ${statistics}.`
-          : ''
-      const broadPlayerSummary = Boolean(
-        result.claim.playerSubject &&
-        result.claim.meaning.category === 'performance-judgement' &&
-        !result.claim.playerMetric &&
-        !result.claim.meaning.comparison?.opponentPlayer,
-      )
-      const noHistoricalParticipation = result.claim.playerSubject &&
-        ['not-yet-on-pitch', 'unused-substitute'].includes(
-          playerParticipation(
-            result.claim.playerSubject,
-            fixture,
-            effectiveEndElapsed,
-          ),
-        )
-      const prefix = broadPlayerSummary
-        ? playerStatisticsText
-        : result.assessment
-      const leadText = lossLead.trim().replace(/\.$/, '')
-      const scopeText = `Period: ${result.periodLabel}.`
-      const anchorText = result.claim.historicalEventAnchor
-        ? ` Evidence excludes anchor ${result.claim.historicalEventAnchor.eventId} (${result.claim.historicalEventAnchor.relationship}).`
-        : ''
-      const summaryLimitation = broadPlayerSummary
-        ? 'These sparse synthetic records cannot establish an overall performance rating.'
-        : result.limitation
-      const limitation =
-        broadPlayerSummary && noHistoricalParticipation
-          ? ''
-          : ` ${summaryLimitation}`
-      return `Claim ${index + 1} — ${subject}: ${leadText ? `${leadText} ` : ''}${prefix}. ${scopeText}${anchorText}${statisticsText}${limitation}${referenceText}`
-    })
-    .join('\n')
+    .map((result) =>
+      fanAnswerForClaim(result, fixture, events, advanced, selectedClock, wordingFor(result)),
+    )
+    .join(' ')
 }
 
 function evidenceReference(
@@ -1659,11 +2161,26 @@ export async function analyzeOpinion(
         players: fixture.players,
       })
     : { claims: [] }
-  const claims = validateInterpretation(
-    interpreted,
-    eventsThroughSelectedTime,
-    fixture.players,
-  )
+  let claims: InterpretedClaim[]
+  try {
+    claims = validateInterpretation(
+      normalizeKnownInterpretation(interpreted),
+      eventsThroughSelectedTime,
+      fixture.players,
+      { requireClaims: request.opinion.length > 0 },
+    )
+  } catch (error) {
+    if (provider.name === 'foundry') {
+      throw new InterpretationProviderError(
+        'semantic-validation',
+        error instanceof Error
+          ? error.message
+          : 'Microsoft Foundry interpretation did not match the validated claim contract.',
+        error,
+      )
+    }
+    throw error
+  }
   const results = claims.map((claim) => {
     const anchorEventId =
       claim.timePeriod.kind === 'before-event'
@@ -1688,6 +2205,7 @@ export async function analyzeOpinion(
       claim,
       matchAnalysis.periodEvents,
       selectedPeriodLabel,
+      request.selectedClock,
       eventsThroughSelectedTime,
       claimAdvanced,
       fixture,
@@ -1721,7 +2239,22 @@ export async function analyzeOpinion(
       provider.name === 'foundry'
         ? 'Microsoft Foundry structured-output model'
         : 'Server-side local rule-based interpreter (no model connection)',
-    summary: `Simulated match using real-player names. All performances and results are fictional.\n${selectedPeriodLabel}\n\n${createSummary(results, fixture, advanced, eventsThroughSelectedTime)}`,
+    summary: createSummary(
+      results,
+      fixture,
+      advanced,
+      eventsThroughSelectedTime,
+      selectedPeriodLabel,
+      request.selectedClock,
+    ),
+    fanReply: createFanReply(
+      results,
+      fixture,
+      advanced,
+      eventsThroughSelectedTime,
+      request.selectedClock,
+      request.opinion,
+    ),
     selectedTime,
     selectedPeriodLabel,
     score: matchSoFar.score,

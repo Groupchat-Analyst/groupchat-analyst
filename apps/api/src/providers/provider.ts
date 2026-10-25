@@ -12,6 +12,24 @@ export type InterpretationContext = {
   players: SyntheticMatchEvidence['players']
 }
 
+export type ProviderFailureCategory =
+  | 'transport'
+  | 'throttling'
+  | 'refusal'
+  | 'incomplete-output'
+  | 'schema'
+  | 'semantic-validation'
+
+export class InterpretationProviderError extends Error {
+  readonly category: ProviderFailureCategory
+
+  constructor(category: ProviderFailureCategory, message: string, cause?: unknown) {
+    super(message, { cause })
+    this.name = 'InterpretationProviderError'
+    this.category = category
+  }
+}
+
 export interface InterpretationProvider {
   readonly name: 'local' | 'foundry'
   interpret(opinion: string, context: InterpretationContext): Promise<unknown>

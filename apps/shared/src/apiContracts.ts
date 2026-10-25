@@ -14,6 +14,7 @@ export type EvidenceKind =
   | 'build-up-phase'
   | 'lineups'
 
+/** Describes the claim's meaning, independently of its requested operation or time scope. */
 export type ClaimMeaningCategory =
   | 'factual-comparison'
   | 'performance-judgement'
@@ -21,6 +22,7 @@ export type ClaimMeaningCategory =
   | 'coaching-question'
   | 'other'
 
+/** Describes what the user wants done; historical scope must not change the operation. */
 export type ClaimIntent =
   | 'statistical-request'
   | 'factual-claim'
@@ -86,6 +88,19 @@ export type AnalysisRequest = {
   opinion: string
   selectedClock: MatchClock
   period: AnalysisPeriod
+}
+
+export type MatchReplayResponse = {
+  selectedTime: string
+  score: Record<MatchTeam, number>
+  events: Array<{
+    id: string
+    time: string
+    team: MatchTeam
+    description: string
+    type: 'shot' | 'other'
+    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target'
+  }>
 }
 
 export type EvidenceReference = {
@@ -283,6 +298,8 @@ export type AnalysisResponse = {
   provider: 'local' | 'foundry'
   providerLabel: string
   summary: string
+  /** Canonical conversational Fan reply: the answer only, without the scope and synthetic-data trailer. */
+  fanReply?: string
   selectedTime: string
   selectedPeriodLabel: string
   score: Record<MatchTeam, number>

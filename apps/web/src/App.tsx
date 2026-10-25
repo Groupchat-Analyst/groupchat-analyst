@@ -1,4 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from 'react'
 import type {
   AnalysisResponse,
   ClaimResult,
@@ -11,18 +18,62 @@ import {
   type AnalysisPeriod,
   type MatchClock,
 } from '../../shared/src/matchClock'
+import { MatchHeader, type KeyMoment } from './MatchHeader'
+import { PassMap } from './PassMap'
+import { requestAnalysis } from './analysisClient'
+import {
+  createAnalysisRequest,
+  createSubmissionContext,
+  isLatestRequest,
+  isSubmissionScopeCurrent,
+  type SubmissionContext,
+} from './matchday'
+import {
+  buildShareCardModel,
+  canonicalReply,
+  CONTEXT_ONLY_LABEL,
+  describeEvidence,
+  describePeriodLabel,
+  isRoutineLimitation,
+  isUnsupportedJudgement,
+  shareCardBlocks,
+  shareCardText,
+  type ShareCardModel,
+} from './presentation'
+import {
+  buildChangeCard,
+  changeCardText,
+  checkedAgainst,
+  compareSnapshots,
+  createSnapshot,
+  isLaterClock,
+  needsPassMap,
+  snapshotReply,
+  type AnswerSnapshot,
+  type ChangeCard,
+  type Comparison,
+} from './investigation'
+import { createBlocksImage, createShareCardImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
+import { fetchReplayFrame } from './replayApi'
+import { clockKey, ReplayController } from './replayController'
+import { getQuestionSuggestions } from './suggestions'
 import './App.css'
+import './matchday.css'
 
 const MATCH_TIME_OPTIONS = getMatchTimeOptions()
+const REPLAY_DWELL_MS = 900
 const INITIAL_MATCH_TIME: MatchClock = {
   period: 2,
-  minute: 90,
-  stoppageMinutes: 4,
+  minute: 57,
 }
 
-function clockKey(clock: MatchClock): string {
-  return `${clock.period}-${clock.minute}-${clock.stoppageMinutes ?? 0}`
-}
+const KEY_MOMENTS: KeyMoment[] = [
+  { label: '45+3′ · Northbridge goal', clock: { period: 1, minute: 45, stoppageMinutes: 3 } },
+  { label: '57′ · before equaliser', clock: { period: 2, minute: 57 } },
+  { label: '58′ · equaliser', clock: { period: 2, minute: 58 } },
+  { label: '83′ · Eastport lead', clock: { period: 2, minute: 83 } },
+  { label: '90+4′ · full-time', clock: { period: 2, minute: 90, stoppageMinutes: 4 } },
+]
 
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (typeof value !== 'object' || value === null) return false
@@ -37,6 +88,7 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
     (value.provider === 'local' || value.provider === 'foundry') &&
     'claims' in value &&
     Array.isArray(value.claims) &&
+    (!('fanReply' in value) || value.fanReply === undefined || typeof value.fanReply === 'string') &&
     'periodEvents' in value &&
     Array.isArray(value.periodEvents) &&
     'score' in value &&
@@ -65,26 +117,41 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   )
 }
 
-function referenceList(references: EvidenceReference[]) {
+type Roster = AnalysisResponse['evidenceFoundation']['players']
+
+function referenceList(references: EvidenceReference[], roster: Roster) {
   if (references.length === 0) {
     return <p className="empty-evidence">No matching event references in this section.</p>
   }
 
   return (
-    <ul className="claim-reference-list">
-      {references.map((reference) => (
-        <li key={reference.id}>
-          <span className="reference-time">{reference.time}</span>
-          <span className="reference-description">
-            <strong>{reference.team}</strong>
-            <span>{reference.description}</span>
-            <small>
-              {reference.id} · {reference.time}
-            </small>
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="claim-reference-list">
+        {references.map((reference) => (
+          <li key={reference.id}>
+            <span className="reference-time">{reference.time}</span>
+            <span className="reference-description">
+              <strong>{reference.team}</strong>
+              <span>{describeEvidence(reference.description, roster)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <TechnicalRecord references={references} />
+    </>
+  )
+}
+
+function TechnicalRecord({ references }: { references: EvidenceReference[] }) {
+  return (
+    <details className="technical-record">
+      <summary>Technical record · IDs and original wording</summary>
+      <ul>
+        {references.map((reference) => (
+          <li key={reference.id}><code>{reference.id}</code> · {reference.time} · {reference.team} · {reference.description}</li>
+        ))}
+      </ul>
+    </details>
   )
 }
 
@@ -107,24 +174,32 @@ function evidenceLabel(kind: string): string {
 function ClaimCard({
   result,
   index,
+  roster,
+  take,
 }: {
   result: ClaimResult
   index: number
+  roster: Roster
+  take?: string
 }) {
   const claim = result.claim
   const titleId = `claim-result-${index}`
+  const contextOnly = isUnsupportedJudgement(result)
   return (
     <article className="claim-result" aria-labelledby={titleId}>
       <h3 className="claim-number" id={titleId}>
         Claim {index + 1}
       </h3>
-      <p className="claim-display">{claim.text}</p>
+      <p className="claim-display">{take ?? claim.text}</p>
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
         >
           {result.assessment}
         </span>
+        {contextOnly && result.statistics.length > 0 && (
+          <p className="context-only-note">{CONTEXT_ONLY_LABEL}</p>
+        )}
         {result.statistics.length > 0 && (
           <div className="broad-stats">
             {result.statistics.map((statistic) => (
@@ -174,7 +249,7 @@ function ClaimCard({
           <p><span>Subject</span><strong>{claim.playerSubject?.name ?? claim.subject ?? 'Needs clarification'}</strong></p>
           <p><span>What we understood</span><strong>{claim.meaning.description}</strong></p>
           <p><span>Request type</span><strong>{claim.intent.replaceAll('-', ' ')}</strong></p>
-          <p><span>Selected period</span><strong>{result.periodLabel}</strong></p>
+          <p><span>Selected period</span><strong>{describePeriodLabel(result.periodLabel)}</strong></p>
           {claim.historicalEventAnchor && <p><span>Historical anchor</span><strong>{claim.historicalEventAnchor.relationship}</strong></p>}
         </div>
       {claim.clarificationNeeds.length === 0 && (
@@ -198,7 +273,7 @@ function ClaimCard({
               <div>
                 <h3>Statistic request answered from the selected records</h3>
                 <p className="evidence-group-summary">
-                  The list below contains the relevant attributed records. Calculation denominators and IDs are available in the expandable trace.
+                  The list below contains the relevant attributed records. Calculation denominators are available in the expandable trace.
                 </p>
               </div>
             ) : claim.intent === 'subjective-judgement' ? (
@@ -242,12 +317,12 @@ function ClaimCard({
                     <span className="reference-time">{reference.time}</span>
                     <span className="reference-description">
                       <strong>{reference.team} · {role}</strong>
-                      <span>{reference.description}</span>
-                      <small>{reference.id} · {reference.time}</small>
+                      <span>{describeEvidence(reference.description, roster)}</span>
                     </span>
                   </li>
                 ))}
               </ul>
+              <TechnicalRecord references={result.evidence.map(({ reference }) => reference)} />
             </section>
           {result.calculations.length > 0 || result.playerCalculations.length > 0 ? (
             <details className="calculation-traces">
@@ -259,8 +334,10 @@ function ClaimCard({
                     ? `${trace.value ?? 'Not available'} turnovers`
                     : `${trace.numerator}/${trace.denominator}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : `${trace.value}%`})` : ''}`}</p>
                   <p>{trace.denominatorDescription}</p>
-                  <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
-                  <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
+                  <details className="technical-record"><summary>Technical record · IDs</summary>
+                    <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
+                    <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
+                  </details>
                 </section>
               ))}
               {result.playerCalculations.map((trace) => (
@@ -274,8 +351,10 @@ function ClaimCard({
                         : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric)}`}
                   </p>
                   <p>{trace.denominatorDescription}</p>
-                  <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
-                  <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
+                  <details className="technical-record"><summary>Technical record · IDs</summary>
+                    <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
+                    <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
+                  </details>
                 </section>
               ))}
             </details>
@@ -293,18 +372,20 @@ function EvidenceFoundationPanel({
 }: {
   foundation: AnalysisResponse['evidenceFoundation']
 }) {
+  const roster = foundation.players
+  const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   return (
     <details className="evidence-foundation">
       <summary className="foundation-summary">
         <div>
-          <p className="card-kicker">Evidence foundation · {foundation.dataset.version}</p>
-          <h2 id="evidence-foundation-title">Synthetic match evidence and squads</h2>
+          <p className="card-kicker">SOURCE & COVERAGE</p>
+          <h2 id="evidence-foundation-title">Match data & coverage</h2>
         </div>
         <span className="synthetic-badge"><span aria-hidden="true" />Synthetic fixture</span>
       </summary>
       <div className="foundation-content">
       <p className="evidence-group-summary">
-        {foundation.dataset.label}. Possession percentages use only recorded controlled-possession minutes;
+        {foundation.dataset.label} · version {foundation.dataset.version}. Possession percentages use only recorded controlled-possession minutes;
         contested play and time out of play are excluded.
       </p>
       <div className="advanced-team-grid">
@@ -370,19 +451,19 @@ function EvidenceFoundationPanel({
         <ul className="metric-definitions">
           {foundation.metricDefinitions.map((definition) => <li key={definition}>{definition}</li>)}
         </ul>
-        <h3>Clipped possession intervals</h3>
+        <h3>Possession sequences</h3>
         <ul className="interval-list">
-          {foundation.possessionIntervals.map((interval) => (
+          {foundation.possessionIntervals.map((interval, index) => (
             <li key={interval.id}>
-              <strong>{interval.id} · {interval.team ?? 'Shared play'} · {interval.status}</strong>
+              <strong>Sequence {index + 1} · {interval.team ?? 'Shared play'} · {interval.status}</strong>
               <span>{interval.start}–{interval.end} · {interval.durationMinutes} minutes{interval.endReason ? ` · ended by ${interval.endReason}` : ''}</span>
             </li>
           ))}
         </ul>
         <h3>Timestamped passes ({foundation.passReferences.length})</h3>
-        {referenceList(foundation.passReferences)}
-        <details className="all-references">
-          <summary>Raw pass records with locations and outcomes</summary>
+        {referenceList(foundation.passReferences, roster)}
+        <details className="all-references technical-record">
+          <summary>Technical record · raw pass records with IDs, locations and outcomes</summary>
           <ul className="interval-list">
             {foundation.passRecords.map((pass) => (
               <li key={pass.id}>
@@ -395,9 +476,9 @@ function EvidenceFoundationPanel({
           </ul>
         </details>
         <h3>Recorded turnovers ({foundation.turnoverReferences.length})</h3>
-        {referenceList(foundation.turnoverReferences)}
-        <details className="all-references">
-          <summary>Raw turnover records and linked pass IDs</summary>
+        {referenceList(foundation.turnoverReferences, roster)}
+        <details className="all-references technical-record">
+          <summary>Technical record · raw turnover records and linked pass IDs</summary>
           <ul className="interval-list">
             {foundation.turnoverRecords.map((turnover) => (
               <li key={turnover.id}>
@@ -410,24 +491,26 @@ function EvidenceFoundationPanel({
           </ul>
         </details>
         <h3>Recoveries ({foundation.recoveryReferences.length})</h3>
-        {referenceList(foundation.recoveryReferences)}
+        {referenceList(foundation.recoveryReferences, roster)}
         <h3>Selected pressure records ({foundation.pressureReferences.length})</h3>
-        {referenceList(foundation.pressureReferences)}
-        <h3>Build-up annotations · partial selected sample</h3>
-        <ul className="interval-list">
-          {foundation.buildUpAnnotations.map((annotation) => (
-            <li key={annotation.id}>
-              <strong>{annotation.id} · v{annotation.version} · {annotation.phase} · {annotation.team} · {annotation.possessionId}</strong>
-              <span>Passes: {annotation.passIds.join(', ') || 'none'} · turnovers: {annotation.turnoverIds.join(', ') || 'none'} · pressure: {annotation.pressureIds.join(', ') || 'none'}</span>
-            </li>
-          ))}
-        </ul>
+        {referenceList(foundation.pressureReferences, roster)}
+        <details className="all-references technical-record">
+          <summary>Technical record · build-up annotations (partial selected sample)</summary>
+          <ul className="interval-list">
+            {foundation.buildUpAnnotations.map((annotation) => (
+              <li key={annotation.id}>
+                <strong>{annotation.id} · v{annotation.version} · {annotation.phase} · {annotation.team} · {annotation.possessionId}</strong>
+                <span>Passes: {annotation.passIds.join(', ') || 'none'} · turnovers: {annotation.turnoverIds.join(', ') || 'none'} · pressure: {annotation.pressureIds.join(', ') || 'none'}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
         <h3>Substitutions recorded by selected time ({foundation.substitutions.length})</h3>
         <ul className="interval-list">
           {foundation.substitutions.map((substitution) => (
             <li key={substitution.id}>
-              <strong>{substitution.team} · {substitution.time} · {substitution.id}</strong>
-              <span>{substitution.playerOnId} on for {substitution.playerOffId}</span>
+              <strong>{substitution.team} · {substitution.time}</strong>
+              <span>{nameOf(substitution.playerOnId)} on for {nameOf(substitution.playerOffId)}</span>
             </li>
           ))}
         </ul>
@@ -442,8 +525,8 @@ function EvidenceFoundationPanel({
                 .filter((player) => player.team === team && player.status === 'starter')
                 .map((player) => (
                   <li key={player.id}>
-                    <strong>{player.id} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.name} · {player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
+                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -453,8 +536,8 @@ function EvidenceFoundationPanel({
                 .filter((player) => player.team === team && player.status === 'substitute')
                 .map((player) => (
                   <li key={player.id}>
-                    <strong>{player.id} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.name} · {player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
+                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -466,346 +549,520 @@ function EvidenceFoundationPanel({
   )
 }
 
+function ArrowIcon() {
+  return <svg viewBox="0 0 20 20" width="20" height="20" fill="none" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+}
+
+function WhatChanged({
+  comparison,
+  view,
+  changeCard,
+  onCopy,
+  onDownload,
+}: {
+  comparison: { earlier: AnswerSnapshot; later: AnswerSnapshot; result: Comparison }
+  view: 'fan' | 'analyst'
+  changeCard: ChangeCard | null
+  onCopy: () => void
+  onDownload: () => void
+}) {
+  const { earlier, later, result } = comparison
+  const separate = result.status !== 'comparable'
+  return (
+    <section className="what-changed" aria-labelledby="what-changed-title">
+      <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
+      <p className="change-headline">{result.headline}</p>
+      {result.lines.map((line) => <p className="change-line" key={line}>{line}</p>)}
+      {view === 'analyst' && !separate && (
+        <div className="change-analyst">
+          <p><strong>Windows</strong> {result.earlierTime}: {result.earlierWindow} · {result.laterTime}: {result.laterWindow}</p>
+          {result.pairs.map((pair) => (
+            <div key={pair.text}>
+              <p><strong>Definition</strong> {later.analysis.claims.find(({ claim }) => claim.text === pair.text)?.claim.meaning.description ?? pair.text}</p>
+              <table className="change-table">
+                <thead><tr><th scope="col">Figure</th><th scope="col">{result.earlierTime}</th><th scope="col">{result.laterTime}</th></tr></thead>
+                <tbody>
+                  {pair.figures.map((figure) => (
+                    <tr key={`${figure.entity}-${figure.metric}`}><th scope="row">{figure.entity} · {figure.label}</th><td>{figure.before ?? 'n/a'}</td><td>{figure.after ?? 'n/a'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <p><strong>Assessments</strong> {result.earlierTime}: {pair.beforeLabel} · {result.laterTime}: {pair.afterLabel}</p>
+            </div>
+          ))}
+          <p className="change-note">Calculation traces and coverage are in the claim details below.</p>
+        </div>
+      )}
+      {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
+      {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
+      <details className="earlier-answer" open={separate}>
+        <summary>Earlier answer · {result.earlierTime} · {earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</summary>
+        <p className="server-summary">{snapshotReply(earlier)}</p>
+        {checkedAgainst(earlier.analysis).length > 0 && <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(earlier.analysis).join('; ')}</p>}
+        <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
+      </details>
+      {changeCard && (
+        <details className="share-preview change-share">
+          <summary>Share what changed</summary>
+          <div className="share-row">
+            <button className="secondary-button" type="button" onClick={onCopy}>Copy what-changed text</button>
+            <button className="secondary-button" type="button" onClick={onDownload}>{changeCard.extended ? 'Download extended card' : 'Download card image'}</button>
+          </div>
+          <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
+            {changeCard.blocks.map((block, index) => (
+              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+            ))}
+          </section>
+        </details>
+      )}
+    </section>
+  )
+}
+
 function App() {
-  const [selectedClock, setSelectedClock] = useState(INITIAL_MATCH_TIME)
+  const replay = useMemo(
+    () =>
+      new ReplayController(MATCH_TIME_OPTIONS, INITIAL_MATCH_TIME, fetchReplayFrame, {
+        dwellMs: REPLAY_DWELL_MS,
+      }),
+    [],
+  )
+  const replaySnapshot = useSyncExternalStore(
+    replay.subscribe,
+    replay.getSnapshot,
+    replay.getSnapshot,
+  )
+  const selectedClock = replaySnapshot.requested
   const [period, setPeriod] = useState<AnalysisPeriod>('match-so-far')
   const [opinion, setOpinion] = useState('')
-  const [submittedOpinion, setSubmittedOpinion] = useState('')
-  const [submissionVersion, setSubmissionVersion] = useState(0)
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [submittedRequest, setSubmittedRequest] = useState<{
+    id: number
+    context: SubmissionContext
+    baseline: AnswerSnapshot | null
+  } | null>(null)
+  // The last successful answer is an immutable snapshot; failed requests never replace it.
+  const [shown, setShown] = useState<AnswerSnapshot | null>(null)
+  const [comparisonState, setComparisonState] = useState<{
+    earlier: AnswerSnapshot
+    later: AnswerSnapshot
+    result: Comparison
+  } | null>(null)
+  const analysis = shown?.analysis ?? null
+  const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
+  const [shareMessage, setShareMessage] = useState('')
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
-  const hasUnresolvedSubject = Boolean(
-    analysis?.claims.some(
-      ({ claim, assessment }) =>
-        claim.subject === null && assessment === 'clarification needed',
-    ),
+  const [view, setView] = useState<'fan' | 'analyst'>('fan')
+  const analysisRequestId = useRef(0)
+  const answerRef = useRef<HTMLElement>(null)
+  const isLoadingSubmit = isLoading && submittedRequest !== null
+  const submittedContext = shown?.context
+  const submittedOpinion = submittedContext?.opinion ?? ''
+  const hasMovedSinceAnswer = Boolean(
+    submittedContext &&
+      !isSubmissionScopeCurrent(submittedContext, selectedClock, period),
   )
-  const clockKeyForSelection = clockKey(selectedClock)
+  const displayedClock = replaySnapshot.displayedClock
+  const canCheckAgain = Boolean(
+    shown && displayedClock && !isLoadingSubmit &&
+      isLaterClock(displayedClock, shown.context.selectedClock),
+  )
+  const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
+  const changeCard = useMemo<ChangeCard | null>(
+    () => (comparison ? buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result) : null),
+    [comparison],
+  )
+  const hasUnresolvedSubject = Boolean(analysis?.claims.some(({ claim, assessment }) =>
+    claim.subject === null && assessment === 'clarification needed'))
+  const periodName = period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+  const isSeeking =
+    replaySnapshot.status === 'loading' &&
+    (replaySnapshot.displayedClock === null ||
+      clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
+  const suggestions = getQuestionSuggestions(selectedClock)
+  const shareModel = useMemo<ShareCardModel | null>(
+    () => (analysis && submittedContext ? buildShareCardModel(submittedContext.opinion, analysis) : null),
+    [analysis, submittedContext],
+  )
+  useEffect(() => {
+    replay.start()
+    return () => replay.dispose()
+  }, [replay])
 
   useEffect(() => {
+    if (!submittedRequest) return
+    const active = submittedRequest
     const controller = new AbortController()
+    const requestId = active.id
+    const request = createAnalysisRequest(active.context)
     async function loadAnalysis() {
       setIsLoading(true)
       setRequestError('')
-      setAnalysis(null)
-
+      setCopyMessage('')
+      setShareMessage('')
       try {
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            opinion: submittedOpinion,
-            selectedClock,
-            period,
-          }),
-          signal: controller.signal,
-        })
-        const responseText = await response.text()
-        let payload: unknown
-        if (responseText) {
-          try {
-            payload = JSON.parse(responseText)
-          } catch {
-            if (response.ok) {
-              throw new Error('The analysis API returned invalid JSON.')
-            }
-          }
+        const payload = await requestAnalysis(request, { signal: controller.signal })
+        if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
+        if (isLatestRequest(requestId, analysisRequestId.current)) {
+          const snapshot = createSnapshot(requestId, active.context, payload)
+          const baseline = active.baseline
+          setShown(snapshot)
+          setComparisonState(
+            baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
+          )
         }
-        if (!response.ok) {
-          const message =
-            typeof payload === 'object' &&
-            payload !== null &&
-            'error' in payload &&
-            typeof payload.error === 'string'
-              ? payload.error
-              : `The analysis service is unavailable (HTTP ${response.status}).`
-          throw new Error(message)
-        }
-        if (!isAnalysisResponse(payload)) {
-          throw new Error('The analysis API returned an invalid response.')
-        }
-        setAnalysis(payload)
       } catch (error) {
-        if (controller.signal.aborted) return
-        setRequestError(
-          error instanceof Error
-            ? `${error.message} Start the local Azure Functions API and try again.`
-            : 'The local analysis API could not be reached. Start it and try again.',
-        )
+        if (
+          !controller.signal.aborted &&
+          isLatestRequest(requestId, analysisRequestId.current)
+        ) {
+          setRequestError(error instanceof Error ? error.message : 'The analysis service could not be reached.')
+        }
       } finally {
-        if (!controller.signal.aborted) setIsLoading(false)
+        if (
+          !controller.signal.aborted &&
+          isLatestRequest(requestId, analysisRequestId.current)
+        ) {
+          setIsLoading(false)
+        }
       }
     }
-
     void loadAnalysis()
     return () => controller.abort()
-  }, [period, selectedClock, submittedOpinion, submissionVersion])
+  }, [submittedRequest])
+
+  const [answerBelowFold, setAnswerBelowFold] = useState(false)
+
+  useEffect(() => {
+    const node = answerRef.current
+    if (!analysis || !node) {
+      setAnswerBelowFold(false)
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const viewportBottom = entry.rootBounds?.bottom ?? window.innerHeight
+        setAnswerBelowFold(!entry.isIntersecting && entry.boundingClientRect.top >= viewportBottom)
+      },
+      { threshold: 0.1 },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [analysis])
+
+  function showAnswer() {
+    const node = answerRef.current
+    if (!node) return
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    node.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+    node.focus({ preventScroll: true })
+  }
 
   function selectClock(value: string) {
     const nextClock = MATCH_TIME_OPTIONS.find((clock) => clockKey(clock) === value)
-    if (nextClock) setSelectedClock(nextClock)
+    if (nextClock) replay.seek(nextClock)
+  }
+
+  function fillQuestion(text: string) {
+    setOpinion(text)
+    document.getElementById('opinion-input')?.focus()
   }
 
   function submitOpinion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isSeeking) return
     const trimmedOpinion = opinion.trim()
     if (!trimmedOpinion) return
-    setSubmittedOpinion(trimmedOpinion)
-    setSubmissionVersion((version) => version + 1)
-    setCopyMessage('')
+    const id = ++analysisRequestId.current
+    setShown(null)
+    setComparisonState(null)
+    setRequestError('')
+    setSubmittedRequest({
+      id,
+      context: createSubmissionContext(trimmedOpinion, selectedClock, period),
+      baseline: null,
+    })
+  }
+
+  // Re-checks the saved take at the committed, displayed moment; never the pending replay position.
+  function checkAgain() {
+    if (!shown || !displayedClock || !canCheckAgain) return
+    const id = ++analysisRequestId.current
+    setRequestError('')
+    setSubmittedRequest({
+      id,
+      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period),
+      baseline: shown,
+    })
+  }
+
+  function retryAnalysis() {
+    if (!submittedRequest || isLoading) return
+    const id = ++analysisRequestId.current
+    setSubmittedRequest({ ...submittedRequest, id })
   }
 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(
-        analysis.summary,
-      )
-      setCopyMessage('Assessment copied.')
+      await navigator.clipboard.writeText(canonicalReply(analysis))
+      setCopyMessage('Reply copied.')
     } catch {
-      setCopyMessage('Could not copy automatically. Select and copy the summary instead.')
+      setCopyMessage('Select the reply above and copy it manually.')
     }
   }
 
+  async function copyShareCard() {
+    if (!shareModel) return
+    try {
+      await navigator.clipboard.writeText(shareCardText(shareModel))
+      setShareMessage('Card text copied.')
+    } catch {
+      setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
+    }
+  }
+
+  async function copyChangeCard() {
+    if (!changeCard) return
+    try {
+      await navigator.clipboard.writeText(changeCardText(changeCard))
+      setShareMessage('What-changed text copied.')
+    } catch {
+      setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
+    }
+  }
+
+  async function downloadImage(image: ShareCardImage, extended: boolean, name: string) {
+    const save = (blob: Blob, extension: string) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${name}.${extension}`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+    try {
+      save(await svgToPngBlob(image, 2), 'png')
+      setShareMessage(extended ? 'Extended card image downloaded.' : 'Card image downloaded.')
+    } catch {
+      try {
+        save(new Blob([image.svg], { type: 'image/svg+xml;charset=utf-8' }), 'svg')
+        setShareMessage('Card image downloaded as SVG.')
+      } catch {
+        setShareMessage('Image download is unavailable. Copy the card text instead.')
+      }
+    }
+  }
+
+  function downloadShareCard() {
+    if (shareModel) void downloadImage(createShareCardImage(shareModel), shareModel.extended, 'groupchat-analyst-card')
+  }
+
+  function downloadChangeCard() {
+    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks), changeCard.extended, 'groupchat-analyst-what-changed')
+  }
+
+  const claimBreakdown = analysis && (
+    <div className="claim-result-list">
+      {analysis.claims.map((result, index) => <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? submittedOpinion || undefined : undefined} />)}
+    </div>
+  )
+
   return (
-    <main className="page-shell analyst-shell">
+    <main className="page-shell analyst-shell" id="main-content">
+      <a className="skip-link" href="#opinion-input">Skip to your take</a>
       <header className="site-header">
         <a className="brand" href="/" aria-label="Groupchat Analyst home">
-          <span className="brand-mark" aria-hidden="true">G</span>
-          <span>Groupchat Analyst</span>
+          <span className="brand-mark" aria-hidden="true">g<span>.</span></span>
+          <span>Groupchat<span className="brand-light">Analyst</span></span>
         </a>
-        <span className="project-status">A matchday companion</span>
+        <span className="demo-label"><span aria-hidden="true" />Synthetic demo</span>
       </header>
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <p className="eyebrow">
-            <span className="status-dot" aria-hidden="true" />
-            Synthetic match demonstration
-          </p>
-          <h1 id="page-title">Bring your take. Check the evidence.</h1>
-          <p className="intro-description">
-            The server interprets each claim, retrieves its relevant match events,
-            calculates recorded statistics, and shows what the fixture cannot establish.
-          </p>
+          <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
+          <p className="intro-description"><span className="intro-long">Drop your football take. Check it against the match. Get the receipts.</span><span className="intro-short">Football takes. Match evidence.</span></p>
         </div>
 
-        <section className="match-card" aria-labelledby="match-title">
-          <div className="match-heading">
-            <div>
-              <p className="card-kicker">Synthetic Premier Division · 2025/26</p>
-              <h2 id="match-title">Northbridge vs Eastport</h2>
-            </div>
-            <span className="synthetic-badge"><span aria-hidden="true" />Fictional match</span>
-          </div>
-          <p className="synthetic-player-disclaimer">
-            Simulated match using real-player names. All performances and results are fictional.
-          </p>
-
-          {analysis ? (
-            <>
-              <div className="scoreboard" aria-live="polite">
-                <span className="score-team">Northbridge</span>
-                <span className="score">
-                  {analysis.score.Northbridge}<span aria-hidden="true">–</span>
-                  {analysis.score.Eastport}
-                </span>
-                <span className="score-team">Eastport</span>
-                <span className="score-clock">Score at {analysis.selectedTime}</span>
-              </div>
-
-              <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />
-            </>
-          ) : (
-            <p className="api-status" role={requestError ? 'alert' : 'status'}>
-              {requestError || (isLoading ? 'Loading server-calculated match data…' : '')}
-            </p>
-          )}
-
-          <div className="analysis-controls">
-            <label className="time-control" htmlFor="match-time">
-              <span className="control-label">Match time</span>
-              <select
-                id="match-time"
-                value={clockKeyForSelection}
-                onChange={(event) => selectClock(event.currentTarget.value)}
-              >
-                <optgroup label="First half">
-                  {MATCH_TIME_OPTIONS.filter((clock) => clock.period === 1).map((clock) => (
-                    <option key={clockKey(clock)} value={clockKey(clock)}>
-                      {formatMatchClock(clock)}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Second half">
-                  {MATCH_TIME_OPTIONS.filter((clock) => clock.period === 2).map((clock) => (
-                    <option key={clockKey(clock)} value={clockKey(clock)}>
-                      {formatMatchClock(clock)}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </label>
-            <fieldset className="period-control">
-              <legend className="control-label">Evidence period</legend>
-              <div className="period-options">
-                <button
-                  className={period === 'match-so-far' ? 'selected' : ''}
-                  type="button"
-                  aria-pressed={period === 'match-so-far'}
-                  onClick={() => setPeriod('match-so-far')}
-                >
-                  Match so far
-                </button>
-                <button
-                  className={period === 'last-10-minutes' ? 'selected' : ''}
-                  type="button"
-                  aria-pressed={period === 'last-10-minutes'}
-                  onClick={() => setPeriod('last-10-minutes')}
-                >
-                  Last 10 minutes
-                </button>
-              </div>
-            </fieldset>
-          </div>
-
-          <p className="context-caption">
-            The server uses the selected match time and period; the browser sends no event data or statistics.
-          </p>
-
-          {analysis && (
-            <div className="player-picker">
-              <label htmlFor="player-select">Choose a fictional matchday player</label>
-              <div>
-                <select
-                  id="player-select"
-                  value={selectedPlayerId}
-                  onChange={(event) => setSelectedPlayerId(event.currentTarget.value)}
-                >
-                  <option value="">Select a player</option>
-                  {TEAMS.map((team) => (
-                    <optgroup key={team} label={team}>
-                      {analysis.evidenceFoundation.players.map((player) =>
-                        player.team === team ? (
-                          <option key={player.id} value={player.id}>
-                            {player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}
-                          </option>
-                        ) : null,
-                      )}
-                    </optgroup>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!selectedPlayerId}
-                  onClick={() => {
-                    const player = analysis.evidenceFoundation.players.find(
-                      ({ id }) => id === selectedPlayerId,
-                    )
-                    if (player) setOpinion(`How did ${player.name} perform?`)
-                    document.getElementById('opinion-input')?.focus()
-                  }}
-                >
-                  Ask about player
-                </button>
-              </div>
-            </div>
-          )}
-
-          <form className="opinion-form" onSubmit={submitOpinion}>
-            <label className="opinion-label" htmlFor="opinion-input">What&apos;s your take?</label>
-            <textarea
-              id="opinion-input"
-              value={opinion}
-              onChange={(event) => setOpinion(event.currentTarget.value)}
-              placeholder="Eastport controlled possession of the game, Northbridge scored against the run of play."
-              rows={3}
-              required
+        <div className="workspace-grid">
+          <div className="match-column">
+            <MatchHeader
+              timeline={MATCH_TIME_OPTIONS}
+              snapshot={replaySnapshot}
+              keyMoments={KEY_MOMENTS}
+              dwellMs={REPLAY_DWELL_MS}
+              onSeek={(clock) => replay.seek(clock)}
+              onStep={(direction) => replay.step(direction)}
+              onPlay={() => replay.play()}
+              onPause={() => replay.pause()}
+              onRetry={() => replay.retry()}
             />
-            <div className="example-prompts" aria-label="Example evidence questions">
-            <span>Try:</span>
-            <button
-              type="button"
-              onClick={() => setOpinion('Northbridge had more possession than Eastport.')}
-            >
-              Compare possession
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpinion('Northbridge scored against the run of play.')}
-            >
-              Review the 45+3′ goal
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpinion('Where are we losing possession during build-up?')}
-            >
-              Coaching: build-up losses
-            </button>
-            </div>
-            <div className="opinion-submit-row">
-              <p className="input-hint">
-                The default server interpreter uses limited local rules. Microsoft Foundry is prepared but not connected.
-              </p>
-              <button className="check-button" type="submit" disabled={isLoading}>
-                {isLoading ? 'Checking…' : 'Check the evidence'}
-              </button>
-            </div>
-          </form>
-
-          {analysis && submittedOpinion && (
-            <section className="claim-assessments" aria-labelledby="result-title" aria-live="polite">
-              <div className="result-title-row">
-                <div>
-                  <p className="card-kicker">{analysis.providerLabel}</p>
-                  <h2 id="result-title">Your claim assessment</h2>
+          </div>
+          <div className="conversation-column">
+            <form className="opinion-form" onSubmit={submitOpinion}>
+              <label className="opinion-label" htmlFor="opinion-input">What’s your take?</label>
+              <textarea
+                id="opinion-input" value={opinion} onChange={(event) => setOpinion(event.currentTarget.value)}
+                placeholder="Ask about this moment, e.g. How many shots did Eastport have?"
+                rows={3} required aria-describedby="input-hint"
+              />
+              <div className="composer-bottom">
+                <div className="scope-summary">
+                  <span>Asking about <strong>{formatMatchClock(selectedClock)}</strong> · {periodName}</span>
+                  <details className="context-controls">
+                    <summary>Change</summary>
+                    <div className="analysis-controls">
+                      <label className="time-control" htmlFor="match-time">
+                        <span className="control-label">Match time</span>
+                        <select id="match-time" value={clockKey(selectedClock)} onChange={(event) => selectClock(event.currentTarget.value)}>
+                          <optgroup label="First half">{MATCH_TIME_OPTIONS.filter((clock) => clock.period === 1).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
+                          <optgroup label="Second half">{MATCH_TIME_OPTIONS.filter((clock) => clock.period === 2).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
+                        </select>
+                      </label>
+                      <fieldset className="period-control">
+                        <legend className="control-label">Evidence period</legend>
+                        <div className="period-options">
+                          <button className={period === 'match-so-far' ? 'selected' : ''} type="button" aria-pressed={period === 'match-so-far'} onClick={() => setPeriod('match-so-far')}>Match so far</button>
+                          <button className={period === 'last-10-minutes' ? 'selected' : ''} type="button" aria-pressed={period === 'last-10-minutes'} onClick={() => setPeriod('last-10-minutes')}>Last 10 minutes</button>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </details>
                 </div>
-                <span className="result-period">{analysis.selectedPeriodLabel}</span>
+                <button className="check-button" type="submit" disabled={isLoadingSubmit || isSeeking}>
+                  {isLoadingSubmit ? 'Checking…' : isSeeking ? 'Moving…' : 'Check this moment'}<ArrowIcon />
+                </button>
               </div>
-              <p className="server-summary">{analysis.summary}</p>
-              <div className="claim-result-list">
-                {analysis.claims.map((result, index) => (
-                  <ClaimCard key={result.claim.id} result={result} index={index} />
+              <div className="suggestions" role="group" aria-label="Suggested questions">
+                <span>Try asking</span>
+                {suggestions.map((question) => (
+                  <button key={question.id} type="button" onClick={() => fillQuestion(question.text)}>{question.text}</button>
                 ))}
               </div>
-              {analysis.claims.length === 0 && (
-                <p className="empty-evidence">No claim could be interpreted from this opinion.</p>
+              <p className="input-hint" id="input-hint">Synthetic match: every performance and result is invented.</p>
+            </form>
+
+            <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
+              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same take again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
+              {requestError && (
+                <div className="api-error" role="alert">
+                  <strong>We couldn’t check that take.</strong><p>{requestError}</p>
+                  <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
+                </div>
               )}
-              <div className="share-row">
-                <button className="copy-button" type="button" onClick={copyAssessment}>
-                  Copy shareable summary
-                </button>
-                <span role="status" aria-live="polite">{copyMessage}</span>
-              </div>
-            </section>
-          )}
+              {analysis && submittedContext && (
+                <section className="claim-assessments" aria-labelledby="result-title" ref={answerRef} tabIndex={-1}>
+                  <div className="result-title-row">
+                    <h2 id="result-title">The answer</h2>
+                    <div className="segmented-control view-control" role="group" aria-label="Answer detail" aria-describedby="detail-help">
+                      <button type="button" aria-pressed={view === 'fan'} onClick={() => setView('fan')}>Fan</button>
+                      <button type="button" aria-pressed={view === 'analyst'} onClick={() => setView('analyst')}>Analyst</button>
+                    </div>
+                  </div>
+                  <p className="detail-help" id="detail-help">
+                    {view === 'fan'
+                      ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
+                      : 'Analyst view opens the reasoning and evidence' + (needsPassMap(analysis) ? ', plus a pass map' : '') + '. The answer, verdict and limitations are the same as in Fan view.'}
+                  </p>
+                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} />}
+                  <p className="checked-question">{submittedOpinion}</p>
+                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved take above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
+                  {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
+                  {canCheckAgain && displayedClock && (
+                    <div className="check-again">
+                      <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
+                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved take, not your edit' : ''}.</span>
+                    </div>
+                  )}
+                  <p className="server-summary">{canonicalReply(analysis)}</p>
+                  {checkedAgainst(analysis).length > 0 && (
+                    <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(analysis).join('; ')}</p>
+                  )}
+                  <div className="answer-attribution"><span>Synthetic match</span><span>Submitted at {formatMatchClock(submittedContext.selectedClock)}</span><span>{submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</span><span>{analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'}</span></div>
+                  <div className="visible-limitations">
+                    {analysis.claims.flatMap((result) => [
+                      ...result.claim.clarificationNeeds.map((need) => ({
+                        key: `${result.claim.id}-${need}`,
+                        text: need,
+                        title: 'Clarification',
+                      })),
+                      ...(isRoutineLimitation(result)
+                        ? []
+                        : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
+                    ])
+                      .map((item) => <p key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
+                    {analysis.claims.length === 0 && (
+                      <p><strong>Limitation:</strong> The request was not interpreted as a supported claim.</p>
+                    )}
+                  </div>
+                  <div className="share-row">
+                    <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
+                    <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
+                    <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
+                    <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
+                  </div>
+                  {shareModel && (
+                    <details className="share-preview">
+                      <summary>Preview share card</summary>
+                      <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
+                        {shareCardBlocks(shareModel).map((block, index) => (
+                          <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+                        ))}
+                      </section>
+                    </details>
+                  )}
+                  {analysis.claims.length > 0 ? view === 'fan' ? (
+                    <details className="answer-breakdown"><summary>Check the reasoning <span>{analysis.claims.length} {analysis.claims.length === 1 ? 'claim' : 'claims'}</span></summary>{claimBreakdown}</details>
+                  ) : <div className="analyst-breakdown"><p className="section-label">CLAIMS & EVIDENCE</p>{claimBreakdown}</div>
+                  : <p className="empty-evidence">Try naming a team or player and the part of the match you mean.</p>}
+                </section>
+              )}
+            </div>
 
-          {analysis && !hasUnresolvedSubject && (
-            <details className="all-evidence">
-              <summary>All events in the selected evidence period ({analysis.periodEvents.length})</summary>
-              {referenceList(analysis.periodEvents)}
-            </details>
-          )}
-          {requestError && analysis && <p className="api-error" role="alert">{requestError}</p>}
-        </section>
+            {analysis && view === 'analyst' && !hasUnresolvedSubject && needsPassMap(analysis) && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
+            {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />}
+            {analysis && !hasUnresolvedSubject && (
+              <details className="all-evidence match-events"><summary>Explore match events <span>{analysis.periodEvents.length} recorded</span></summary>{referenceList(analysis.periodEvents, analysis.evidenceFoundation.players)}</details>
+            )}
+            {analysis && (
+              <details className="player-picker">
+                <summary>Ask about a player</summary>
+                <label htmlFor="player-select">Fictional matchday squad</label>
+                <select id="player-select" value={selectedPlayerId} onChange={(event) => setSelectedPlayerId(event.currentTarget.value)}>
+                  <option value="">Choose a player</option>
+                  {TEAMS.map((team) => <optgroup key={team} label={team}>{analysis.evidenceFoundation.players.filter((player) => player.team === team).map((player) => <option key={player.id} value={player.id}>{player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}</option>)}</optgroup>)}
+                </select>
+                <button className="secondary-button" type="button" disabled={!selectedPlayerId} onClick={() => {
+                  const player = analysis.evidenceFoundation.players.find(({ id }) => id === selectedPlayerId)
+                  if (player) fillQuestion(`How did ${player.name} perform?`)
+                }}>Use this player <ArrowIcon /></button>
+              </details>
+            )}
+          </div>
+        </div>
 
-        <p className="analysis-footnote">
-          Fictional synthetic data only. Statistics and evidence are calculated server-side from the fixture.
-          Goals are shot outcomes. First-half stoppage time is shown as 45+N; the last-10-minutes window
-          excludes half-time and includes both endpoints. Historical “before” periods exclude the anchored
-          event itself and all later events. Possession percentages use recorded controlled time only;
-          contested and out-of-play time are excluded. Selected pressure events are partial, not continuous.
-          Continuous tracking, video, physical data, defensive shape and calibrated xG are not included.
-        </p>
+
+        <details className="about-demo">
+          <summary>About this demo & its data</summary>
+          <div>
+            <p>Northbridge and Eastport are fictional teams using real-player names. Every performance and result is invented.</p>
+            <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
+            <p>Match statistics use the selected time and evidence period. Possession uses recorded controlled time only; contested and out-of-play time are excluded. Build-up and pressure observations cover selected samples.</p>
+            <p>Player tracking, video, running distance, defensive shape and calibrated expected goals are not recorded. A missing measurement is not a zero.</p>
+            <p>First-half stoppage time is 45+N′; second-half stoppage is 90+N′. Recent-minute windows exclude half-time. Historical “before” periods exclude the anchored event and all later events.</p>
+          </div>
+        </details>
       </section>
-
-      <footer className="site-footer">
-        <span>Good debates leave room for the full picture.</span>
-        <span className="footer-label"><span className="footer-dot" aria-hidden="true" />Prototype in progress</span>
-      </footer>
+      <footer className="site-footer"><span>Football opinions. A fuller picture.</span><span className="footer-label">{analysis?.provider === 'foundry' ? 'Foundry interpretation' : analysis?.provider === 'local' ? 'Local rules demo' : 'Demo match analysis'}</span></footer>
+      {answerBelowFold && (
+        <div className="answer-ready" role="status">
+          <button type="button" onClick={showAnswer}>Answer ready <span aria-hidden="true">↓</span></button>
+        </div>
+      )}
     </main>
   )
 }

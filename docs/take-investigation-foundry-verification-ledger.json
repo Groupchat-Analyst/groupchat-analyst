@@ -1,0 +1,126 @@
+{
+  "name": "take-investigation bounded Foundry verification",
+  "applicationCommit": "cf10c74",
+  "runDate": "2026-10-25",
+  "scope": "Four authorised model requests, sequential, no retries or replacement calls. Four calls do not establish broad reliability.",
+  "configuration": {
+    "deployment": "gpt-5-mini",
+    "maxCompletionTokens": 8192,
+    "providerTimeoutSeconds": 30,
+    "providerRetries": false,
+    "browserDeadlineSeconds": 45,
+    "rawCapture": "enabled for this isolated process only; file archived under apps/api/.local-captures/take-investigation-cf10c74-foundry-run (git-ignored, not committed)",
+    "isolation": "separate API on :7073 and UI on :5181; both stopped after the run; :7071, :7072, :5174 and :5180 untouched"
+  },
+  "verificationMethod": "All four requests were submitted through the real browser UI (call 2 via the Check again button). Interpretation, usage and provider-side duration come from the server capture/log; displayed text comes from the page. Hidden reasoning, credentials, headers and endpoints are not recorded.",
+  "calls": [
+    {
+      "n": 1,
+      "input": "Eastport had more shots on target.",
+      "clock": "57′",
+      "period": "match-so-far",
+      "provider": "Foundry · server-side interpretation (as displayed)",
+      "result": "answered",
+      "interpretation": {
+        "claimText": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "operator": "greater-than",
+        "opponent": "Northbridge",
+        "requiredEvidence": ["shots-on-target"],
+        "timePeriod": "selected",
+        "clarificationNeeds": []
+      },
+      "displayedReply": "No — Eastport and Northbridge are level on 2 shots on target each.",
+      "checkedAgainst": "Eastport vs Northbridge · shots on target · Match so far through 57′",
+      "figures": "Eastport 2, Northbridge 2",
+      "assessment": "not captured directly; displayed reply is a 'No' (contradicted)",
+      "elapsed": { "serverMs": 4253, "browserMs": "not captured (browser-side recording failed; the request itself was single)" },
+      "usage": { "promptTokens": 3864, "completionTokens": 335, "totalTokens": 4199 },
+      "finish": "stop (response accepted)"
+    },
+    {
+      "n": 2,
+      "input": "Eastport had more shots on target.",
+      "clock": "58′",
+      "period": "match-so-far",
+      "flow": "Check again button; exactly one request",
+      "provider": "Foundry · server-side interpretation (as displayed)",
+      "result": "answered; direct comparison NOT produced",
+      "interpretation": {
+        "claimText": "Eastport had more shots on target than Northbridge up to the 58′ minute.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "operator": "greater-than",
+        "opponent": "Northbridge",
+        "requiredEvidence": ["shots-on-target"],
+        "timePeriod": "selected",
+        "clarificationNeeds": []
+      },
+      "displayedReply": "Yes — Eastport have 3 shots on target to Northbridge's 2.",
+      "checkedAgainst": "Eastport vs Northbridge · shots on target · Match so far through 58′",
+      "figures": "Eastport 3, Northbridge 2",
+      "assessment": "supported",
+      "comparison": "The panel said the two checks read the take differently and showed the answers separately. Cause: the comparison key includes the model's free-text claim.text, which differed between calls (structured fields were identical).",
+      "elapsed": { "serverMs": 6264, "browserMs": 6272 },
+      "usage": { "promptTokens": 3916, "completionTokens": 785, "totalTokens": 4701 },
+      "finish": "stop (response accepted)"
+    },
+    {
+      "n": 3,
+      "input": "Northbridge parked the bus.",
+      "clock": "57′",
+      "period": "match-so-far",
+      "provider": "Foundry · server-side interpretation (as displayed)",
+      "result": "answered with a wording problem",
+      "interpretation": {
+        "claimText": "Northbridge parked the bus.",
+        "intent": "subjective-judgement",
+        "category": "performance-judgement",
+        "requiredEvidence": ["possession", "shots", "passing", "possession-losses", "lineups"],
+        "timePeriod": "selected",
+        "clarificationNeeds": []
+      },
+      "assessment": "insufficient evidence for a firm conclusion",
+      "displayedReply": "Northbridge had 55.4% of recorded possession to Eastport's 44.6%. That backs up the possession part of the take. Possession alone doesn't settle overall dominance.",
+      "finding": "No firm verdict and no low-possession substitution, but the deterministic Fan reply frames possession as backing 'the possession part of the take' and talks about 'dominance', which does not fit 'parked the bus'. This is a server wording mismatch, not a model interpretation error.",
+      "elapsed": { "serverMs": 6903, "browserMs": 6912 },
+      "usage": { "promptTokens": 3862, "completionTokens": 906, "totalTokens": 4768 },
+      "finish": "stop (response accepted)"
+    },
+    {
+      "n": 4,
+      "input": "How many passes did Bruno complete?",
+      "clock": "58′",
+      "period": "match-so-far",
+      "provider": "Foundry · server-side interpretation (as displayed)",
+      "result": "FAILED: server rejected the interpretation (HTTP 502, category semantic-validation)",
+      "interpretation": {
+        "claimText": "Number of completed passes by Bruno in the match so far (up to 58′).",
+        "intent": "statistical-request",
+        "playerSubject": null,
+        "playerMetric": null,
+        "category": "other",
+        "requiredEvidence": ["passing"],
+        "clarificationNeeds": ["Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?"]
+      },
+      "displayedError": "Claim 1 intent does not match its evidence request.",
+      "finding": "Foundry asked the right clarification question and guessed no player, but the server's intent/evidence validation rejected the whole interpretation, so the user saw a generic error instead of the clarification. No pass count or guessed player was returned. Not retried.",
+      "elapsed": { "serverMs": 5428, "browserMs": 5433 },
+      "usage": { "promptTokens": 3916, "completionTokens": 655, "totalTokens": 4571 },
+      "finish": "stop (usage returned; rejected by server validation, not truncated)"
+    }
+  ],
+  "totals": {
+    "callsAttempted": 4,
+    "knownPromptTokens": 15558,
+    "knownCompletionTokens": 2681,
+    "knownTotalTokens": 18239,
+    "unknownUsage": "none; usage was returned for all four calls"
+  },
+  "notVerified": [
+    "Broad reliability, repeat-run consistency, phrasing coverage, failure rate, latency distribution or cost at scale",
+    "A direct 57′→58′ comparison on Foundry (not produced; see call 2)",
+    "Call 1 assessment label read directly from the response"
+  ]
+}

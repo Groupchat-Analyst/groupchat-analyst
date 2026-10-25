@@ -1,0 +1,960 @@
+{
+ "provider": "local",
+ "providerLabel": "Server-side local rule-based interpreter (no model connection)",
+ "summary": "Yes — Eastport recorded 1 shot on target, compared with Northbridge's 0 shots on target.\n\nSelected period: Last 10 minutes ending 58′. This is a fictional match using real-player names; all performances and results are fictional.",
+ "fanReply": "Yes — Eastport have 1 shot on target to Northbridge's 0.",
+ "selectedTime": "58′",
+ "selectedPeriodLabel": "Last 10 minutes ending 58′",
+ "score": {
+  "Northbridge": 1,
+  "Eastport": 1
+ },
+ "periodStatistics": {
+  "Northbridge": {
+   "shots": 1,
+   "shotsOnTarget": 0,
+   "goals": 0
+  },
+  "Eastport": {
+   "shots": 1,
+   "shotsOnTarget": 1,
+   "goals": 1
+  }
+ },
+ "periodEvents": [
+  {
+   "id": "event-09",
+   "time": "51′",
+   "team": "Northbridge",
+   "description": "A counter-attacking effort goes wide. Shooter: Viktor Gyökeres (north-player-11)."
+  },
+  {
+   "id": "event-10",
+   "time": "58′",
+   "team": "Eastport",
+   "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+  }
+ ],
+ "evidenceFoundation": {
+  "dataset": {
+   "id": "northbridge-eastport-analysis-demo",
+   "version": "3.0.0",
+   "label": "Simulated match using real-player names. All performances and results are fictional.",
+   "source": "Authored deterministic synthetic fixture; roster-name references documented in DATA_DICTIONARY.md",
+   "provenance": "synthetic"
+  },
+  "capabilities": [
+   {
+    "id": "match-events",
+    "label": "Timestamped match events",
+    "status": "available",
+    "detail": "The original synthetic fixture records shots and goals with stable event IDs."
+   },
+   {
+    "id": "possession-intervals",
+    "label": "Possession duration",
+    "status": "available",
+    "detail": "Synthetic controlled intervals are separate from contested and out-of-play time."
+   },
+   {
+    "id": "passes-and-locations",
+    "label": "Pass outcomes and locations",
+    "status": "available",
+    "detail": "Synthetic pass attempts include start/end coordinates and completion outcomes."
+   },
+   {
+    "id": "turnovers-and-recoveries",
+    "label": "Possession losses and recoveries",
+    "status": "available",
+    "detail": "Recorded synthetic incomplete-pass turnovers include area and recovery links."
+   },
+   {
+    "id": "pressure-events",
+    "label": "Pressure events",
+    "status": "partial",
+    "detail": "Only selected synthetic pressure events are recorded; this is not continuous pressure tracking."
+   },
+   {
+    "id": "lineups",
+    "label": "Lineups and substitutions",
+    "status": "available",
+    "detail": "Fictional player IDs and synthetic lineup/substitution records are included."
+   },
+   {
+    "id": "player-attributed-actions",
+    "label": "Player-attributed synthetic actions",
+    "status": "partial",
+    "detail": "Selected passes, receptions, shots, turnovers, recoveries, and pressure observations have deterministic player IDs; the sparse authored events are not a complete player-performance dataset."
+   },
+   {
+    "id": "continuous-tracking",
+    "label": "Continuous player/ball tracking",
+    "status": "not-recorded",
+    "detail": "No continuous tracking or defensive-shape measurements are available."
+   },
+   {
+    "id": "video",
+    "label": "Synchronized video",
+    "status": "not-recorded",
+    "detail": "No video is included or linked."
+   },
+   {
+    "id": "physical-measurements",
+    "label": "Physical measurements",
+    "status": "not-recorded",
+    "detail": "No distance, speed, acceleration, or workload measurements are included."
+   },
+   {
+    "id": "build-up-phase",
+    "label": "Defined build-up phase",
+    "status": "partial",
+    "detail": "A small, versioned synthetic sample labels build-up sequences and links passes, losses, and selected pressure observations. It is not complete match-wide phase coverage."
+   },
+   {
+    "id": "advanced-models",
+    "label": "Expected-goal or other advanced models",
+    "status": "not-recorded",
+    "detail": "No calibrated xG or model-derived metrics are supplied."
+   }
+  ],
+  "possessionDenominatorMinutes": 10,
+  "possessionCoverageComplete": true,
+  "passCoverageComplete": true,
+  "turnoverCoverageComplete": true,
+  "missingCoveragePeriods": [],
+  "excludedOutOfPlayMinutes": 0,
+  "contestedMinutes": 0,
+  "metricDefinitions": [
+   "Possession percentage = each team’s controlled-possession minutes divided by the sum of both teams’ controlled-possession minutes. Contested and out-of-play intervals are excluded.",
+   "Pass completion = completed recorded passes divided by pass attempts in the selected window.",
+   "Pass attempts, completions, percentage, numerator IDs, and denominator IDs are returned as a calculation trace for statistical requests.",
+   "Possession losses are recorded incomplete-pass turnovers grouped by the x-coordinate of the pass endpoint: defensive third <33.3, middle third 33.3–<66.7, final third >=66.7.",
+   "Final-third entries count completed passes whose start is outside and endpoint is inside the final third (x >=66.7).",
+   "Build-up events are returned only for a versioned, selected sample of explicitly annotated sequences; this sample is not complete match-wide phase coverage.",
+   "Intervals use half-aware clocks and are clipped to the selected window; halftime has no possession duration. A clipped interval omits its eventual end reason.",
+   "Event references use stable fixture IDs, team/player IDs, period-aware match timestamps, dataset version 3.0.0, and synthetic provenance."
+  ],
+  "teams": {
+   "Northbridge": {
+    "possessionMinutes": 7,
+    "possessionPercentage": 70,
+    "passAttempts": 5,
+    "completedPasses": 4,
+    "passCompletionPercentage": 80,
+    "possessionLosses": {
+     "defensive-third": 0,
+     "middle-third": 1,
+     "final-third": 0
+    },
+    "finalThirdEntries": 0
+   },
+   "Eastport": {
+    "possessionMinutes": 3,
+    "possessionPercentage": 30,
+    "passAttempts": 3,
+    "completedPasses": 2,
+    "passCompletionPercentage": 66.7,
+    "possessionLosses": {
+     "defensive-third": 0,
+     "middle-third": 1,
+     "final-third": 0
+    },
+    "finalThirdEntries": 0
+   }
+  },
+  "possessionIntervals": [
+   {
+    "id": "sequence-13",
+    "team": "Eastport",
+    "status": "controlled",
+    "start": "48′",
+    "end": "51′",
+    "durationMinutes": 3,
+    "relatedEventIds": [
+     "event-08"
+    ],
+    "endReason": "turnover"
+   },
+   {
+    "id": "sequence-14",
+    "team": "Northbridge",
+    "status": "controlled",
+    "start": "51′",
+    "end": "58′",
+    "durationMinutes": 7,
+    "relatedEventIds": [
+     "event-09"
+    ],
+    "endReason": "turnover"
+   }
+  ],
+  "passRecords": [
+   {
+    "id": "pass-036",
+    "possessionId": "sequence-13",
+    "team": "Eastport",
+    "playerId": "east-player-03",
+    "receiverId": "east-player-04",
+    "time": "48′",
+    "start": {
+     "x": 48,
+     "y": 35
+    },
+    "end": {
+     "x": 66,
+     "y": 48
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-037",
+    "possessionId": "sequence-13",
+    "team": "Eastport",
+    "playerId": "east-player-04",
+    "receiverId": "east-player-05",
+    "time": "49′",
+    "start": {
+     "x": 66,
+     "y": 48
+    },
+    "end": {
+     "x": 66,
+     "y": 61
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-038",
+    "possessionId": "sequence-13",
+    "team": "Eastport",
+    "playerId": "east-player-05",
+    "receiverId": "east-player-06",
+    "time": "50′",
+    "start": {
+     "x": 66,
+     "y": 61
+    },
+    "end": {
+     "x": 66,
+     "y": 74
+    },
+    "outcome": "incomplete",
+    "qualifiers": [
+     "turnover"
+    ],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-039",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-03",
+    "receiverId": "north-player-04",
+    "time": "52′",
+    "start": {
+     "x": 38,
+     "y": 22
+    },
+    "end": {
+     "x": 48,
+     "y": 35
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-040",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-04",
+    "receiverId": "north-player-05",
+    "time": "53′",
+    "start": {
+     "x": 48,
+     "y": 35
+    },
+    "end": {
+     "x": 66,
+     "y": 48
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-041",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-05",
+    "receiverId": "north-player-06",
+    "time": "54′",
+    "start": {
+     "x": 66,
+     "y": 48
+    },
+    "end": {
+     "x": 66,
+     "y": 61
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-042",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-06",
+    "receiverId": "north-player-07",
+    "time": "55′",
+    "start": {
+     "x": 66,
+     "y": 61
+    },
+    "end": {
+     "x": 66,
+     "y": 74
+    },
+    "outcome": "complete",
+    "qualifiers": [],
+    "provenance": "synthetic"
+   },
+   {
+    "id": "pass-043",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-07",
+    "receiverId": "north-player-08",
+    "time": "56′",
+    "start": {
+     "x": 66,
+     "y": 74
+    },
+    "end": {
+     "x": 66,
+     "y": 31
+    },
+    "outcome": "incomplete",
+    "qualifiers": [
+     "turnover"
+    ],
+    "provenance": "synthetic"
+   }
+  ],
+  "turnoverRecords": [
+   {
+    "id": "turnover-010",
+    "possessionId": "sequence-13",
+    "team": "Eastport",
+    "playerId": "east-player-05",
+    "time": "50′",
+    "location": {
+     "x": 66,
+     "y": 74
+    },
+    "lostPassId": "pass-038",
+    "recoveredBy": "Northbridge",
+    "provenance": "synthetic"
+   },
+   {
+    "id": "turnover-011",
+    "possessionId": "sequence-14",
+    "team": "Northbridge",
+    "playerId": "north-player-07",
+    "time": "56′",
+    "location": {
+     "x": 66,
+     "y": 31
+    },
+    "lostPassId": "pass-043",
+    "recoveredBy": "Eastport",
+    "provenance": "synthetic"
+   }
+  ],
+  "passReferences": [
+   {
+    "id": "pass-036",
+    "time": "48′",
+    "team": "Eastport",
+    "description": "Completed pass by east-player-03 intended for east-player-04, from (48, 35) to (66, 48)."
+   },
+   {
+    "id": "pass-037",
+    "time": "49′",
+    "team": "Eastport",
+    "description": "Completed pass by east-player-04 intended for east-player-05, from (66, 48) to (66, 61)."
+   },
+   {
+    "id": "pass-038",
+    "time": "50′",
+    "team": "Eastport",
+    "description": "Incomplete pass by east-player-05 intended for east-player-06, from (66, 61) to (66, 74)."
+   },
+   {
+    "id": "pass-039",
+    "time": "52′",
+    "team": "Northbridge",
+    "description": "Completed pass by north-player-03 intended for north-player-04, from (38, 22) to (48, 35)."
+   },
+   {
+    "id": "pass-040",
+    "time": "53′",
+    "team": "Northbridge",
+    "description": "Completed pass by north-player-04 intended for north-player-05, from (48, 35) to (66, 48)."
+   },
+   {
+    "id": "pass-041",
+    "time": "54′",
+    "team": "Northbridge",
+    "description": "Completed pass by north-player-05 intended for north-player-06, from (66, 48) to (66, 61)."
+   },
+   {
+    "id": "pass-042",
+    "time": "55′",
+    "team": "Northbridge",
+    "description": "Completed pass by north-player-06 intended for north-player-07, from (66, 61) to (66, 74)."
+   },
+   {
+    "id": "pass-043",
+    "time": "56′",
+    "team": "Northbridge",
+    "description": "Incomplete pass by north-player-07 intended for north-player-08, from (66, 74) to (66, 31)."
+   }
+  ],
+  "turnoverReferences": [
+   {
+    "id": "turnover-010",
+    "time": "50′",
+    "team": "Eastport",
+    "description": "Lost possession by east-player-05 in the middle third; recovered by Northbridge."
+   },
+   {
+    "id": "turnover-011",
+    "time": "56′",
+    "team": "Northbridge",
+    "description": "Lost possession by north-player-07 in the middle third; recovered by Eastport."
+   }
+  ],
+  "recoveryReferences": [
+   {
+    "id": "recovery-010",
+    "time": "50′",
+    "team": "Northbridge",
+    "description": "Recovery by north-player-02 following turnover-010 at (66, 74)."
+   },
+   {
+    "id": "recovery-011",
+    "time": "56′",
+    "team": "Eastport",
+    "description": "Recovery by east-player-03 following turnover-011 at (66, 31)."
+   }
+  ],
+  "pressureReferences": [
+   {
+    "id": "pressure-003",
+    "time": "54′",
+    "team": "Eastport",
+    "description": "Recorded pressured pass pressure by east-player-03 at (52, 55); pressure coverage is partial."
+   }
+  ],
+  "players": [
+   {
+    "id": "north-player-01",
+    "team": "Northbridge",
+    "name": "David Raya",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-02",
+    "team": "Northbridge",
+    "name": "Jurriën Timber",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "north-player-03",
+    "team": "Northbridge",
+    "name": "William Saliba",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "north-player-04",
+    "team": "Northbridge",
+    "name": "Gabriel Magalhães",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 2
+   },
+   {
+    "id": "north-player-05",
+    "team": "Northbridge",
+    "name": "Riccardo Calafiori",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 2
+   },
+   {
+    "id": "north-player-06",
+    "team": "Northbridge",
+    "name": "Declan Rice",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 2
+   },
+   {
+    "id": "north-player-07",
+    "team": "Northbridge",
+    "name": "Martín Zubimendi",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 3
+   },
+   {
+    "id": "north-player-08",
+    "team": "Northbridge",
+    "name": "Martin Ødegaard",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "north-player-09",
+    "team": "Northbridge",
+    "name": "Bukayo Saka",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-10",
+    "team": "Northbridge",
+    "name": "Eberechi Eze",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-11",
+    "team": "Northbridge",
+    "name": "Viktor Gyökeres",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "north-player-12",
+    "team": "Northbridge",
+    "name": "Ben White",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-13",
+    "team": "Northbridge",
+    "name": "Kepa Arrizabalaga",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-14",
+    "team": "Northbridge",
+    "name": "Cristhian Mosquera",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-15",
+    "team": "Northbridge",
+    "name": "Piero Hincapié",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-16",
+    "team": "Northbridge",
+    "name": "Myles Lewis-Skelly",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-17",
+    "team": "Northbridge",
+    "name": "Mikel Merino",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-18",
+    "team": "Northbridge",
+    "name": "Bruno Guimarães",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-19",
+    "team": "Northbridge",
+    "name": "Noni Madueke",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "north-player-20",
+    "team": "Northbridge",
+    "name": "Kai Havertz",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-01",
+    "team": "Eastport",
+    "name": "Senne Lammens",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-02",
+    "team": "Eastport",
+    "name": "Diogo Dalot",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-03",
+    "team": "Eastport",
+    "name": "Matthijs de Ligt",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 3
+   },
+   {
+    "id": "east-player-04",
+    "team": "Eastport",
+    "name": "Lisandro Martínez",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 2
+   },
+   {
+    "id": "east-player-05",
+    "team": "Eastport",
+    "name": "Luke Shaw",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 3
+   },
+   {
+    "id": "east-player-06",
+    "team": "Eastport",
+    "name": "Carlos Baleba",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "east-player-07",
+    "team": "Eastport",
+    "name": "Kobbie Mainoo",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-08",
+    "team": "Eastport",
+    "name": "Bruno Fernandes",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-09",
+    "team": "Eastport",
+    "name": "Amad",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-10",
+    "team": "Eastport",
+    "name": "Matheus Cunha",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 1
+   },
+   {
+    "id": "east-player-11",
+    "team": "Eastport",
+    "name": "Benjamin Šeško",
+    "status": "starter",
+    "provenance": "synthetic",
+    "participation": "on-pitch",
+    "minutesInWindow": 10,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-12",
+    "team": "Eastport",
+    "name": "Leny Yoro",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-13",
+    "team": "Eastport",
+    "name": "Karl Darlow",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-14",
+    "team": "Eastport",
+    "name": "Harry Maguire",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-15",
+    "team": "Eastport",
+    "name": "Noussair Mazraoui",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-16",
+    "team": "Eastport",
+    "name": "Patrick Dorgu",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-17",
+    "team": "Eastport",
+    "name": "Manuel Ugarte",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-18",
+    "team": "Eastport",
+    "name": "Mason Mount",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-19",
+    "team": "Eastport",
+    "name": "Bryan Mbeumo",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   },
+   {
+    "id": "east-player-20",
+    "team": "Eastport",
+    "name": "Joshua Zirkzee",
+    "status": "substitute",
+    "provenance": "synthetic",
+    "participation": "not-yet-on-pitch",
+    "minutesInWindow": 0,
+    "selectedWindowActions": 0
+   }
+  ],
+  "buildUpAnnotations": [
+   {
+    "id": "buildup-v1-05",
+    "version": "1.0.0",
+    "phase": "build-up",
+    "team": "Northbridge",
+    "possessionId": "sequence-14",
+    "passIds": [
+     "pass-039",
+     "pass-040",
+     "pass-041",
+     "pass-042",
+     "pass-043"
+    ],
+    "turnoverIds": [
+     "turnover-011"
+    ],
+    "pressureIds": [
+     "pressure-003"
+    ],
+    "coverage": "selected-sample"
+   }
+  ],
+  "buildUpCoverage": "selected-sample",
+  "substitutions": [],
+  "windowLabel": "Last 10 minutes ending 58′"
+ },
+ "claims": [
+  {
+   "claim": {
+    "id": "claim-1",
+    "subject": "Eastport",
+    "playerSubject": null,
+    "playerMetric": null,
+    "text": "Eastport had more shots on target than Northbridge",
+    "intent": "factual-claim",
+    "meaning": {
+     "category": "factual-comparison",
+     "description": "Eastport had more shots on target than Northbridge.",
+     "comparison": {
+      "opponent": "Northbridge",
+      "opponentPlayer": null,
+      "metric": "shots-on-target",
+      "operator": "greater-than"
+     }
+    },
+    "requiredEvidence": [
+     "shots-on-target"
+    ],
+    "timePeriod": {
+     "kind": "selected"
+    },
+    "historicalEventAnchor": null,
+    "clarificationNeeds": []
+   },
+   "assessment": "supported",
+   "periodLabel": "Last 10 minutes ending 58′",
+   "statistics": [
+    {
+     "team": "Northbridge",
+     "metric": "shots-on-target",
+     "value": 0
+    },
+    {
+     "team": "Eastport",
+     "metric": "shots-on-target",
+     "value": 1
+    }
+   ],
+   "playerStatistics": [],
+   "playerCalculations": [],
+   "evidenceAvailability": [
+    {
+     "kind": "shots-on-target",
+     "available": true,
+     "detail": "The synthetic fixture records shots on target events."
+    }
+   ],
+   "evidence": [
+    {
+     "role": "supporting",
+     "reference": {
+      "id": "event-10",
+      "time": "58′",
+      "team": "Eastport",
+      "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+     }
+    }
+   ],
+   "calculations": [],
+   "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance."
+  }
+ ]
+}

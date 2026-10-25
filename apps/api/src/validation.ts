@@ -70,6 +70,19 @@ const evidenceForMetric: Record<ClaimMetric, EvidenceKind> = {
   recoveries: 'player-events',
   'pressure-observations': 'player-events',
 }
+// These team metrics have deterministic calculators. Other listed metrics are
+// player-only until a team definition and calculation trace are implemented.
+const teamComparisonMetrics = new Set<ClaimMetric>([
+  'shots',
+  'shots-on-target',
+  'goals',
+  'possession-percentage',
+  'pass-attempts',
+  'pass-completions',
+  'pass-completion-percentage',
+  'running-distance', // Supported as an explicit unavailable-data response.
+])
+
 const operators: ClaimOperator[] = [
   'greater-than',
   'less-than',
@@ -191,10 +204,250 @@ function requireStringArray(value: unknown, label: string): string[] {
   return value.map((item) => item.trim())
 }
 
+export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
+
+const halfTimeAssertionPattern =
+  /^(Northbridge|Eastport)\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?|scored)\s+before half[- ]time[.!?]?$/i
+
+export function goalBeforeHalfTimeAssertion(
+  value: unknown,
+  allowNormalization = false,
+): GoalBeforeHalfTimeAssertion | undefined {
+  if (!isRecord(value) || typeof value.text !== 'string') return undefined
+  const match = halfTimeAssertionPattern.exec(value.text.trim())
+  if (
+    !match ||
+    typeof value.subject !== 'string' ||
+    value.subject.toLowerCase() !== match[1].toLowerCase()
+  ) {
+    return undefined
+  }
+  if (
+    value.playerSubject !== null ||
+    value.playerMetric !== null ||
+    !Array.isArray(value.clarificationNeeds) ||
+    value.clarificationNeeds.length !== 0 ||
+    value.historicalEventAnchor !== null ||
+    !Array.isArray(value.requiredEvidence) ||
+    value.requiredEvidence.some(
+      (kind) => kind !== 'goals' && kind !== 'attacking-events',
+    ) ||
+    !isRecord(value.meaning) ||
+    value.meaning.comparison !== null ||
+    !isRecord(value.timePeriod) ||
+    value.timePeriod.kind !== 'selected'
+  ) {
+    return undefined
+  }
+  if (allowNormalization) {
+    if (
+      !['statistical-request', 'factual-claim'].includes(value.intent as string) ||
+      !['historical-circumstance', 'other'].includes(
+        value.meaning.category as string,
+      )
+    ) {
+      return undefined
+    }
+  } else if (
+    value.intent !== 'factual-claim' ||
+    value.meaning.category !== 'historical-circumstance'
+  ) {
+    return undefined
+  }
+  return /^(?:Northbridge|Eastport)\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before half[- ]time[.!?]?$/i.test(
+    value.text.trim(),
+  )
+    ? 'did-not-score'
+    : 'scored'
+}
+
+function hasAmbiguousHalfTimeScoringClaim(value: Record<string, unknown>): boolean {
+  if (
+    typeof value.text !== 'string' ||
+    !['factual-claim', 'statistical-request', 'unrecognized-language'].includes(
+      value.intent as string,
+    ) ||
+    !isRecord(value.meaning) ||
+    !['historical-circumstance', 'other'].includes(
+      value.meaning.category as string,
+    ) ||
+    value.meaning.comparison !== null ||
+    value.playerSubject !== null ||
+    value.playerMetric !== null ||
+    value.historicalEventAnchor !== null ||
+    !Array.isArray(value.requiredEvidence) ||
+    value.requiredEvidence.some(
+      (kind) => kind !== 'goals' && kind !== 'attacking-events',
+    ) ||
+    !Array.isArray(value.clarificationNeeds) ||
+    value.clarificationNeeds.length !== 0 ||
+    !isRecord(value.timePeriod) ||
+    value.timePeriod.kind !== 'selected'
+  ) {
+    return false
+  }
+  const text = value.text.trim()
+  const subject =
+    value.subject === 'Northbridge' || value.subject === 'Eastport'
+      ? value.subject
+      : undefined
+  if (!subject || goalBeforeHalfTimeAssertion(value, true)) return false
+  return (
+    new RegExp(`\\b${subject}\\b`, 'i').test(text) &&
+    /(?:\b(?:score|scores|scored|scoring|goal|goals)\b.{0,80}\bbefore half[- ]time\b|\bbefore half[- ]time\b.{0,80}\b(?:score|scores|scored|scoring|goal|goals)\b)/i.test(
+      text,
+    )
+  )
+}
+
+function isBuildUpLossLocationQuestion(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const asksForLocation =
+    /^\s*(?:where\b|(?:locate|identify|show|map)\s+where\b|(?:which|what)\s+(?:areas?|parts?|zones?)\b)/i.test(
+      value,
+    )
+  return (
+    asksForLocation &&
+    /\b(?:lose|loses|losing|lost)\s+(?:possession|the ball)\b/i.test(value) &&
+    /\bbuild[- ]?up\b/i.test(value)
+  )
+}
+
+export function hasExplicitBuildUpPassingScope(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const phaseScope =
+    /\b(?:during|in|within|throughout)\s+(?:the\s+)?build[- ]?up(?:\s+phase)?\b|\bbuild[- ]?up(?:\s+phase)?\s+(?:passes?|passing|pass[- ]completion)\b/i
+  const passingMetric =
+    /\bpasses?\b|\bpassing\b|\bpass[- ]completion(?:\s+(?:rate|percentage|accuracy))?\b/i
+  return phaseScope.test(value) && passingMetric.test(value)
+}
+
+export function normalizeKnownInterpretation(value: unknown): unknown {
+  if (!isRecord(value) || !Array.isArray(value.claims)) return value
+  return {
+    ...value,
+    claims: value.claims.map((value) => {
+      if (!isRecord(value)) return value
+      const claim = { ...value }
+      const meaning = isRecord(claim.meaning) ? { ...claim.meaning } : undefined
+      if (!meaning) return claim
+
+      const comparison = isRecord(meaning.comparison)
+        ? meaning.comparison
+        : undefined
+      const explicitBuildUpPassingScope = hasExplicitBuildUpPassingScope(
+        claim.text,
+      )
+      if (
+        hasAmbiguousHalfTimeScoringClaim(claim)
+      ) {
+        claim.clarificationNeeds = [
+          'Please rephrase whether the team scored or did not score before half-time.',
+        ]
+      }
+
+      const comparisonMetric = comparison?.metric
+      const comparisonOperator = comparison?.operator
+      if (
+        comparison &&
+        typeof comparisonMetric === 'string' &&
+        metrics.includes(comparisonMetric as ClaimMetric) &&
+        operators.includes(comparisonOperator as ClaimOperator) &&
+        ['statistical-request', 'factual-claim', 'unavailable-metric'].includes(
+          claim.intent as string,
+        ) &&
+        meaning.category === 'factual-comparison' &&
+        (claim.playerMetric === null ||
+          claim.playerMetric === comparisonMetric)
+      ) {
+        const metric = comparisonMetric as ClaimMetric
+        claim.playerMetric = null
+        claim.requiredEvidence = [
+          evidenceForMetric[metric],
+          ...(explicitBuildUpPassingScope && evidenceForMetric[metric] === 'passing'
+            ? ['build-up-phase']
+            : []),
+        ]
+        if (claim.intent !== 'unavailable-metric') {
+          claim.intent =
+            comparisonOperator === 'comparison-request'
+              ? 'statistical-request'
+              : 'factual-claim'
+        }
+      }
+
+      const requiredEvidence = Array.isArray(claim.requiredEvidence)
+        ? claim.requiredEvidence
+        : []
+      if (
+        explicitBuildUpPassingScope &&
+        requiredEvidence.includes('passing') &&
+        !requiredEvidence.includes('build-up-phase')
+      ) {
+        claim.requiredEvidence = [...requiredEvidence, 'build-up-phase']
+      }
+      if (
+        comparison === undefined &&
+        claim.playerMetric === null &&
+        requiredEvidence.includes('build-up-phase') &&
+        requiredEvidence.includes('possession-losses') &&
+        claim.intent === 'statistical-request' &&
+        meaning.category === 'other' &&
+        isBuildUpLossLocationQuestion(claim.text)
+      ) {
+        claim.intent = 'coaching-question'
+        meaning.category = 'coaching-question'
+      }
+
+      if (
+        meaning.category === 'historical-circumstance' &&
+        typeof claim.text === 'string' &&
+        /against the run of play/i.test(claim.text) &&
+        Object.hasOwn(claim, 'requiredEvidence')
+      ) {
+        claim.requiredEvidence = [
+          'possession',
+          'territorial-control',
+          'attacking-events',
+        ]
+      }
+
+      const metric =
+        comparisonMetric ??
+        (typeof claim.playerMetric === 'string' ? claim.playerMetric : undefined)
+      if (
+        claim.intent === 'unavailable-metric' &&
+        metric === 'running-distance' &&
+        Object.hasOwn(claim, 'requiredEvidence') &&
+        Object.hasOwn(claim, 'timePeriod') &&
+        Object.hasOwn(claim, 'historicalEventAnchor')
+      ) {
+        claim.requiredEvidence = ['physical-measurements']
+        claim.timePeriod = { kind: 'selected' }
+        claim.historicalEventAnchor = null
+      }
+
+      if (goalBeforeHalfTimeAssertion(claim, true)) {
+        claim.intent = 'factual-claim'
+        meaning.category = 'historical-circumstance'
+        meaning.comparison = null
+        claim.playerMetric = null
+        claim.requiredEvidence = ['goals']
+        claim.timePeriod = { kind: 'selected' }
+        claim.historicalEventAnchor = null
+      }
+
+      claim.meaning = meaning
+      return claim
+    }),
+  }
+}
+
 export function validateInterpretation(
   value: unknown,
   availableEvents: MatchEvent[],
   availablePlayers: Array<PlayerEntityReference> = [],
+  options: { requireClaims?: boolean } = {},
 ): InterpretedClaim[] {
   const root = requireRecord(value, 'Interpretation')
   if (!hasExactKeys(root, ['claims']) || !Array.isArray(root.claims)) {
@@ -203,6 +456,10 @@ export function validateInterpretation(
   if (root.claims.length > 8) {
     throw new Error('Interpretation may contain at most eight claims.')
   }
+  if (options.requireClaims && root.claims.length === 0) {
+    throw new Error('A non-empty opinion must produce at least one claim or clarification.')
+  }
+  const claimIds = new Set<string>()
   const eventIds = new Set(availableEvents.map((event) => event.id))
   const playersById = new Map(availablePlayers.map((player) => [player.id, player]))
 
@@ -243,6 +500,11 @@ export function validateInterpretation(
     if (!hasExactKeys(claim, claimKeys)) {
       throw new Error(`${label} has missing or unexpected fields.`)
     }
+    const id = requireString(claim.id, `${label} ID`, 64)
+    if (claimIds.has(id)) {
+      throw new Error(`${label} ID must be unique within an interpretation.`)
+    }
+    claimIds.add(id)
     const claimText = requireString(claim.text, `${label} text`, 500)
 
     const subject = claim.subject
@@ -339,11 +601,20 @@ export function validateInterpretation(
         `${label} comparison must be factual and request its calculated metric.`,
       )
     }
+    // An unresolved entity is acceptable only as an explicit clarification state.
+    const isClarificationState =
+      claim.intent === 'statistical-request' &&
+      !comparison &&
+      subject === null &&
+      playerSubject === null &&
+      playerMetric === null &&
+      Array.isArray(claim.clarificationNeeds) &&
+      claim.clarificationNeeds.length > 0
     if (
       (claim.intent === 'statistical-request' &&
         (comparison
           ? comparison.operator !== 'comparison-request'
-          : subject === null ||
+          : (subject === null && !isClarificationState) ||
             meaning.category !== 'other' ||
           !requiredEvidence.some((kind) =>
             ['shots', 'shots-on-target', 'goals', 'passing', 'player-events', 'lineups'].includes(kind),
@@ -353,13 +624,32 @@ export function validateInterpretation(
         !requiredEvidence.includes(evidenceForMetric[playerMetric])) ||
       (comparison !== null && playerMetric !== null) ||
       (comparison?.operator === 'comparison-request' &&
-        claim.intent !== 'statistical-request') ||
+        claim.intent !== 'statistical-request' &&
+        claim.intent !== 'unavailable-metric') ||
       (claim.intent === 'unavailable-metric' &&
         !requiredEvidence.some((kind) =>
           ['physical-measurements', 'player-events'].includes(kind),
         ))
     ) {
       throw new Error(`${label} intent does not match its evidence request.`)
+    }
+    if (
+      comparison &&
+      !['factual-claim', 'statistical-request', 'unavailable-metric'].includes(
+        claim.intent as string,
+      )
+    ) {
+      throw new Error(`${label} comparison is incompatible with its declared intent.`)
+    }
+    if (comparison && !playerSubject && !teamComparisonMetrics.has(comparison.metric)) {
+      throw new Error(`${label} metric does not have a supported team comparison calculator.`)
+    }
+    if (
+      playerSubject &&
+      (playerMetric === 'possession-percentage' ||
+        comparison?.metric === 'possession-percentage')
+    ) {
+      throw new Error(`${label} possession percentage is defined for teams, not individual players.`)
     }
     const timePeriod = requireRecord(claim.timePeriod, `${label} time period`)
     let normalizedTimePeriod: InterpretedClaim['timePeriod']
@@ -421,6 +711,17 @@ export function validateInterpretation(
       claim.clarificationNeeds,
       `${label} clarification needs`,
     )
+    if (historicalEventAnchor && normalizedTimePeriod.kind !== 'before-event') {
+      throw new Error(`${label} historical anchor must use its exclusive before-event period.`)
+    }
+    if (
+      meaning.category === 'historical-circumstance' &&
+      clarificationNeeds.length === 0 &&
+      normalizedTimePeriod.kind !== 'before-event' &&
+      goalBeforeHalfTimeAssertion(claim) === undefined
+    ) {
+      throw new Error(`${label} historical circumstance requires an exclusive before-event period or clarification.`)
+    }
     if (
       subject === null &&
       clarificationNeeds.length === 0 &&
@@ -428,10 +729,7 @@ export function validateInterpretation(
     ) {
       throw new Error(`${label} needs clarification when its subject is unknown.`)
     }
-    if (
-      meaning.category === 'historical-circumstance' &&
-      normalizedTimePeriod.kind === 'before-event'
-    ) {
+    if (normalizedTimePeriod.kind === 'before-event') {
       const anchorEvent = availableEvents.find(
         (event) => event.id === normalizedTimePeriod.eventId,
       )
@@ -442,20 +740,16 @@ export function validateInterpretation(
         (subject !== null && anchorEvent.team !== subject)
       ) {
         throw new Error(
-          `${label} historical period must anchor to a goal by its named subject.`,
+          `${label} before-event period must anchor to a goal by its named subject.`,
         )
       }
       if (
-        normalizedTimePeriod.kind === 'before-event' &&
-        playerSubject
+        playerSubject &&
+        meaning.category === 'historical-circumstance'
       ) {
-        const scorer = availableEvents.find(
-          (event) => event.id === normalizedTimePeriod.eventId,
-        )
         if (
-          !scorer ||
-          scorer.type !== 'shot' ||
-          scorer.playerId !== playerSubject.id
+          anchorEvent.type !== 'shot' ||
+          anchorEvent.playerId !== playerSubject.id
         ) {
           throw new Error(
             `${label} historical anchor must be a goal scored by the named player.`,
@@ -465,7 +759,7 @@ export function validateInterpretation(
     }
 
     return {
-      id: requireString(claim.id, `${label} ID`, 64),
+      id,
       subject: subject as InterpretedClaim['subject'],
       playerSubject,
       playerMetric,

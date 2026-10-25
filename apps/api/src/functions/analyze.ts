@@ -6,6 +6,7 @@ import type {
 import { analyzeOpinion } from '../service.js'
 import { InputValidationError } from '../validation.js'
 import type { InterpretationProvider } from '../providers/provider.js'
+import { InterpretationProviderError } from '../providers/provider.js'
 
 export function createAnalyzeHandler(provider: InterpretationProvider) {
   return async (
@@ -32,6 +33,15 @@ export function createAnalyzeHandler(provider: InterpretationProvider) {
         return { status: 400, jsonBody: { error: error.message } }
       }
       context.error('Match analysis request failed.', error)
+      if (error instanceof InterpretationProviderError) {
+        return {
+          status: 502,
+          jsonBody: {
+            error: error.message,
+            failureType: error.category,
+          },
+        }
+      }
       return {
         status: 502,
         jsonBody: {

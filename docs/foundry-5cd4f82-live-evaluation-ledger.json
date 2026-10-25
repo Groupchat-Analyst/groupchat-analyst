@@ -1,0 +1,4753 @@
+{
+  "title": "Bounded live Foundry evaluation of 5cd4f82",
+  "sourceIdentity": {
+    "baselineCommit": "5cd4f82dc66ce0e6ab5fe660b708effde67ffdd7",
+    "applicationCommit": "5de5fcee4795ed1a6a7be9c113939381feff535c",
+    "evaluationPlanCommit": "0f5436f598f1295c4a44b5b88280a56d14099413",
+    "providerSourceSha256": "8c342299eb449eaca855bc6040015f0bcf7db84c73f97386ef38fc211f0927de",
+    "systemPromptTextSha256": "497e1bec71f06872ec5bfb97e2d0f62bf1d06c6b0d902edd3225e99c17739e9d",
+    "provider": "foundry",
+    "deployment": "gpt-5-mini"
+  },
+  "protocol": {
+    "scheduledCalls": 12,
+    "upstreamCallBudget": 12,
+    "actualUpstreamCalls": 12,
+    "retries": 0,
+    "automaticRetries": false,
+    "extraBrowserCalls": 0,
+    "applicationOrPromptChangedDuringEvaluation": false,
+    "rawCapture": "opt-in local-only structured-output capture; raw local files remain Git-ignored",
+    "sanitization": "No request headers, credentials, environment values, or local-settings contents are included. Credential-pattern redaction was applied to captured response text before committing."
+  },
+  "aggregate": {
+    "httpStatuses": {
+      "200": 12
+    },
+    "providerErrors": {
+      "transport": 0,
+      "throttling": 0,
+      "refusal": 0,
+      "incompleteOutput": 0,
+      "schema": 0,
+      "semanticValidationRejections": 0
+    },
+    "totalElapsedMs": 111908.19999999998,
+    "meanElapsedMs": 9325.7,
+    "minElapsedMs": 6231.6,
+    "maxElapsedMs": 14119.5,
+    "tokenUsage": {
+      "promptTokens": 48222,
+      "completionTokens": 13291,
+      "totalTokens": 61513
+    }
+  },
+  "results": {
+    "fullyCorrect": 9,
+    "acceptedButWrong": 3,
+    "rejected": 0,
+    "byGroup": {
+      "knownDevelopmentRegressions": {
+        "attempts": 3,
+        "fullyCorrect": 1,
+        "acceptedButWrong": 2,
+        "rejected": 0
+      },
+      "freshCases": {
+        "attempts": 6,
+        "fullyCorrect": 6,
+        "acceptedButWrong": 0,
+        "rejected": 0
+      },
+      "repeats": {
+        "attempts": 3,
+        "fullyCorrect": 2,
+        "acceptedButWrong": 1,
+        "rejected": 0
+      }
+    },
+    "answerableCases": {
+      "attemptIds": [
+        "D01",
+        "D02",
+        "D03",
+        "F01",
+        "F03",
+        "F06",
+        "R01",
+        "R03"
+      ],
+      "fullyCorrect": 5,
+      "acceptedButWrong": 3,
+      "note": "Whole-response correctness includes consistency of the verdict, calculations, evidence, and limitations; D01 is counted wrong because its limitation contradicts its otherwise-correct verdict."
+    },
+    "correctUnavailableHandling": {
+      "attemptIds": [
+        "F02"
+      ],
+      "correct": 1,
+      "total": 1
+    },
+    "correctAmbiguityHandling": {
+      "attemptIds": [
+        "F05"
+      ],
+      "correct": 1,
+      "total": 1
+    },
+    "correctHistoricalQualification": {
+      "attemptIds": [
+        "F04",
+        "R02"
+      ],
+      "correct": 2,
+      "total": 2
+    },
+    "repeatConsistency": {
+      "pairs": [
+        {
+          "repeat": "R01",
+          "original": "D03",
+          "consistent": true,
+          "correct": false
+        },
+        {
+          "repeat": "R02",
+          "original": "F04",
+          "consistent": true,
+          "correct": true
+        },
+        {
+          "repeat": "R03",
+          "original": "F03",
+          "consistent": true,
+          "correct": true
+        }
+      ],
+      "consistent": 3,
+      "total": 3,
+      "note": "Semantic outcome and interpretations are consistent; prose need not be byte-identical."
+    }
+  },
+  "attempts": [
+    {
+      "attemptId": "D01",
+      "group": "known-development-regression",
+      "attemptedAt": "2026-10-22T20:01:21.369Z",
+      "request": {
+        "input": "Northbridge did not score before half-time.",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Negated Northbridge scoring assertion is contradicted by event-07 at 45+3; do not affirm the negation.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "No — Northbridge did score before half-time at 45+3′; this recorded goal contradicts the claim. This claim is checked against first-half goal events, independently of the selected analysis window.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Northbridge did not score before half-time.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "historical-circumstance",
+                "description": "Assertion that Northbridge had no goals during the first half (period 1).",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "goals"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Recorded first-half goal events",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "goals",
+                "value": 1
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "goals",
+                "available": true,
+                "detail": "The synthetic fixture records goals events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "The fixture records only the evidence listed for this claim. Those events provide context, but do not establish the full subjective judgement \"Northbridge did not score before half-time.\"."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "accepted-but-wrong",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "polarity": true,
+          "timeScope": true,
+          "calculation": true,
+          "evidence": true,
+          "limitations": false
+        },
+        "note": "The response correctly preserves negation, says contradicted, and cites event-07. However the per-claim limitation says the goal evidence does not establish the subjective judgement, contradicting the factual verdict and evidence."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 7467.5,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4035,
+        "completionTokens": 891,
+        "totalTokens": 4926
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"c1\",\"subject\":\"Northbridge\",\"playerSubject\":null,\"playerMetric\":null,\"text\":\"Northbridge did not score before half-time.\",\"intent\":\"factual-claim\",\"meaning\":{\"category\":\"historical-circumstance\",\"description\":\"Assertion that Northbridge had no goals during the first half (period 1).\",\"comparison\":null},\"requiredEvidence\":[\"goals\"],\"timePeriod\":{\"kind\":\"selected\",\"eventId\":null},\"historicalEventAnchor\":null,\"clarificationNeeds\":[]}]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "D02",
+      "group": "known-development-regression",
+      "attemptedAt": "2026-10-22T20:01:27.609Z",
+      "request": {
+        "input": "Where are Northbridge losing possession during build-up?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Use only the five eligible annotated losses and linked passes: turnover-001/pass-005 and turnover-014/pass-050 in the defensive third; turnover-003/pass-012 and turnover-011/pass-043 in the middle third; turnover-016/pass-067 in the final third. Counts 2/2/1; disclose partial sample.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "the annotated build-up sample, Northbridge: defensive third 2, middle third 2, final third 1 (5 recorded losses); 5 losses in total. This is a partial annotated sample, not a match-wide count. Linked passes and any recorded pressure show context, not why possession was lost.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Identify where Northbridge lose possession during build-up sequences.",
+              "intent": "coaching-question",
+              "meaning": {
+                "category": "coaching-question",
+                "description": "Request the locations and types of possession losses that occurred while Northbridge were in documented build-up phases (e.g., incomplete passes, interceptions, turnovers) so coaching staff can analyse vulnerability points.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "build-up-phase",
+                "possession-losses"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "insufficient evidence for a firm conclusion",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "build-up-phase",
+                "available": true,
+                "detail": "A small versioned sample labels build-up sequences and links selected passes, turnovers, and pressure events; coverage is not complete for the match."
+              },
+              {
+                "kind": "possession-losses",
+                "available": true,
+                "detail": "The synthetic fixture records possession losses events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "turnover-001",
+                  "time": "6′",
+                  "team": "Northbridge",
+                  "description": "Recorded annotated build-up incomplete-pass turnover by north-player-05 in the defensive-third at (32, 31); linked pass pass-005."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "turnover-003",
+                  "time": "16′",
+                  "team": "Northbridge",
+                  "description": "Recorded annotated build-up incomplete-pass turnover by north-player-06 in the middle-third at (66, 74); linked pass pass-012."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "turnover-011",
+                  "time": "56′",
+                  "team": "Northbridge",
+                  "description": "Recorded annotated build-up incomplete-pass turnover by north-player-07 in the middle-third at (66, 31); linked pass pass-043."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "turnover-014",
+                  "time": "67′",
+                  "team": "Northbridge",
+                  "description": "Recorded annotated build-up incomplete-pass turnover by north-player-09 in the defensive-third at (32, 61); linked pass pass-050."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "turnover-016",
+                  "time": "89′",
+                  "team": "Northbridge",
+                  "description": "Recorded annotated build-up incomplete-pass turnover by north-player-06 in the final-third at (98, 31); linked pass pass-067."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-005",
+                  "time": "6′",
+                  "team": "Northbridge",
+                  "description": "Linked incomplete pass by north-player-05 intended for north-player-06, from (32, 74) to (32, 31)."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-012",
+                  "time": "16′",
+                  "team": "Northbridge",
+                  "description": "Linked incomplete pass by north-player-06 intended for north-player-07, from (66, 61) to (66, 74)."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-043",
+                  "time": "56′",
+                  "team": "Northbridge",
+                  "description": "Linked incomplete pass by north-player-07 intended for north-player-08, from (66, 74) to (66, 31)."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-050",
+                  "time": "67′",
+                  "team": "Northbridge",
+                  "description": "Linked incomplete pass by north-player-09 intended for north-player-10, from (32, 48) to (32, 61)."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-067",
+                  "time": "89′",
+                  "team": "Northbridge",
+                  "description": "Linked incomplete pass by north-player-06 intended for north-player-07, from (98, 74) to (98, 31)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pressure-003",
+                  "time": "54′",
+                  "team": "Eastport",
+                  "description": "Selected pressured pass observation by east-player-03; pressure coverage is partial."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pressure-004",
+                  "time": "66′",
+                  "team": "Eastport",
+                  "description": "Selected pressured pass observation by east-player-07; pressure coverage is partial."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pressure-build-up-01",
+                  "time": "15′",
+                  "team": "Eastport",
+                  "description": "Selected pressured pass observation by east-player-03; pressure coverage is partial."
+                }
+              }
+            ],
+            "calculations": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-losses-by-area",
+                "area": "defensive-third",
+                "value": 2,
+                "numerator": 2,
+                "denominator": 5,
+                "numeratorRecordIds": [
+                  "turnover-001",
+                  "turnover-014"
+                ],
+                "denominatorRecordIds": [
+                  "turnover-001",
+                  "turnover-003",
+                  "turnover-011",
+                  "turnover-014",
+                  "turnover-016"
+                ],
+                "denominatorDescription": "5 eligible turnover records for Northbridge in the versioned, selected-sample build-up annotations; annotation coverage is not complete for the match."
+              },
+              {
+                "team": "Northbridge",
+                "metric": "possession-losses-by-area",
+                "area": "middle-third",
+                "value": 2,
+                "numerator": 2,
+                "denominator": 5,
+                "numeratorRecordIds": [
+                  "turnover-003",
+                  "turnover-011"
+                ],
+                "denominatorRecordIds": [
+                  "turnover-001",
+                  "turnover-003",
+                  "turnover-011",
+                  "turnover-014",
+                  "turnover-016"
+                ],
+                "denominatorDescription": "5 eligible turnover records for Northbridge in the versioned, selected-sample build-up annotations; annotation coverage is not complete for the match."
+              },
+              {
+                "team": "Northbridge",
+                "metric": "possession-losses-by-area",
+                "area": "final-third",
+                "value": 1,
+                "numerator": 1,
+                "denominator": 5,
+                "numeratorRecordIds": [
+                  "turnover-016"
+                ],
+                "denominatorRecordIds": [
+                  "turnover-001",
+                  "turnover-003",
+                  "turnover-011",
+                  "turnover-014",
+                  "turnover-016"
+                ],
+                "denominatorDescription": "5 eligible turnover records for Northbridge in the versioned, selected-sample build-up annotations; annotation coverage is not complete for the match."
+              }
+            ],
+            "limitation": "This is a filtered result from the versioned, selected-sample build-up annotations; they do not cover the match continuously. Recorded turnover locations for Northbridge: defensive-third 2, middle-third 2, final-third 1 (5 eligible recorded turnovers). These records do not establish why possession was lost; linked passes and any selected pressure observations describe associations, not tactical causes."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "scope": true,
+          "calculation": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Returns the five annotation-linked losses, exact 2/2/1 area counts, linked passes, partial-sample limitation, and no causal overclaim."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 6231.6,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4037,
+        "completionTokens": 532,
+        "totalTokens": 4569
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"c1\",\"subject\":\"Northbridge\",\"playerSubject\":null,\"playerMetric\":null,\"text\":\"Identify where Northbridge lose possession during build-up sequences.\",\"intent\":\"coaching-question\",\"meaning\":{\"category\":\"coaching-question\",\"description\":\"Request the locations and types of possession losses that occurred while Northbridge were in documented build-up phases (e.g., incomplete passes, interceptions, turnovers) so coaching staff can analyse vulnerability points.\",\"comparison\":null},\"requiredEvidence\":[\"build-up-phase\",\"possession-losses\"],\"timePeriod\":{\"kind\":\"selected\",\"eventId\":null},\"historicalEventAnchor\":null,\"clarificationNeeds\":[]}]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "D03",
+      "group": "known-development-regression",
+      "attemptedAt": "2026-10-22T20:01:38.157Z",
+      "request": {
+        "input": "Before Northbridge scored at 45+3, how many passes had they completed?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Strictly before event-07: Northbridge 14/18 passes completed (77.8%); exclude event-07 and later records.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "The available evidence cannot establish whether Number of passes completed by Northbridge before their goal at 45+3. This uses play strictly before Northbridge's goal at 45+3′; the goal is a separate time anchor. The fixture records only the evidence listed for this claim. Those events provide context, but do not establish the full subjective judgement \"Number of passes completed by Northbridge before their goal at 45+3.\".\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "claim-1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Number of passes completed by Northbridge before their goal at 45+3.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "historical-circumstance",
+                "description": "Count of Northbridge pass completions in the match before the goal scored at 45+3.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "passing",
+                "goals"
+              ],
+              "timePeriod": {
+                "kind": "before-event",
+                "eventId": "event-07"
+              },
+              "historicalEventAnchor": {
+                "eventId": "event-07",
+                "relationship": "before"
+              },
+              "clarificationNeeds": []
+            },
+            "assessment": "insufficient evidence for a firm conclusion",
+            "periodLabel": "Recorded match play strictly before 45+3′ (event-07 Northbridge goal)",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "goals",
+                "value": 0
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "passing",
+                "available": true,
+                "detail": "The synthetic fixture records passing events."
+              },
+              {
+                "kind": "goals",
+                "available": true,
+                "detail": "The synthetic fixture records goals events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-001",
+                  "time": "2′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-01 from (12, 22) to (22, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-002",
+                  "time": "3′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-02 from (22, 35) to (32, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-003",
+                  "time": "4′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-03 from (32, 48) to (32, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-004",
+                  "time": "5′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-04 from (32, 61) to (32, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-005",
+                  "time": "6′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-05 from (32, 74) to (32, 31)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-006",
+                  "time": "9′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-02 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-007",
+                  "time": "10′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-03 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-008",
+                  "time": "11′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-04 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-009",
+                  "time": "13′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-03 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-010",
+                  "time": "14′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-04 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-011",
+                  "time": "15′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-05 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-012",
+                  "time": "16′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-06 from (66, 61) to (66, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-013",
+                  "time": "19′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-04 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-014",
+                  "time": "20′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-05 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-015",
+                  "time": "21′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-06 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-016",
+                  "time": "22′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-07 from (66, 61) to (66, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-017",
+                  "time": "24′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-05 from (70, 22) to (80, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-018",
+                  "time": "25′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-06 from (80, 35) to (98, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-019",
+                  "time": "27′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-07 from (98, 48) to (98, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-020",
+                  "time": "28′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-08 from (98, 61) to (98, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-021",
+                  "time": "29′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-09 from (98, 74) to (98, 31)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-022",
+                  "time": "32′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-06 from (70, 22) to (80, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-023",
+                  "time": "33′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-07 from (80, 35) to (98, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-024",
+                  "time": "34′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-08 from (98, 48) to (98, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-025",
+                  "time": "35′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-09 from (98, 61) to (98, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-026",
+                  "time": "37′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-08 from (12, 22) to (22, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-027",
+                  "time": "38′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-09 from (22, 35) to (32, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-028",
+                  "time": "39′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-10 from (32, 48) to (32, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-029",
+                  "time": "41′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-09 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-030",
+                  "time": "42′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-10 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-031",
+                  "time": "43′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-11 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-032",
+                  "time": "45′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-11 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-033",
+                  "time": "45+1′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-01 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-034",
+                  "time": "45+2′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-01 from (38, 22) to (40, 35)."
+                }
+              },
+              {
+                "role": "anchor",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "The fixture records only the evidence listed for this claim. Those events provide context, but do not establish the full subjective judgement \"Number of passes completed by Northbridge before their goal at 45+3.\"."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "accepted-but-wrong",
+        "dimensions": {
+          "meaning": false,
+          "entity": true,
+          "metric": false,
+          "polarity": true,
+          "timeScope": true,
+          "calculation": false,
+          "evidence": true,
+          "limitations": false
+        },
+        "note": "Correctly anchors to event-07 with an exclusive cutoff and excludes later evidence, but interprets a count request as a factual claim, supplies no pass-completion metric/calculation, and says the requested count cannot be established."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 10544.2,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4044,
+        "completionTokens": 1430,
+        "totalTokens": 5474
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"claim-1\",\"subject\":\"Northbridge\",\"playerSubject\":null,\"playerMetric\":null,\"text\":\"Number of passes completed by Northbridge before their goal at 45+3.\",\"intent\":\"factual-claim\",\"meaning\":{\"category\":\"historical-circumstance\",\"description\":\"Count of Northbridge pass completions in the match before the goal scored at 45+3.\",\"comparison\":null},\"requiredEvidence\":[\"passing\",\"goals\"],\"timePeriod\":{\"kind\":\"before-event\",\"eventId\":\"event-07\"},\"historicalEventAnchor\":{\"eventId\":\"event-07\",\"relationship\":\"before\"},\"clarificationNeeds\":[] }]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F01",
+      "group": "fresh-player-statistics",
+      "attemptedAt": "2026-10-22T20:01:45.427Z",
+      "request": {
+        "input": "How many passes did Bukayo Saka complete?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Bukayo Saka (north-player-09): 2 completed of 4 attempts (50.0%); identify the denominator clearly.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "Bukayo Saka: 2 pass completions.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Northbridge",
+              "playerSubject": {
+                "id": "north-player-09",
+                "name": "Bukayo Saka",
+                "team": "Northbridge"
+              },
+              "playerMetric": "pass-completions",
+              "text": "Count Bukayo Saka's completed passes in the match so far.",
+              "intent": "statistical-request",
+              "meaning": {
+                "category": "other",
+                "description": "Request the total number of completed passes by the named player during the selected period.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "passing"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "statistics provided",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [],
+            "playerStatistics": [
+              {
+                "playerId": "north-player-09",
+                "playerName": "Bukayo Saka",
+                "team": "Northbridge",
+                "metric": "pass-completions",
+                "value": 2
+              }
+            ],
+            "playerCalculations": [
+              {
+                "playerId": "north-player-09",
+                "playerName": "Bukayo Saka",
+                "team": "Northbridge",
+                "metric": "pass-completions",
+                "numerator": 2,
+                "denominator": 4,
+                "value": 2,
+                "numeratorRecordIds": [
+                  "pass-027",
+                  "pass-053"
+                ],
+                "denominatorRecordIds": [
+                  "pass-021",
+                  "pass-027",
+                  "pass-050",
+                  "pass-053"
+                ],
+                "denominatorDescription": "2 completed passes among 4 recorded pass attempts made by Bukayo Saka."
+              }
+            ],
+            "evidenceAvailability": [
+              {
+                "kind": "passing",
+                "available": true,
+                "detail": "The synthetic fixture records passing events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-027",
+                  "time": "38′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-09 intended for north-player-10."
+                }
+              },
+              {
+                "role": "calculation",
+                "reference": {
+                  "id": "pass-053",
+                  "time": "71′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-09 intended for north-player-10."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "timeScope": true,
+          "calculation": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Correct Saka identity and pass-completions metric; 2 completions from 4 attempts (50%) appears in the deterministic trace and evidence IDs."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 7263.3,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4037,
+        "completionTokens": 850,
+        "totalTokens": 4887
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"c1\",\n      \"subject\": \"Northbridge\",\n      \"playerSubject\": {\n        \"id\": \"north-player-09\",\n        \"name\": \"Bukayo Saka\",\n        \"team\": \"Northbridge\"\n      },\n      \"playerMetric\": \"pass-completions\",\n      \"text\": \"Count Bukayo Saka's completed passes in the match so far.\",\n      \"intent\": \"statistical-request\",\n      \"meaning\": {\n        \"category\": \"other\",\n        \"description\": \"Request the total number of completed passes by the named player during the selected period.\",\n        \"comparison\": null\n      },\n      \"requiredEvidence\": [\n        \"passing\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"selected\",\n        \"eventId\": null\n      },\n      \"historicalEventAnchor\": null,\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F02",
+      "group": "fresh-unavailable-measurement",
+      "attemptedAt": "2026-10-22T20:01:53.003Z",
+      "request": {
+        "input": "What running distance did Amad cover in kilometres?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Amad (east-player-09) is understood; running distance is not recorded. State unavailability without unrelated substitute statistics.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "Running distance and other physical measurements are not recorded; this fixture has no physical-data or continuous-tracking source.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "claim-1",
+              "subject": "Eastport",
+              "playerSubject": {
+                "id": "east-player-09",
+                "name": "Amad",
+                "team": "Eastport"
+              },
+              "playerMetric": "running-distance",
+              "text": "Player Amad's running distance in kilometres.",
+              "intent": "unavailable-metric",
+              "meaning": {
+                "category": "other",
+                "description": "Request for the player's running-distance (km).",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "physical-measurements"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "unavailable data",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "physical-measurements",
+                "available": false,
+                "detail": "Running distance and other physical measurements are not recorded; this fixture has no physical-data or continuous-tracking source."
+              }
+            ],
+            "evidence": [],
+            "calculations": [],
+            "limitation": "Running distance and other physical measurements are not recorded; this fixture has no physical-data or continuous-tracking source."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "unavailability": true,
+          "noSubstitution": true
+        },
+        "note": "Resolves Amad, identifies running distance as unrecorded, and supplies no unrelated statistics."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 7566.2,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4037,
+        "completionTokens": 963,
+        "totalTokens": 5000
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"claim-1\",\"subject\":\"Eastport\",\"playerSubject\":{\"id\":\"east-player-09\",\"name\":\"Amad\",\"team\":\"Eastport\"},\"playerMetric\":\"running-distance\",\"text\":\"Player Amad's running distance in kilometres.\",\"intent\":\"unavailable-metric\",\"meaning\":{\"category\":\"other\",\"description\":\"Request for the player's running-distance (km).\",\"comparison\":null},\"requiredEvidence\":[\"physical-measurements\"],\"timePeriod\":{\"kind\":\"selected\",\"eventId\":null},\"historicalEventAnchor\":null,\"clarificationNeeds\":[]}]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F03",
+      "group": "fresh-compound-claims",
+      "attemptedAt": "2026-10-22T20:02:05.292Z",
+      "request": {
+        "input": "Northbridge had more shots on target than Eastport, while Eastport had more possession overall.",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Keep two claims distinct: Northbridge shots-on-target greater than Eastport is contradicted (4 vs 5); Eastport possession greater than Northbridge is contradicted (44% vs 56%). No overall-performance inference.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "No — Northbridge recorded 4 shots on target, compared with Eastport's 5 shots on target. No — Eastport recorded 44% possession, compared with Northbridge's 56% possession. Possession is calculated from recorded controlled time only; it does not show territorial control or overall performance.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "claim-1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Northbridge had more shots on target than Eastport.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "factual-comparison",
+                "description": "Compare shots on target between the two teams for the selected period.",
+                "comparison": {
+                  "opponent": "Eastport",
+                  "opponentPlayer": null,
+                  "metric": "shots-on-target",
+                  "operator": "greater-than"
+                }
+              },
+              "requiredEvidence": [
+                "shots-on-target"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "shots-on-target",
+                "value": 4
+              },
+              {
+                "team": "Eastport",
+                "metric": "shots-on-target",
+                "value": 5
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "shots-on-target",
+                "available": true,
+                "detail": "The synthetic fixture records shots on target events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-01",
+                  "time": "12′",
+                  "team": "Northbridge",
+                  "description": "Low shot from the edge of the box, saved by the goalkeeper. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-04",
+                  "time": "31′",
+                  "team": "Eastport",
+                  "description": "Header from a cross is held by the goalkeeper. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-08",
+                  "time": "46′",
+                  "team": "Eastport",
+                  "description": "Eastport test the goalkeeper soon after the restart. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-10",
+                  "time": "58′",
+                  "team": "Eastport",
+                  "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-11",
+                  "time": "64′",
+                  "team": "Northbridge",
+                  "description": "A driven effort is pushed away by the goalkeeper. Shooter: Martin Ødegaard (north-player-08)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-13",
+                  "time": "77′",
+                  "team": "Northbridge",
+                  "description": "A header from a cross is saved. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-14",
+                  "time": "83′",
+                  "team": "Eastport",
+                  "description": "Eastport take the lead with a shot from close range. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-15",
+                  "time": "90+2′",
+                  "team": "Eastport",
+                  "description": "Late shot is held by the goalkeeper. Shooter: Bruno Fernandes (east-player-08)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance."
+          },
+          {
+            "claim": {
+              "id": "claim-2",
+              "subject": "Eastport",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Eastport had more possession overall than Northbridge.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "factual-comparison",
+                "description": "Compare overall possession between the two teams for the selected period.",
+                "comparison": {
+                  "opponent": "Northbridge",
+                  "opponentPlayer": null,
+                  "metric": "possession-percentage",
+                  "operator": "greater-than"
+                }
+              },
+              "requiredEvidence": [
+                "possession"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 44
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "possession",
+                "available": true,
+                "detail": "The synthetic fixture records possession events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-01",
+                  "time": "1′–8′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-02",
+                  "time": "8′–12′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-03",
+                  "time": "12′–18′",
+                  "team": "Northbridge",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-04",
+                  "time": "18′–23′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-05",
+                  "time": "23′–31′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-06",
+                  "time": "31′–36′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-08",
+                  "time": "37′–40′",
+                  "team": "Northbridge",
+                  "description": "3 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-09",
+                  "time": "40′–44′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-11",
+                  "time": "45′–45+2′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-12",
+                  "time": "45+2′–45+3′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-13",
+                  "time": "46′–51′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-14",
+                  "time": "51′–58′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-15",
+                  "time": "58′–62′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-17",
+                  "time": "63′–64′",
+                  "team": "Eastport",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-18",
+                  "time": "64′–68′",
+                  "team": "Northbridge",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-19",
+                  "time": "68′–70′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-20",
+                  "time": "70′–75′",
+                  "team": "Northbridge",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-22",
+                  "time": "76′–77′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-23",
+                  "time": "77′–83′",
+                  "team": "Eastport",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-24",
+                  "time": "83′–90+1′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-25",
+                  "time": "90+1′–90+3′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-26",
+                  "time": "90+3′–90+4′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              }
+            ],
+            "calculations": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56,
+                "numerator": 51,
+                "denominator": 91,
+                "numeratorRecordIds": [
+                  "sequence-01",
+                  "sequence-03",
+                  "sequence-05",
+                  "sequence-08",
+                  "sequence-12",
+                  "sequence-14",
+                  "sequence-18",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-24",
+                  "sequence-26"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-18",
+                  "sequence-19",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-23",
+                  "sequence-24",
+                  "sequence-25",
+                  "sequence-26"
+                ],
+                "denominatorDescription": "91 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 44,
+                "numerator": 40,
+                "denominator": 91,
+                "numeratorRecordIds": [
+                  "sequence-02",
+                  "sequence-04",
+                  "sequence-06",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-13",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-19",
+                  "sequence-23",
+                  "sequence-25"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-18",
+                  "sequence-19",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-23",
+                  "sequence-24",
+                  "sequence-25",
+                  "sequence-26"
+                ],
+                "denominatorDescription": "91 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              }
+            ],
+            "limitation": "Possession percentage is calculated only across recorded controlled-possession minutes; contested and out-of-play time are excluded. It does not establish territorial control, chance quality, or overall performance."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "claimSeparation": true,
+          "entities": true,
+          "metrics": true,
+          "operators": true,
+          "calculations": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Preserves both claims; correctly contradicts Northbridge > Eastport on shots on target (4 vs 5) and Eastport > Northbridge possession (44% vs 56%). Limitation distinguishes possession from overall performance."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 12281.1,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4045,
+        "completionTokens": 1488,
+        "totalTokens": 5533
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"claim-1\",\n      \"subject\": \"Northbridge\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Northbridge had more shots on target than Eastport.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"factual-comparison\",\n        \"description\": \"Compare shots on target between the two teams for the selected period.\",\n        \"comparison\": {\n          \"opponent\": \"Eastport\",\n          \"opponentPlayer\": null,\n          \"metric\": \"shots-on-target\",\n          \"operator\": \"greater-than\"\n        }\n      },\n      \"requiredEvidence\": [\n        \"shots-on-target\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"selected\",\n        \"eventId\": null\n      },\n      \"historicalEventAnchor\": null,\n      \"clarificationNeeds\": []\n    },\n    {\n      \"id\": \"claim-2\",\n      \"subject\": \"Eastport\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Eastport had more possession overall than Northbridge.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"factual-comparison\",\n        \"description\": \"Compare overall possession between the two teams for the selected period.\",\n        \"comparison\": {\n          \"opponent\": \"Northbridge\",\n          \"opponentPlayer\": null,\n          \"metric\": \"possession-percentage\",\n          \"operator\": \"greater-than\"\n        }\n      },\n      \"requiredEvidence\": [\n        \"possession\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"selected\",\n        \"eventId\": null\n      },\n      \"historicalEventAnchor\": null,\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F04",
+      "group": "fresh-historical-circumstance",
+      "attemptedAt": "2026-10-22T20:02:19.150Z",
+      "request": {
+        "input": "Did Eastport's goal at 58 minutes come against the run of play?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Anchor to event-10, Eastport goal at 58; evidence strictly before it, excluding the goal and later events. Possession 56.1% Northbridge vs 43.9% Eastport is insufficient to establish territory/chance quality; qualify as inconclusive.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "The available evidence cannot establish whether Eastport's goal at 58' came against the run of play. This uses play strictly before Eastport's goal at 58′; the goal is a separate time anchor. The fixture has no continuous territorial or chance-quality data.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Eastport",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Eastport's goal at 58' came against the run of play.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "historical-circumstance",
+                "description": "Whether Eastport's goal at 58 minutes was scored despite Northbridge having the run of play (possession/territorial advantage) immediately before the goal.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "possession",
+                "territorial-control",
+                "attacking-events"
+              ],
+              "timePeriod": {
+                "kind": "before-event",
+                "eventId": "event-10"
+              },
+              "historicalEventAnchor": {
+                "eventId": "event-10",
+                "relationship": "preceding-goal"
+              },
+              "clarificationNeeds": []
+            },
+            "assessment": "insufficient evidence for a firm conclusion",
+            "periodLabel": "Recorded match play strictly before 58′ (event-10 Eastport goal)",
+            "statistics": [
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 43.9
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "possession",
+                "available": true,
+                "detail": "The synthetic fixture records possession events."
+              },
+              {
+                "kind": "territorial-control",
+                "available": false,
+                "detail": "The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking."
+              },
+              {
+                "kind": "attacking-events",
+                "available": true,
+                "detail": "The fixture records a limited set of shots, goals, and other match events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-01",
+                  "time": "12′",
+                  "team": "Northbridge",
+                  "description": "Low shot from the edge of the box, saved by the goalkeeper. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-02",
+                  "time": "18′",
+                  "team": "Eastport",
+                  "description": "First-time effort from outside the area goes wide. Shooter: Matheus Cunha (east-player-10)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-03",
+                  "time": "27′",
+                  "team": "Northbridge",
+                  "description": "Northbridge win a corner."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-04",
+                  "time": "31′",
+                  "team": "Eastport",
+                  "description": "Header from a cross is held by the goalkeeper. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-05",
+                  "time": "38′",
+                  "team": "Northbridge",
+                  "description": "A defender blocks a shot inside the area. Shooter: Viktor Gyökeres (north-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-06",
+                  "time": "45+2′",
+                  "team": "Eastport",
+                  "description": "Free-kick attempt clears the crossbar. Shooter: Bruno Fernandes (east-player-08)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-08",
+                  "time": "46′",
+                  "team": "Eastport",
+                  "description": "Eastport test the goalkeeper soon after the restart. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-09",
+                  "time": "51′",
+                  "team": "Northbridge",
+                  "description": "A counter-attacking effort goes wide. Shooter: Viktor Gyökeres (north-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-01",
+                  "time": "1′–8′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-02",
+                  "time": "8′–12′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-03",
+                  "time": "12′–18′",
+                  "team": "Northbridge",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-04",
+                  "time": "18′–23′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-05",
+                  "time": "23′–31′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-06",
+                  "time": "31′–36′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-08",
+                  "time": "37′–40′",
+                  "team": "Northbridge",
+                  "description": "3 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-09",
+                  "time": "40′–44′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-11",
+                  "time": "45′–45+2′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-12",
+                  "time": "45+2′–45+3′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-13",
+                  "time": "46′–51′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-14",
+                  "time": "51′–58′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "anchor",
+                "reference": {
+                  "id": "event-10",
+                  "time": "58′",
+                  "team": "Eastport",
+                  "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+                }
+              }
+            ],
+            "calculations": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56.1,
+                "numerator": 32,
+                "denominator": 57,
+                "numeratorRecordIds": [
+                  "sequence-01",
+                  "sequence-03",
+                  "sequence-05",
+                  "sequence-08",
+                  "sequence-12",
+                  "sequence-14"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14"
+                ],
+                "denominatorDescription": "57 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 43.9,
+                "numerator": 25,
+                "denominator": 57,
+                "numeratorRecordIds": [
+                  "sequence-02",
+                  "sequence-04",
+                  "sequence-06",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-13"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14"
+                ],
+                "denominatorDescription": "57 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              }
+            ],
+            "limitation": "The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking. These missing data prevent a firm conclusion about \"Whether Eastport's goal at 58 minutes was scored despite Northbridge having the run of play (possession/territorial advantage) immediately before the goal.\"."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "historicalAnchor": true,
+          "exclusiveCutoff": true,
+          "calculation": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Uses event-10 as the Eastport 58? goal anchor, strictly excludes it and later events from the evidence, reports pre-goal possession, and properly declines a firm run-of-play conclusion without territorial/chance-quality data."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 13851.1,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4043,
+        "completionTokens": 1579,
+        "totalTokens": 5622
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"c1\",\n      \"subject\": \"Eastport\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Eastport's goal at 58' came against the run of play.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"historical-circumstance\",\n        \"description\": \"Whether Eastport's goal at 58 minutes was scored despite Northbridge having the run of play (possession/territorial advantage) immediately before the goal.\",\n        \"comparison\": null\n      },\n      \"requiredEvidence\": [\n        \"goals\",\n        \"possession\",\n        \"shots\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"before-event\",\n        \"eventId\": \"event-10\"\n      },\n      \"historicalEventAnchor\": {\n        \"eventId\": \"event-10\",\n        \"relationship\": \"preceding-goal\"\n      },\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F05",
+      "group": "fresh-ambiguous-player",
+      "attemptedAt": "2026-10-22T20:02:25.776Z",
+      "request": {
+        "input": "What did Bruno contribute?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Ask whether Bruno Fernandes (east-player-08) or Bruno Guimar?es (north-player-18) is meant; do not guess or provide unrelated totals.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "claim-1",
+              "subject": null,
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Summarise Bruno's contributions in the match.",
+              "intent": "subjective-judgement",
+              "meaning": {
+                "category": "performance-judgement",
+                "description": "Broad player-performance judgement for a player named Bruno; request player-events, passing, shots, and goals to evaluate contributions.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "player-events",
+                "passing",
+                "shots",
+                "goals"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": [
+                "Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?"
+              ]
+            },
+            "assessment": "clarification needed",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [],
+            "evidence": [],
+            "calculations": [],
+            "limitation": "Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?"
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "ambiguity": true,
+          "identityOptions": true,
+          "noGuess": true,
+          "noUnrelatedStatistics": true
+        },
+        "note": "Requests clarification between Bruno Fernandes (Eastport) and Bruno Guimar?es (Northbridge), without guessing."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 6613.4,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4032,
+        "completionTokens": 799,
+        "totalTokens": 4831
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"claim-1\",\"subject\":null,\"playerSubject\":null,\"playerMetric\":null,\"text\":\"Summarise Bruno's contributions in the match.\",\"intent\":\"subjective-judgement\",\"meaning\":{\"category\":\"performance-judgement\",\"description\":\"Broad player-performance judgement for a player named Bruno; request player-events, passing, shots, and goals to evaluate contributions.\",\"comparison\":null},\"requiredEvidence\":[\"player-events\",\"passing\",\"shots\",\"goals\"],\"timePeriod\":{\"kind\":\"selected\",\"eventId\":null},\"historicalEventAnchor\":null,\"clarificationNeeds\":[\"Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?\"]}]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "F06",
+      "group": "fresh-selected-window",
+      "attemptedAt": "2026-10-22T20:02:33.047Z",
+      "request": {
+        "input": "In the ten minutes ending at 68 minutes, did Eastport have more shots on target?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 68
+        },
+        "selectedPeriod": "last-10-minutes",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Window 58?68 inclusive: one shot on target per team; Eastport is not greater. Score 1?1 at 68; exclude later events.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "No — Eastport recorded 1 shot on target, compared with Northbridge's 1 shot on target.\n\nSelected period: Last 10 minutes ending 68′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "68′",
+        "selectedPeriodLabel": "Last 10 minutes ending 68′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 1
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 1,
+            "shotsOnTarget": 1,
+            "goals": 0
+          },
+          "Eastport": {
+            "shots": 1,
+            "shotsOnTarget": 1,
+            "goals": 1
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Eastport",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Eastport had more shots on target than Northbridge in the ten minutes ending at 68 minutes.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "factual-comparison",
+                "description": "Compare shots-on-target between the two teams in the selected 10-minute period ending at 68 minutes.",
+                "comparison": {
+                  "opponent": "Northbridge",
+                  "opponentPlayer": null,
+                  "metric": "shots-on-target",
+                  "operator": "greater-than"
+                }
+              },
+              "requiredEvidence": [
+                "shots-on-target"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Last 10 minutes ending 68′",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "shots-on-target",
+                "value": 1
+              },
+              {
+                "team": "Eastport",
+                "metric": "shots-on-target",
+                "value": 1
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "shots-on-target",
+                "available": true,
+                "detail": "The synthetic fixture records shots on target events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-10",
+                  "time": "58′",
+                  "team": "Eastport",
+                  "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-11",
+                  "time": "64′",
+                  "team": "Northbridge",
+                  "description": "A driven effort is pushed away by the goalkeeper. Shooter: Martin Ødegaard (north-player-08)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entities": true,
+          "metric": true,
+          "operator": true,
+          "selectedWindow": true,
+          "calculation": true,
+          "evidence": true,
+          "futureExclusion": true
+        },
+        "note": "Labels the last ten minutes ending 68?; cites event-10 at 58? and event-11 at 64? only; reports 1?1 shots on target and contradicted; score at 68 is 1?1."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 7259.9,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 3780,
+        "completionTokens": 863,
+        "totalTokens": 4643
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\"claims\":[{\"id\":\"c1\",\"subject\":\"Eastport\",\"playerSubject\":null,\"playerMetric\":null,\"text\":\"Eastport had more shots on target than Northbridge in the ten minutes ending at 68 minutes.\",\"intent\":\"factual-claim\",\"meaning\":{\"category\":\"factual-comparison\",\"description\":\"Compare shots-on-target between the two teams in the selected 10-minute period ending at 68 minutes.\",\"comparison\":{\"opponent\":\"Northbridge\",\"opponentPlayer\":null,\"metric\":\"shots-on-target\",\"operator\":\"greater-than\"}},\"requiredEvidence\":[\"shots-on-target\"],\"timePeriod\":{\"kind\":\"selected\",\"eventId\":null},\"historicalEventAnchor\":null,\"clarificationNeeds\":[]}]}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "R01",
+      "group": "repeat-of-D03",
+      "attemptedAt": "2026-10-22T20:02:43.286Z",
+      "request": {
+        "input": "Before Northbridge scored at 45+3, how many passes had they completed?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Exact repeat of D03: strictly before event-07, Northbridge 14/18 passes (77.8%).",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "The available evidence cannot establish whether Count of passes Northbridge completed before their goal at 45+3. This uses play strictly before Northbridge's goal at 45+3′; the goal is a separate time anchor. The fixture records only the evidence listed for this claim. Those events provide context, but do not establish the full subjective judgement \"Count of passes Northbridge completed before their goal at 45+3.\".\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Count of passes Northbridge completed before their goal at 45+3.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "historical-circumstance",
+                "description": "Number of completed passes by Northbridge in the match prior to (but not including) the goal scored at 45+3.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "passing"
+              ],
+              "timePeriod": {
+                "kind": "before-event",
+                "eventId": "event-07"
+              },
+              "historicalEventAnchor": {
+                "eventId": "event-07",
+                "relationship": "before"
+              },
+              "clarificationNeeds": []
+            },
+            "assessment": "insufficient evidence for a firm conclusion",
+            "periodLabel": "Recorded match play strictly before 45+3′ (event-07 Northbridge goal)",
+            "statistics": [],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "passing",
+                "available": true,
+                "detail": "The synthetic fixture records passing events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-001",
+                  "time": "2′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-01 from (12, 22) to (22, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-002",
+                  "time": "3′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-02 from (22, 35) to (32, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-003",
+                  "time": "4′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-03 from (32, 48) to (32, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-004",
+                  "time": "5′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-04 from (32, 61) to (32, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-005",
+                  "time": "6′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-05 from (32, 74) to (32, 31)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-006",
+                  "time": "9′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-02 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-007",
+                  "time": "10′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-03 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-008",
+                  "time": "11′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-04 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-009",
+                  "time": "13′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-03 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-010",
+                  "time": "14′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-04 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-011",
+                  "time": "15′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-05 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-012",
+                  "time": "16′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-06 from (66, 61) to (66, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-013",
+                  "time": "19′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-04 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-014",
+                  "time": "20′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-05 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-015",
+                  "time": "21′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-06 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-016",
+                  "time": "22′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-07 from (66, 61) to (66, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-017",
+                  "time": "24′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-05 from (70, 22) to (80, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-018",
+                  "time": "25′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-06 from (80, 35) to (98, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-019",
+                  "time": "27′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-07 from (98, 48) to (98, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-020",
+                  "time": "28′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-08 from (98, 61) to (98, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-021",
+                  "time": "29′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-09 from (98, 74) to (98, 31)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-022",
+                  "time": "32′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-06 from (70, 22) to (80, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-023",
+                  "time": "33′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-07 from (80, 35) to (98, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-024",
+                  "time": "34′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-08 from (98, 48) to (98, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-025",
+                  "time": "35′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-09 from (98, 61) to (98, 74)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-026",
+                  "time": "37′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-08 from (12, 22) to (22, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-027",
+                  "time": "38′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-09 from (22, 35) to (32, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-028",
+                  "time": "39′",
+                  "team": "Northbridge",
+                  "description": "Incomplete pass by north-player-10 from (32, 48) to (32, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-029",
+                  "time": "41′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-09 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-030",
+                  "time": "42′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-10 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-031",
+                  "time": "43′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-11 from (66, 48) to (66, 61)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-032",
+                  "time": "45′",
+                  "team": "Eastport",
+                  "description": "Completed pass by east-player-11 from (38, 22) to (48, 35)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-033",
+                  "time": "45+1′",
+                  "team": "Eastport",
+                  "description": "Incomplete pass by east-player-01 from (48, 35) to (66, 48)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "pass-034",
+                  "time": "45+2′",
+                  "team": "Northbridge",
+                  "description": "Completed pass by north-player-01 from (38, 22) to (40, 35)."
+                }
+              },
+              {
+                "role": "anchor",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "The fixture records only the evidence listed for this claim. Those events provide context, but do not establish the full subjective judgement \"Count of passes Northbridge completed before their goal at 45+3.\"."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "accepted-but-wrong",
+        "dimensions": {
+          "meaning": false,
+          "entity": true,
+          "metric": false,
+          "polarity": true,
+          "timeScope": true,
+          "calculation": false,
+          "evidence": true,
+          "limitations": false
+        },
+        "note": "Repeat of D03 reproduces the same semantic failure: correct exclusive event-07 boundary, but no pass-statistic interpretation or 14/18 calculation."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 10223.2,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4044,
+        "completionTokens": 984,
+        "totalTokens": 5028
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"c1\",\n      \"subject\": \"Northbridge\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Count of passes Northbridge completed before their goal at 45+3.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"historical-circumstance\",\n        \"description\": \"Number of completed passes by Northbridge in the match prior to (but not including) the goal scored at 45+3.\",\n        \"comparison\": null\n      },\n      \"requiredEvidence\": [\n        \"passing\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"before-event\",\n        \"eventId\": \"event-07\"\n      },\n      \"historicalEventAnchor\": {\n        \"eventId\": \"event-07\",\n        \"relationship\": \"before\"\n      },\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "R02",
+      "group": "repeat-of-F04",
+      "attemptedAt": "2026-10-22T20:02:57.417Z",
+      "request": {
+        "input": "Did Eastport's goal at 58 minutes come against the run of play?",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Exact repeat of F04: exclusive cutoff before event-10, qualified/inconclusive, no event-10 or later evidence.",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "The available evidence cannot establish whether Eastport's goal at 58' was scored against the run of play. This uses play strictly before Eastport's goal at 58′; the goal is a separate time anchor. The fixture has no continuous territorial or chance-quality data.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Eastport",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Eastport's goal at 58' was scored against the run of play.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "historical-circumstance",
+                "description": "Assess whether Eastport's 58' goal occurred despite Northbridge dominating play in the period immediately before that goal.",
+                "comparison": null
+              },
+              "requiredEvidence": [
+                "possession",
+                "territorial-control",
+                "attacking-events"
+              ],
+              "timePeriod": {
+                "kind": "before-event",
+                "eventId": "event-10"
+              },
+              "historicalEventAnchor": {
+                "eventId": "event-10",
+                "relationship": "before"
+              },
+              "clarificationNeeds": []
+            },
+            "assessment": "insufficient evidence for a firm conclusion",
+            "periodLabel": "Recorded match play strictly before 58′ (event-10 Eastport goal)",
+            "statistics": [
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 43.9
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "possession",
+                "available": true,
+                "detail": "The synthetic fixture records possession events."
+              },
+              {
+                "kind": "territorial-control",
+                "available": false,
+                "detail": "The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking."
+              },
+              {
+                "kind": "attacking-events",
+                "available": true,
+                "detail": "The fixture records a limited set of shots, goals, and other match events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-01",
+                  "time": "12′",
+                  "team": "Northbridge",
+                  "description": "Low shot from the edge of the box, saved by the goalkeeper. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-02",
+                  "time": "18′",
+                  "team": "Eastport",
+                  "description": "First-time effort from outside the area goes wide. Shooter: Matheus Cunha (east-player-10)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-03",
+                  "time": "27′",
+                  "team": "Northbridge",
+                  "description": "Northbridge win a corner."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-04",
+                  "time": "31′",
+                  "team": "Eastport",
+                  "description": "Header from a cross is held by the goalkeeper. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-05",
+                  "time": "38′",
+                  "team": "Northbridge",
+                  "description": "A defender blocks a shot inside the area. Shooter: Viktor Gyökeres (north-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-06",
+                  "time": "45+2′",
+                  "team": "Eastport",
+                  "description": "Free-kick attempt clears the crossbar. Shooter: Bruno Fernandes (east-player-08)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-08",
+                  "time": "46′",
+                  "team": "Eastport",
+                  "description": "Eastport test the goalkeeper soon after the restart. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "event-09",
+                  "time": "51′",
+                  "team": "Northbridge",
+                  "description": "A counter-attacking effort goes wide. Shooter: Viktor Gyökeres (north-player-11)."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-01",
+                  "time": "1′–8′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-02",
+                  "time": "8′–12′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-03",
+                  "time": "12′–18′",
+                  "team": "Northbridge",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-04",
+                  "time": "18′–23′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-05",
+                  "time": "23′–31′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-06",
+                  "time": "31′–36′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-08",
+                  "time": "37′–40′",
+                  "team": "Northbridge",
+                  "description": "3 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-09",
+                  "time": "40′–44′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-11",
+                  "time": "45′–45+2′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-12",
+                  "time": "45+2′–45+3′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-13",
+                  "time": "46′–51′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-14",
+                  "time": "51′–58′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "anchor",
+                "reference": {
+                  "id": "event-10",
+                  "time": "58′",
+                  "team": "Eastport",
+                  "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+                }
+              }
+            ],
+            "calculations": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56.1,
+                "numerator": 32,
+                "denominator": 57,
+                "numeratorRecordIds": [
+                  "sequence-01",
+                  "sequence-03",
+                  "sequence-05",
+                  "sequence-08",
+                  "sequence-12",
+                  "sequence-14"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14"
+                ],
+                "denominatorDescription": "57 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 43.9,
+                "numerator": 25,
+                "denominator": 57,
+                "numeratorRecordIds": [
+                  "sequence-02",
+                  "sequence-04",
+                  "sequence-06",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-13"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14"
+                ],
+                "denominatorDescription": "57 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              }
+            ],
+            "limitation": "The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking. These missing data prevent a firm conclusion about \"Assess whether Eastport's 58' goal occurred despite Northbridge dominating play in the period immediately before that goal.\"."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "meaning": true,
+          "entity": true,
+          "metric": true,
+          "historicalAnchor": true,
+          "exclusiveCutoff": true,
+          "calculation": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Semantically matches F04: event-10 anchor, strict pre-goal evidence, qualified conclusion, and no goal-or-later evidence."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 14119.5,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4043,
+        "completionTokens": 1883,
+        "totalTokens": 5926
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"c1\",\n      \"subject\": \"Eastport\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Eastport's goal at 58' was scored against the run of play.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"historical-circumstance\",\n        \"description\": \"Assess whether Eastport's 58' goal occurred despite Northbridge dominating play in the period immediately before that goal.\",\n        \"comparison\": null\n      },\n      \"requiredEvidence\": [\n        \"possession\",\n        \"shots\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"before-event\",\n        \"eventId\": \"event-10\"\n      },\n      \"historicalEventAnchor\": {\n        \"eventId\": \"event-10\",\n        \"relationship\": \"before\"\n      },\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    },
+    {
+      "attemptId": "R03",
+      "group": "repeat-of-F03",
+      "attemptedAt": "2026-10-22T20:03:05.916Z",
+      "request": {
+        "input": "Northbridge had more shots on target than Eastport, while Eastport had more possession overall.",
+        "selectedClock": {
+          "period": 2,
+          "minute": 90,
+          "stoppageMinutes": 4
+        },
+        "selectedPeriod": "match-so-far",
+        "provider": "foundry",
+        "deployment": "gpt-5-mini"
+      },
+      "expectedInterpretation": "Exact repeat of F03: two distinct contradicted claims (4 vs 5 shots on target; 44% vs 56% possession).",
+      "actualResponse": {
+        "provider": "foundry",
+        "providerLabel": "Microsoft Foundry structured-output model",
+        "summary": "No — Northbridge recorded 4 shots on target, compared with Eastport's 5 shots on target. No — Eastport recorded 44% possession, compared with Northbridge's 56% possession. Possession is calculated from recorded controlled time only; it does not show territorial control or overall performance.\n\nSelected period: Match so far through 90+4′. This is a fictional match using real-player names; all performances and results are fictional.",
+        "selectedTime": "90+4′",
+        "selectedPeriodLabel": "Match so far through 90+4′",
+        "score": {
+          "Northbridge": 1,
+          "Eastport": 2
+        },
+        "periodStatistics": {
+          "Northbridge": {
+            "shots": 7,
+            "shotsOnTarget": 4,
+            "goals": 1
+          },
+          "Eastport": {
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "goals": 2
+          }
+        },
+        "periodEvents": [
+          {
+            "id": "event-01",
+            "time": "12′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-02",
+            "time": "18′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-03",
+            "time": "27′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-04",
+            "time": "31′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-05",
+            "time": "38′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-06",
+            "time": "45+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-07",
+            "time": "45+3′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-08",
+            "time": "46′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-09",
+            "time": "51′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-10",
+            "time": "58′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-11",
+            "time": "64′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-12",
+            "time": "70′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-13",
+            "time": "77′",
+            "team": "Northbridge"
+          },
+          {
+            "id": "event-14",
+            "time": "83′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-15",
+            "time": "90+2′",
+            "team": "Eastport"
+          },
+          {
+            "id": "event-16",
+            "time": "90+4′",
+            "team": "Northbridge"
+          }
+        ],
+        "claims": [
+          {
+            "claim": {
+              "id": "c1",
+              "subject": "Northbridge",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Northbridge had more shots on target than Eastport.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "factual-comparison",
+                "description": "Comparison of shots on target between two teams.",
+                "comparison": {
+                  "opponent": "Eastport",
+                  "opponentPlayer": null,
+                  "metric": "shots-on-target",
+                  "operator": "greater-than"
+                }
+              },
+              "requiredEvidence": [
+                "shots-on-target"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "shots-on-target",
+                "value": 4
+              },
+              {
+                "team": "Eastport",
+                "metric": "shots-on-target",
+                "value": 5
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "shots-on-target",
+                "available": true,
+                "detail": "The synthetic fixture records shots on target events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-01",
+                  "time": "12′",
+                  "team": "Northbridge",
+                  "description": "Low shot from the edge of the box, saved by the goalkeeper. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-04",
+                  "time": "31′",
+                  "team": "Eastport",
+                  "description": "Header from a cross is held by the goalkeeper. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-07",
+                  "time": "45+3′",
+                  "team": "Northbridge",
+                  "description": "Northbridge score with a close-range shot. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-08",
+                  "time": "46′",
+                  "team": "Eastport",
+                  "description": "Eastport test the goalkeeper soon after the restart. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-10",
+                  "time": "58′",
+                  "team": "Eastport",
+                  "description": "Eastport level the score with a shot from the area. Shooter: Matheus Cunha (east-player-10)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-11",
+                  "time": "64′",
+                  "team": "Northbridge",
+                  "description": "A driven effort is pushed away by the goalkeeper. Shooter: Martin Ødegaard (north-player-08)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-13",
+                  "time": "77′",
+                  "team": "Northbridge",
+                  "description": "A header from a cross is saved. Shooter: Bukayo Saka (north-player-09)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-14",
+                  "time": "83′",
+                  "team": "Eastport",
+                  "description": "Eastport take the lead with a shot from close range. Shooter: Benjamin Šeško (east-player-11)."
+                }
+              },
+              {
+                "role": "challenging",
+                "reference": {
+                  "id": "event-15",
+                  "time": "90+2′",
+                  "team": "Eastport",
+                  "description": "Late shot is held by the goalkeeper. Shooter: Bruno Fernandes (east-player-08)."
+                }
+              }
+            ],
+            "calculations": [],
+            "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance."
+          },
+          {
+            "claim": {
+              "id": "c2",
+              "subject": "Eastport",
+              "playerSubject": null,
+              "playerMetric": null,
+              "text": "Eastport had more possession than Northbridge.",
+              "intent": "factual-claim",
+              "meaning": {
+                "category": "factual-comparison",
+                "description": "Comparison of overall possession between two teams.",
+                "comparison": {
+                  "opponent": "Northbridge",
+                  "opponentPlayer": null,
+                  "metric": "possession-percentage",
+                  "operator": "greater-than"
+                }
+              },
+              "requiredEvidence": [
+                "possession"
+              ],
+              "timePeriod": {
+                "kind": "selected"
+              },
+              "historicalEventAnchor": null,
+              "clarificationNeeds": []
+            },
+            "assessment": "contradicted",
+            "periodLabel": "Match so far through 90+4′",
+            "statistics": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 44
+              }
+            ],
+            "playerStatistics": [],
+            "playerCalculations": [],
+            "evidenceAvailability": [
+              {
+                "kind": "possession",
+                "available": true,
+                "detail": "The synthetic fixture records possession events."
+              }
+            ],
+            "evidence": [
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-01",
+                  "time": "1′–8′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-02",
+                  "time": "8′–12′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-03",
+                  "time": "12′–18′",
+                  "team": "Northbridge",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-04",
+                  "time": "18′–23′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-05",
+                  "time": "23′–31′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-06",
+                  "time": "31′–36′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-08",
+                  "time": "37′–40′",
+                  "team": "Northbridge",
+                  "description": "3 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-09",
+                  "time": "40′–44′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-11",
+                  "time": "45′–45+2′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-12",
+                  "time": "45+2′–45+3′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-13",
+                  "time": "46′–51′",
+                  "team": "Eastport",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-14",
+                  "time": "51′–58′",
+                  "team": "Northbridge",
+                  "description": "7 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-15",
+                  "time": "58′–62′",
+                  "team": "Eastport",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-17",
+                  "time": "63′–64′",
+                  "team": "Eastport",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-18",
+                  "time": "64′–68′",
+                  "team": "Northbridge",
+                  "description": "4 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-19",
+                  "time": "68′–70′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-20",
+                  "time": "70′–75′",
+                  "team": "Northbridge",
+                  "description": "5 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-22",
+                  "time": "76′–77′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-23",
+                  "time": "77′–83′",
+                  "team": "Eastport",
+                  "description": "6 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-24",
+                  "time": "83′–90+1′",
+                  "team": "Northbridge",
+                  "description": "8 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-25",
+                  "time": "90+1′–90+3′",
+                  "team": "Eastport",
+                  "description": "2 recorded minutes of controlled possession."
+                }
+              },
+              {
+                "role": "context",
+                "reference": {
+                  "id": "sequence-26",
+                  "time": "90+3′–90+4′",
+                  "team": "Northbridge",
+                  "description": "1 recorded minutes of controlled possession."
+                }
+              }
+            ],
+            "calculations": [
+              {
+                "team": "Northbridge",
+                "metric": "possession-percentage",
+                "value": 56,
+                "numerator": 51,
+                "denominator": 91,
+                "numeratorRecordIds": [
+                  "sequence-01",
+                  "sequence-03",
+                  "sequence-05",
+                  "sequence-08",
+                  "sequence-12",
+                  "sequence-14",
+                  "sequence-18",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-24",
+                  "sequence-26"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-18",
+                  "sequence-19",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-23",
+                  "sequence-24",
+                  "sequence-25",
+                  "sequence-26"
+                ],
+                "denominatorDescription": "91 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              },
+              {
+                "team": "Eastport",
+                "metric": "possession-percentage",
+                "value": 44,
+                "numerator": 40,
+                "denominator": 91,
+                "numeratorRecordIds": [
+                  "sequence-02",
+                  "sequence-04",
+                  "sequence-06",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-13",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-19",
+                  "sequence-23",
+                  "sequence-25"
+                ],
+                "denominatorRecordIds": [
+                  "sequence-01",
+                  "sequence-02",
+                  "sequence-03",
+                  "sequence-04",
+                  "sequence-05",
+                  "sequence-06",
+                  "sequence-08",
+                  "sequence-09",
+                  "sequence-11",
+                  "sequence-12",
+                  "sequence-13",
+                  "sequence-14",
+                  "sequence-15",
+                  "sequence-17",
+                  "sequence-18",
+                  "sequence-19",
+                  "sequence-20",
+                  "sequence-22",
+                  "sequence-23",
+                  "sequence-24",
+                  "sequence-25",
+                  "sequence-26"
+                ],
+                "denominatorDescription": "91 total recorded controlled-possession minutes; contested and out-of-play intervals excluded."
+              }
+            ],
+            "limitation": "Possession percentage is calculated only across recorded controlled-possession minutes; contested and out-of-play time are excluded. It does not establish territorial control, chance quality, or overall performance."
+          }
+        ]
+      },
+      "scoring": {
+        "classification": "fully-correct",
+        "dimensions": {
+          "claimSeparation": true,
+          "entities": true,
+          "metrics": true,
+          "operators": true,
+          "calculations": true,
+          "evidence": true,
+          "limitations": true
+        },
+        "note": "Semantically matches F03: both distinct claims contradicted with the same values and limitations."
+      },
+      "outcome": {
+        "httpStatus": 200,
+        "error": null,
+        "elapsedMs": 8487.2,
+        "upstreamCalls": 1
+      },
+      "usage": {
+        "promptTokens": 4045,
+        "completionTokens": 1029,
+        "totalTokens": 5074
+      },
+      "rawModelOutput": {
+        "format": "original structured content captured before parsing/semantic validation",
+        "content": "{\n  \"claims\": [\n    {\n      \"id\": \"c1\",\n      \"subject\": \"Northbridge\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Northbridge had more shots on target than Eastport.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"factual-comparison\",\n        \"description\": \"Comparison of shots on target between two teams.\",\n        \"comparison\": {\n          \"opponent\": \"Eastport\",\n          \"opponentPlayer\": null,\n          \"metric\": \"shots-on-target\",\n          \"operator\": \"greater-than\"\n        }\n      },\n      \"requiredEvidence\": [\n        \"shots-on-target\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"selected\",\n        \"eventId\": null\n      },\n      \"historicalEventAnchor\": null,\n      \"clarificationNeeds\": []\n    },\n    {\n      \"id\": \"c2\",\n      \"subject\": \"Eastport\",\n      \"playerSubject\": null,\n      \"playerMetric\": null,\n      \"text\": \"Eastport had more possession than Northbridge.\",\n      \"intent\": \"factual-claim\",\n      \"meaning\": {\n        \"category\": \"factual-comparison\",\n        \"description\": \"Comparison of overall possession between two teams.\",\n        \"comparison\": {\n          \"opponent\": \"Northbridge\",\n          \"opponentPlayer\": null,\n          \"metric\": \"possession-percentage\",\n          \"operator\": \"greater-than\"\n        }\n      },\n      \"requiredEvidence\": [\n        \"possession\"\n      ],\n      \"timePeriod\": {\n        \"kind\": \"selected\",\n        \"eventId\": null\n      },\n      \"historicalEventAnchor\": null,\n      \"clarificationNeeds\": []\n    }\n  ]\n}"
+      },
+      "redactionsApplied": []
+    }
+  ],
+  "limitations": [
+    "Small, single-fixture evaluation; not evidence of production reliability.",
+    "All cases used one deployment and one sequential request per attempt; no transport failures occurred.",
+    "The repeated pre-goal passing error shows an unresolved semantic-intent weakness despite correct historical anchoring and cutoff.",
+    "D01 shows an internally inconsistent claim limitation despite a correct negation verdict.",
+    "Passing outputs are derived from sparse synthetic records and should not be generalized beyond this fixture."
+  ]
+}
