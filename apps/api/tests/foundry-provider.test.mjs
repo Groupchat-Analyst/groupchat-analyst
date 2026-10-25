@@ -375,6 +375,53 @@ test('classifies refused finish reasons and truncated output as incomplete', asy
   }
 })
 
+test('sends an 8192 completion-token ceiling alongside the existing request settings', async () => {
+  let body
+  const valid = await analyzeOpinion(request('How many shots did Eastport have?'))
+  const provider = mockedFoundry({ claims: [valid.claims[0].claim] }, (_url, init) => {
+    body = JSON.parse(init.body)
+  })
+  await analyzeOpinion(request('How many shots did Eastport have?'), provider)
+  assert.equal(body.max_completion_tokens, 8192)
+  assert.equal(body.model, 'mock-deployment')
+  assert.equal(body.response_format.type, 'json_schema')
+  assert.equal('max_tokens' in body, false)
+  assert.equal('reasoning_effort' in body, false)
+})
+
+test('a token-limited response is rejected even when its content parses, with one call and no usage success', async () => {
+  let calls = 0
+  const usage = []
+  const valid = await analyzeOpinion(request('How many shots did Eastport have?'))
+  const provider = new FoundryInterpretationProvider(
+    { baseUrl: 'https://example.invalid/openai/v1', apiKey: 'mock-key', deployment: 'mock-deployment' },
+    async () => {
+      calls += 1
+      return response({
+        choices: [{ finish_reason: 'length', message: { content: JSON.stringify({ claims: [valid.claims[0].claim] }) } }],
+        usage: { prompt_tokens: 100, completion_tokens: 8192, total_tokens: 8292 },
+      })
+    },
+    (reported) => usage.push(reported),
+  )
+  await assert.rejects(
+    analyzeOpinion(request('How many shots did Eastport have?'), provider),
+    (error) => error.category === 'incomplete-output' && /truncated/.test(error.message),
+  )
+  assert.equal(calls, 1)
+  assert.deepEqual(usage, [])
+})
+
+test('a token-limited response with empty content is rejected as truncated', async () => {
+  const provider = providerWithFetch(async () => response({
+    choices: [{ finish_reason: 'length', message: { content: '' } }],
+  }))
+  await assert.rejects(
+    analyzeOpinion(request('Explain this claim.'), provider),
+    (error) => error.category === 'incomplete-output' && /truncated/.test(error.message),
+  )
+})
+
 test('classifies an upstream timeout as transport failure', async () => {
   const provider = providerWithFetch(async () => {
     throw new DOMException('request timed out', 'TimeoutError')

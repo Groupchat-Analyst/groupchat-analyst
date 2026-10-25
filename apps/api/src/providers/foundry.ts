@@ -27,6 +27,8 @@ type FoundryConfiguration = {
   deployment: string
 }
 
+const MAX_COMPLETION_TOKENS = 8192
+
 const CLAIM_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -249,6 +251,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
         signal: timeoutSignal,
         body: JSON.stringify({
         model: this.configuration.deployment,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
         messages: [
           {
             role: 'system',
