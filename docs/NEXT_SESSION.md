@@ -48,6 +48,23 @@ Ledger: `docs/take-investigation-90b7e97-foundry-verification-ledger.json`; arti
 - Open item before any further live run: derive "Checked against" and displayed figures for unsupported tactical judgements so they do not name possession as the metric (no code changed in this run).
 - Mobile screenshot is viewport emulation, not a real device.
 
+## 1c. Tactical-assessment presentation repair (offline replay, NOT new Foundry verification)
+
+Commit 32d32b0 repairs the call-3 presentation. Verified only by replaying the captured call-3 interpretation/response through the real application path (API tests with a stubbed provider; browser render of the replayed response through a local-provider stack with the analysis request route-fulfilled from the fixture). No model calls were made; call 4 (Bruno) has still never run live.
+
+- Unsupported tactical judgement (subjective intent, "insufficient evidence", `territorial-control` unavailable) now reads "Checked against Northbridge · defensive shape and positioning (not recorded, so no verdict) · …". Possession figures remain but are labelled "Context only — can't establish defensive shape or positioning" in Fan, Analyst, copied text and share card.
+- The Fan reply and the claim display quote the user's wording, not the model paraphrase. Pass-map help/map appear only for non-subjective passing claims.
+- A genuine possession question keeps normal "Checked against … possession" and "Key facts"; the 57′/58′ shots pair still compares directly.
+- Remaining limitations: the API limitation text still quotes the model's `meaning.description` ("…prevent a firm conclusion about "The claim judges…"") because historical replay tests pin that string; the server `summary` still quotes the paraphrase; with several claims a paraphrase that is not a substring of the opinion falls back to `claim.text`; mismatch detection in `service.ts` is regex-based.
+
+### Deployment preparation (inspected, nothing deployed)
+
+1. Source/workflow: `.github/workflows/shared-preview.yml` ("Deploy shared preview"), `workflow_dispatch` only, job guarded by `github.ref == 'refs/heads/main'`, checks out `main`, deploys `apps/web` + `apps/api` to Azure Static Web Apps. Hosting the current app therefore requires this branch merged to `main`.
+2. Prerequisites: `origin/main` (9d81c6b) contains **none** of the workflow, `staticwebapp.config.json` or `TEAM_DEMO.md`; the branch is 0 behind / 37 ahead. Needs review/merge to `main`, Azure Static Web App (Free, deployment source "Other"), repository secret `AZURE_STATIC_WEB_APPS_API_TOKEN`, write-access restriction and `main` protection (no GitHub environment/approval gate on the current plan).
+3. Judge access: Entra sign-in; `staticwebapp.config.json` limits `/*` and `/api/*` to role `preview-user`, invited manually per user; verify an uninvited account is denied first. Revocation: remove the role.
+4. Foundry settings: not configured and intended to stay disabled. Would be Static Web App application settings (`CLAIM_INTERPRETER_PROVIDER`, `FOUNDRY_OPENAI_BASE_URL`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL_DEPLOYMENT`); preview uses `CLAIM_INTERPRETER_PROVIDER=local`. Local dev uses git-ignored `apps/api/local.settings.json`.
+5. Spend/request controls: role gate, 30 s provider timeout, 8192 completion-token ceiling, no retries, and a 45 s Static Web Apps request limit. **Gap:** no per-user/per-request quota, daily cap or kill switch in the API, and Azure budgets only alert. Do not enable Foundry on a hosted preview until such limits exist. Note: hosted Foundry would also rely on the 30 s provider timeout fitting inside the 45 s platform limit.
+
 
 
 Current walkthrough is **local-provider verified** (local interpreter), not Foundry verified. Use the long wording locally.
