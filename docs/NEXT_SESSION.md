@@ -39,7 +39,16 @@ Repairs are verified **offline by captured-output replay** (the recorded structu
 Replay results: 57′ shots → contradicted ("No — … level on 2 shots on target each."); 58′ → supported ("Yes — Eastport have 3 … to Northbridge's 2."); parked the bus → insufficient evidence with no possession figure; Bruno → clarification needed. Call 1's *live* assessment label was never captured and remains **unverified**; the replay label comes from the deterministic server on the captured interpretation. A new live run would be needed to confirm the repaired behaviour end to end with Foundry. Web 87 tests and API 171 tests pass.
 - ~~Analyst help text mentions a pass map when none is shown~~ Fixed: it now mentions the pass map only for passing-related claims.
 
-## 2. Demo outline (110 seconds maximum)
+## 1b. Live confirmation run at 90b7e97 (three of four authorised calls; stopped)
+
+Ledger: `docs/take-investigation-90b7e97-foundry-verification-ledger.json`; artifacts in `docs/verification-artifacts/take-investigation-90b7e97/` (full API responses, desktop and emulated-mobile screenshots, exported what-changed PNG). Browser-driven, gpt-5-mini, 8192 ceiling, 30 s provider timeout, no retries. Known usage 13,937 tokens (11,642 prompt, 2,295 completion).
+
+- Call 1 (57′): contradicted, 2–2, "No — … level on 2 shots on target each." Call 2 (Check again, 58′): supported, Eastport 3 / Northbridge 2. A **direct** 57′→58′ comparison was produced from the real responses; copied text, preview and the opened PNG agree.
+- Call 3 ("Northbridge parked the bus." at 57′): Fan reply is evidence-limited with no possession template, **but** the "Checked against" line reads "Northbridge · % possession" and the claim card shows only possession figures, which presents possession as the checked metric. Treated as a required-behaviour failure, so **call 4 (Bruno) was not run** and the clarification repair remains verified by captured replay only. Minor: the Analyst help text mentions a pass map for this claim.
+- Open item before any further live run: derive "Checked against" and displayed figures for unsupported tactical judgements so they do not name possession as the metric (no code changed in this run).
+- Mobile screenshot is viewport emulation, not a real device.
+
+
 
 Current walkthrough is **local-provider verified** (local interpreter), not Foundry verified. Use the long wording locally.
 

@@ -1,0 +1,233 @@
+{
+  "ledger": "take-investigation 90b7e97 Foundry verification (bounded, sanitised)",
+  "applicationCommit": "90b7e97",
+  "date": "2026-10-25",
+  "dataset": "synthetic fictional match",
+  "configuration": {
+    "deployment": "gpt-5-mini",
+    "max_completion_tokens": 8192,
+    "providerTimeoutSeconds": 30,
+    "browserDeadlineSeconds": 45,
+    "retries": "none",
+    "capture": "enabled for the isolated process only; archived to a git-ignored directory"
+  },
+  "authorisation": "at most four sequential requests; no retries or replacements",
+  "callsAttempted": 3,
+  "callsNotAttempted": [
+    {
+      "call": 4,
+      "input": "How many passes did Bruno complete?",
+      "clock": "58′",
+      "reason": "Stopped before the call because call 3 showed a required-behaviour failure (see findings). The Bruno clarification repair is therefore unverified live."
+    }
+  ],
+  "calls": [
+    {
+      "call": 1,
+      "input": "Eastport had more shots on target.",
+      "clock": "57′",
+      "period": "match-so-far",
+      "flow": "Submit (Check this moment)",
+      "verifiedThrough": "browser",
+      "http": 200,
+      "browserElapsedMs": 6355,
+      "provider": "foundry",
+      "providerLabel": "Microsoft Foundry structured-output model",
+      "interpretation": {
+        "text": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "category": "factual-comparison",
+        "comparison": {
+          "opponent": "Northbridge",
+          "opponentPlayer": null,
+          "metric": "shots-on-target",
+          "operator": "greater-than"
+        },
+        "requiredEvidence": [
+          "shots-on-target"
+        ],
+        "timePeriod": {
+          "kind": "selected"
+        },
+        "clarificationNeeds": []
+      },
+      "assessment": "contradicted",
+      "figures": [
+        {
+          "team": "Northbridge",
+          "metric": "shots-on-target",
+          "value": 2
+        },
+        {
+          "team": "Eastport",
+          "metric": "shots-on-target",
+          "value": 2
+        }
+      ],
+      "fanReply": "No — Eastport and Northbridge are level on 2 shots on target each.",
+      "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance.",
+      "usage": {
+        "promptTokens": 3864,
+        "completionTokens": 845,
+        "totalTokens": 4709
+      },
+      "finishDetails": "HTTP 200; no failure; truncation not observed (completion tokens far below 8192)",
+      "fullResponseFile": "docs/verification-artifacts/take-investigation-90b7e97/call1-api-response.json"
+    },
+    {
+      "call": 2,
+      "input": "Eastport had more shots on target.",
+      "clock": "58′",
+      "period": "match-so-far",
+      "flow": "Check again at 58′ (saved take)",
+      "verifiedThrough": "browser",
+      "http": 200,
+      "browserElapsedMs": 15084,
+      "provider": "foundry",
+      "providerLabel": "Microsoft Foundry structured-output model",
+      "interpretation": {
+        "text": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "category": "factual-comparison",
+        "comparison": {
+          "opponent": "Northbridge",
+          "opponentPlayer": null,
+          "metric": "shots-on-target",
+          "operator": "greater-than"
+        },
+        "requiredEvidence": [
+          "shots-on-target"
+        ],
+        "timePeriod": {
+          "kind": "selected"
+        },
+        "clarificationNeeds": []
+      },
+      "assessment": "supported",
+      "figures": [
+        {
+          "team": "Northbridge",
+          "metric": "shots-on-target",
+          "value": 2
+        },
+        {
+          "team": "Eastport",
+          "metric": "shots-on-target",
+          "value": 3
+        }
+      ],
+      "fanReply": "Yes — Eastport have 3 shots on target to Northbridge's 2.",
+      "limitation": "This is a comparison of recorded events in the synthetic fixture, not a claim about chance quality or overall performance.",
+      "usage": {
+        "promptTokens": 3916,
+        "completionTokens": 790,
+        "totalTokens": 4706
+      },
+      "finishDetails": "HTTP 200; no failure; truncation not observed (completion tokens far below 8192)",
+      "fullResponseFile": "docs/verification-artifacts/take-investigation-90b7e97/call2-api-response.json"
+    },
+    {
+      "call": 3,
+      "input": "Northbridge parked the bus.",
+      "clock": "57′",
+      "period": "match-so-far",
+      "flow": "Submit (edited wording, replay returned to 57′)",
+      "verifiedThrough": "browser",
+      "http": 200,
+      "browserElapsedMs": 5784,
+      "provider": "foundry",
+      "providerLabel": "Microsoft Foundry structured-output model",
+      "interpretation": {
+        "text": "Northbridge parked the bus (adopted an extremely defensive, low-block approach)",
+        "intent": "subjective-judgement",
+        "category": "performance-judgement",
+        "comparison": null,
+        "requiredEvidence": [
+          "possession",
+          "territorial-control",
+          "shots",
+          "attacking-events",
+          "passing"
+        ],
+        "timePeriod": {
+          "kind": "selected"
+        },
+        "clarificationNeeds": []
+      },
+      "assessment": "insufficient evidence for a firm conclusion",
+      "figures": [
+        {
+          "team": "Northbridge",
+          "metric": "possession-percentage",
+          "value": 55.4
+        },
+        {
+          "team": "Eastport",
+          "metric": "possession-percentage",
+          "value": 44.6
+        }
+      ],
+      "fanReply": "That's a bigger football opinion than the match events can settle: “Northbridge parked the bus (adopted an extremely defensive, low-block approach)”. I can only report what's recorded. Nothing here records defensive shape or positioning, and possession share doesn't tell you how a side set up.",
+      "limitation": "The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking. These missing data prevent a firm conclusion about \"The claim judges Northbridge's overall tactical approach as highly defensive with limited attacking intent through the match so far.\".",
+      "usage": {
+        "promptTokens": 3862,
+        "completionTokens": 660,
+        "totalTokens": 4522
+      },
+      "finishDetails": "HTTP 200; no failure; truncation not observed (completion tokens far below 8192)",
+      "fullResponseFile": "docs/verification-artifacts/take-investigation-90b7e97/call3-api-response.json"
+    }
+  ],
+  "comparison57to58": {
+    "verifiedThrough": "browser",
+    "direct": true,
+    "headline": "That's changed: at 57′ it didn't hold up; at 58′ it holds up.",
+    "figures": "Shots on target: Northbridge 2, Eastport 2 → 3.",
+    "newRecordedMoment": "58′ · Eastport level the score with a shot from the area. Shooter: Matheus Cunha",
+    "caveat": "The listed moments match the change in the count. That's a tally, not a reason: the records can't say why it happened."
+  },
+  "sharing": {
+    "verifiedThrough": "browser",
+    "copiedTextMatchesPreview": true,
+    "exportedPng": "docs/verification-artifacts/take-investigation-90b7e97/what-changed-card.png",
+    "pngOpenedAndInspected": true,
+    "extraAnalysisCalls": 0,
+    "notes": "PNG download captured by intercepting the anchor download in the page and saved via a local receiver, because the automation did not surface a download event."
+  },
+  "screenshots": {
+    "desktop": "docs/verification-artifacts/take-investigation-90b7e97/desktop-comparison.png",
+    "mobile": "docs/verification-artifacts/take-investigation-90b7e97/mobile-emulated-comparison.png",
+    "mobileNote": "390x844 viewport emulation in a desktop browser; NOT a real-device check.",
+    "call3": "docs/verification-artifacts/take-investigation-90b7e97/call3-desktop-parked-the-bus.png"
+  },
+  "usageKnown": {
+    "promptTokens": 11642,
+    "completionTokens": 2295,
+    "totalTokens": 13937,
+    "unknownUsage": "call 4 not attempted; no attempted call lacked usage"
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "call": 3,
+      "severity": "required-behaviour failure (stop condition)",
+      "summary": "The Fan reply is correctly evidence-limited and no longer uses a possession template. However the “Checked against” line reads “Northbridge · % possession · Match so far through 57′” and the claim card lists possession figures (55.4% / 44.6%) as the only figures, which presents possession as the metric the take was checked against. This is the misleading possession wording the run required to be absent. The model also put its own gloss in claim.text (“…(adopted an extremely defensive, low-block approach)”), which the Fan reply quotes."
+    },
+    {
+      "id": "F2",
+      "call": 3,
+      "severity": "minor",
+      "summary": "Analyst help text mentions a pass map for this claim (requiredEvidence includes passing) although the claim is not about passing."
+    }
+  ],
+  "passes": [
+    "Call 1: contradicted, Eastport 2 / Northbridge 2, scope Match so far through 57′, reply “No — … level on 2 shots on target each.”, provider foundry.",
+    "Call 2: supported, Eastport 3 / Northbridge 2, equivalent interpretation despite different prose; direct comparison produced; Fan and Analyst presentation, copied text and exported PNG consistent."
+  ],
+  "limits": [
+    "Three calls (two distinct claims) do not establish reliability.",
+    "Call 4 (Bruno clarification) was not run; that validation repair is verified by captured-output replay only.",
+    "Mobile is emulation only."
+  ],
+  "historicalLedgerUntouched": "docs/take-investigation-foundry-verification-ledger.json (e64c08d)"
+}
