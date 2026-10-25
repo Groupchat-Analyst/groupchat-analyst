@@ -1,6 +1,8 @@
 # Next-session handoff
 
-Application code at `feature/take-investigation` commit `76e3037` (timeout fix `41edbc8`, handoff `8f2bbaf`, comparison safeguards `ed7d5c7`). All match data is fictional/synthetic.
+**Hackathon candidate (current):** see [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) and [PR_DESCRIPTION.md](./PR_DESCRIPTION.md). Hosting is now planned as **public, no sign-in, local provider only**; the earlier invited-`preview-user` plan is archived as [PRIVATE_PREVIEW_PLAN_SUPERSEDED.md](./PRIVATE_PREVIEW_PLAN_SUPERSEDED.md), and the long former README is [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md). Section 1c's deployment notes below describe the earlier invited-access arrangement and are superseded by the runbook. Nothing has been deployed; feature development is frozen.
+
+Application code at `feature/take-investigation` commit `76e3037` (timeout fix `41edbc8`, handoff `8f2bbaf`, comparison safeguards `ed7d5c7`); later repairs are listed in sections 1a–1c. All match data is fictional/synthetic.
 
 - Comparison: https://github.com/Groupchat-Analyst/groupchat-analyst/compare/feature/matchday-experience...feature/take-investigation
 - Baseline review branch: `feature/matchday-experience` (unchanged; its PR is separate).

@@ -8,17 +8,14 @@ const packageUrl = new URL('../package.json', import.meta.url)
 const vitePackageUrl = new URL('../node_modules/vite/package.json', import.meta.url)
 const workflowUrl = new URL('../../../.github/workflows/shared-preview.yml', import.meta.url)
 
-test('shared preview requires its invited role for the site and API', async () => {
+test('hackathon candidate is publicly readable without sign-in, with API routes excluded from the SPA fallback', async () => {
   const config = JSON.parse(await readFile(configUrl, 'utf8'))
 
-  assert.deepEqual(config.routes, [
-    { route: '/api/*', allowedRoles: ['preview-user'] },
-    { route: '/*', allowedRoles: ['preview-user'] },
-  ])
-  assert.equal(
-    config.responseOverrides['401'].redirect,
-    '/.auth/login/aad?post_login_redirect_uri=.referrer',
-  )
+  assert.equal(config.routes, undefined)
+  assert.equal(config.responseOverrides, undefined)
+  assert.ok(config.navigationFallback.exclude.includes('/api/*'))
+  assert.equal(config.globalHeaders['X-Frame-Options'], 'DENY')
+  assert.doesNotMatch(JSON.stringify(config), /allowedRoles|preview-user|\.auth/)
 })
 
 test('shared preview API runtime matches the project Node baseline', async () => {
@@ -58,4 +55,19 @@ test('deployment is manual, uses the repository secret, and has no environment g
   assert.match(workflow, /secrets\.AZURE_STATIC_WEB_APPS_API_TOKEN/)
   assert.doesNotMatch(workflow, /^\s+environment:/m)
   assert.doesNotMatch(workflow, /^\s+(push|pull_request):/m)
+})
+
+test('the workflow carries no Foundry credentials or provider override', async () => {
+  const workflow = await readFile(workflowUrl, 'utf8')
+
+  assert.doesNotMatch(workflow, /FOUNDRY|CLAIM_INTERPRETER_PROVIDER|OPENAI/i)
+  assert.equal([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]).join(), 'AZURE_STATIC_WEB_APPS_API_TOKEN')
+})
+
+test('public API routes stay anonymous-level and default to the local interpreter', async () => {
+  const index = await readFile(new URL('../../api/src/index.ts', import.meta.url), 'utf8')
+  const providers = await readFile(new URL('../../api/src/providers/index.ts', import.meta.url), 'utf8')
+
+  assert.equal([...index.matchAll(/authLevel: 'anonymous'/g)].length, 2)
+  assert.match(providers, /CLAIM_INTERPRETER_PROVIDER\?\.trim\(\) \|\| 'local'/)
 })
