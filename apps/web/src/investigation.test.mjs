@@ -69,6 +69,31 @@ test('different interpretations are reported plainly and are not compared', () =
   assert.equal(buildChangeCard(OPINION, earlier, later, comparison), null)
 })
 
+test('different model prose with identical structured meaning still compares directly', () => {
+  // Mirrors the cf10c74 Foundry pair: same structure, differently worded claim text.
+  const earlier = load('sot-57')
+  const later = load('sot-58')
+  earlier.claims[0].claim.text = 'Eastport had more shots on target than Northbridge.'
+  later.claims[0].claim.text = 'Eastport had more shots on target than Northbridge up to the 58′ minute.'
+  const comparison = compareSnapshots(createSnapshot(1, context(57), earlier), createSnapshot(2, context(58), later))
+  assert.equal(comparison.status, 'comparable')
+  assert.equal(comparison.pairs[0].after, 'supported')
+})
+
+test('claims without a structured comparison stay separate when their wording differs', () => {
+  const judgement = (text) => {
+    const analysis = load('sot-57')
+    const { claim } = analysis.claims[0]
+    claim.text = text
+    claim.intent = 'subjective-judgement'
+    claim.meaning = { category: 'performance-judgement', description: text, comparison: null }
+    return analysis
+  }
+  const a = createSnapshot(1, context(57), judgement('Northbridge parked the bus.'))
+  const b = createSnapshot(2, context(58), judgement('Northbridge dominated.'))
+  assert.equal(compareSnapshots(a, b).status, 'different-interpretation')
+})
+
 test('opposite polarity or a different comparison target is not treated as equivalent', () => {
   const earlier = snap(1, 57, 'sot-57')
   for (const mutate of [

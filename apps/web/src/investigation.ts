@@ -115,7 +115,8 @@ function claimKey(result: ClaimResult): string {
     ],
     [...claim.requiredEvidence].sort(),
     claim.timePeriod.kind === 'before-event' ? claim.timePeriod.eventId : 'selected',
-    claim.text.trim().toLowerCase(),
+    // Prose is model-generated; it only distinguishes claims the structure cannot.
+    comparison ? null : claim.text.trim().toLowerCase(),
   ])
 }
 

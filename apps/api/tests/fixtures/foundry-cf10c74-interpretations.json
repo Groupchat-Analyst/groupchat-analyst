@@ -1,0 +1,122 @@
+[
+  {
+    "claims": [
+      {
+        "id": "claim-1",
+        "subject": "Eastport",
+        "playerSubject": null,
+        "playerMetric": null,
+        "text": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "meaning": {
+          "category": "factual-comparison",
+          "description": "Head-to-head comparison of shots on target between the two teams.",
+          "comparison": {
+            "opponent": "Northbridge",
+            "opponentPlayer": null,
+            "metric": "shots-on-target",
+            "operator": "greater-than"
+          }
+        },
+        "requiredEvidence": [
+          "shots-on-target"
+        ],
+        "timePeriod": {
+          "kind": "selected",
+          "eventId": null
+        },
+        "historicalEventAnchor": null,
+        "clarificationNeeds": []
+      }
+    ]
+  },
+  {
+    "claims": [
+      {
+        "id": "c1",
+        "subject": "Eastport",
+        "playerSubject": null,
+        "playerMetric": null,
+        "text": "Eastport had more shots on target than Northbridge up to the 58′ minute.",
+        "intent": "factual-claim",
+        "meaning": {
+          "category": "factual-comparison",
+          "description": "Compare shots on target between the two teams.",
+          "comparison": {
+            "opponent": "Northbridge",
+            "opponentPlayer": null,
+            "metric": "shots-on-target",
+            "operator": "greater-than"
+          }
+        },
+        "requiredEvidence": [
+          "shots-on-target"
+        ],
+        "timePeriod": {
+          "kind": "selected",
+          "eventId": null
+        },
+        "historicalEventAnchor": null,
+        "clarificationNeeds": []
+      }
+    ]
+  },
+  {
+    "claims": [
+      {
+        "id": "c1",
+        "subject": "Northbridge",
+        "playerSubject": null,
+        "playerMetric": null,
+        "text": "Northbridge parked the bus.",
+        "intent": "subjective-judgement",
+        "meaning": {
+          "category": "performance-judgement",
+          "description": "Subjective team-level judgement that Northbridge adopted a very defensive, low-attacking approach ('parked the bus').",
+          "comparison": null
+        },
+        "requiredEvidence": [
+          "possession",
+          "shots",
+          "passing",
+          "possession-losses",
+          "lineups"
+        ],
+        "timePeriod": {
+          "kind": "selected",
+          "eventId": null
+        },
+        "historicalEventAnchor": null,
+        "clarificationNeeds": []
+      }
+    ]
+  },
+  {
+    "claims": [
+      {
+        "id": "claim-1",
+        "subject": null,
+        "playerSubject": null,
+        "playerMetric": null,
+        "text": "Number of completed passes by Bruno in the match so far (up to 58′).",
+        "intent": "statistical-request",
+        "meaning": {
+          "category": "other",
+          "description": "Count the player's pass completions in the selected match period.",
+          "comparison": null
+        },
+        "requiredEvidence": [
+          "passing"
+        ],
+        "timePeriod": {
+          "kind": "selected",
+          "eventId": null
+        },
+        "historicalEventAnchor": null,
+        "clarificationNeeds": [
+          "Which Bruno do you mean — Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?"
+        ]
+      }
+    ]
+  }
+]

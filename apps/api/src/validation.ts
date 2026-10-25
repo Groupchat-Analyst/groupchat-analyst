@@ -601,11 +601,20 @@ export function validateInterpretation(
         `${label} comparison must be factual and request its calculated metric.`,
       )
     }
+    // An unresolved entity is acceptable only as an explicit clarification state.
+    const isClarificationState =
+      claim.intent === 'statistical-request' &&
+      !comparison &&
+      subject === null &&
+      playerSubject === null &&
+      playerMetric === null &&
+      Array.isArray(claim.clarificationNeeds) &&
+      claim.clarificationNeeds.length > 0
     if (
       (claim.intent === 'statistical-request' &&
         (comparison
           ? comparison.operator !== 'comparison-request'
-          : subject === null ||
+          : (subject === null && !isClarificationState) ||
             meaning.category !== 'other' ||
           !requiredEvidence.some((kind) =>
             ['shots', 'shots-on-target', 'goals', 'passing', 'player-events', 'lineups'].includes(kind),

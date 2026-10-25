@@ -1046,6 +1046,7 @@ function makeLimitation(
   if (
     claim.intent === 'subjective-judgement' &&
     claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
     claim.subject
   ) {
     const opponent = TEAMS.find((team) => team !== claim.subject)!
@@ -1711,9 +1712,10 @@ function answerForClaim(
   if (
     claim.intent === 'subjective-judgement' &&
     claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
     claim.subject
   ) {
-    const own = result.statistics.find(({ team }) => team === claim.subject)?.value
+    const own =  result.statistics.find(({ team }) => team === claim.subject)?.value
     const opponentStat = result.statistics.find(({ team }) => team !== claim.subject)
     const opponent = opponentStat?.value
     if (own !== undefined && own !== null && opponent !== undefined && opponent !== null) {
@@ -1756,6 +1758,17 @@ function createSummary(
     answerForClaim(result, fixture, events, advanced, selectedClock),
   )
   return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`
+}
+
+const possessionControlPattern = /possess|domina|in control|controll?ed|ran the (?:game|match)|bossed|outplay|had the ball/i
+const defensiveShapePattern = /park(?:ed|ing) the bus|low block|sat (?:deep|back)|defen[cs]\w*|deep|compact|shape|back (?:five|four|three)/i
+
+function concernsPossessionOrControl(claim: InterpretedClaim): boolean {
+  return possessionControlPattern.test(claim.text) && !defensiveShapePattern.test(claim.text)
+}
+
+function concernsDefensiveShape(claim: InterpretedClaim): boolean {
+  return defensiveShapePattern.test(claim.text)
 }
 
 function fanScope(claim: InterpretedClaim, events: MatchEvent[]): string {
@@ -1881,7 +1894,12 @@ function fanAnswerForClaim(
       : result.limitation
     return `${supported ? `The records back that up: ${quote}.` : `The records can't settle whether ${quote}.`}${possession} ${fanScope(claim, events)} ${limitation}`.replace(/\s{2,}/g, ' ').trim()
   }
-  if (claim.intent === 'subjective-judgement' && claim.requiredEvidence.includes('possession') && claim.subject) {
+  if (
+    claim.intent === 'subjective-judgement' &&
+    claim.requiredEvidence.includes('possession') &&
+    concernsPossessionOrControl(claim) &&
+    claim.subject
+  ) {
     const own = result.statistics.find(({ team }) => team === claim.subject)?.value
     const opponentStat = result.statistics.find(({ team }) => team !== claim.subject)
     const opponent = opponentStat?.value
@@ -1899,7 +1917,10 @@ function fanAnswerForClaim(
     return `${answer} That's sparse data, so it isn't a full read on ${claim.playerSubject.name}'s game.`
   }
   if (claim.intent === 'subjective-judgement') {
-    return `That's a bigger football opinion than the match events can settle: “${quote}”. I can only report what's recorded.`
+    const shape = concernsDefensiveShape(claim)
+      ? " Nothing here records defensive shape or positioning, and possession share doesn't tell you how a side set up."
+      : ''
+    return `That's a bigger football opinion than the match events can settle: “${quote}”. I can only report what's recorded.${shape}`
   }
   if (result.assessment === 'insufficient evidence for a firm conclusion') {
     return `The records don't settle whether ${quote}. ${result.limitation}`

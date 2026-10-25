@@ -26,7 +26,17 @@ Implemented: "Checked against" line, explicit "Check again at [time]", immutable
 - No component-level automated tests for App interactions; no real-device or screen-reader testing.
 - Local interpreter understands only the long wording "…than Northbridge."; the short wording is covered by an offline stub only.
 - Snapshots are session memory only (lost on refresh).
-- Foundry behaviour for this milestone is **unverified**. No live calls were made.
+- Foundry behaviour: only the bounded four-call `cf10c74` run (ledger `docs/take-investigation-foundry-verification-ledger.json`, commit `e64c08d`, unchanged) has touched live Foundry; four calls do not establish reliability. See section 1a for what has since been repaired offline.
+
+## 1a. Defects from the cf10c74 Foundry run and their repairs
+
+Repairs are verified **offline by captured-output replay** (the recorded structured outputs, committed as `apps/api/tests/fixtures/foundry-cf10c74-interpretations.json`, replayed through the real `analyzeOpinion` path with a stubbed transport). This is not live Foundry verification; no model calls were made. The ledger and prompts/settings are untouched.
+
+1. **Equivalent-claim comparison.** The web comparison key included model prose, so the two shots outputs (different `text`) were shown as separate answers. Prose is now excluded when a structured comparison exists (subject, players, metric, operator, intent, category, evidence, period and dataset gates are unchanged); claims without a structured comparison still need identical wording, otherwise they stay separate.
+2. **"Parked the bus" Fan wording.** A possession-majority template fired for any subjective judgement requiring possession evidence. It now applies only when the claim wording concerns possession/dominance/control and not defensive shape; defensive-shape judgements get an insufficient-evidence reply that says shape/positioning is not recorded and possession doesn't show how a side set up. The wording-based test is a bounded heuristic, not a tactical interpreter.
+3. **Bruno clarification.** Validation rejected a statistical request with no resolved subject. It now accepts one only as an explicit clarification state (subject, player and player metric all null, no comparison, non-empty `clarificationNeeds`, pass-related evidence). Executable claims, guessed player metrics and mismatched evidence are still rejected. The reply is the Fernandes/Guimarães question with no pass count.
+
+Replay results: 57′ shots → contradicted ("No — … level on 2 shots on target each."); 58′ → supported ("Yes — Eastport have 3 … to Northbridge's 2."); parked the bus → insufficient evidence with no possession figure; Bruno → clarification needed. Call 1's *live* assessment label was never captured and remains **unverified**; the replay label comes from the deterministic server on the captured interpretation. A new live run would be needed to confirm the repaired behaviour end to end with Foundry. Web 87 tests and API 171 tests pass.
 - ~~Analyst help text mentions a pass map when none is shown~~ Fixed: it now mentions the pass map only for passing-related claims.
 
 ## 2. Demo outline (110 seconds maximum)
