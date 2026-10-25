@@ -42,9 +42,11 @@ test('frontend build Node selection independently satisfies Vite runtime require
 
 test('the browser uses the same-origin API route, not localhost', async () => {
   const app = await readFile(appUrl, 'utf8')
+  const client = await readFile(new URL('./analysisClient.ts', import.meta.url), 'utf8')
 
-  assert.match(app, /fetch\('\/api\/analyze'/)
-  assert.doesNotMatch(app, /localhost|127\.0\.0\.1/)
+  assert.match(client, /fetchImpl\('\/api\/analyze'/)
+  assert.match(app, /requestAnalysis\(/)
+  assert.doesNotMatch(app + client, /localhost|127\.0\.0\.1/)
 })
 
 test('deployment is manual, uses the repository secret, and has no environment gate', async () => {

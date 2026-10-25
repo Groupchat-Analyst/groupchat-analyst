@@ -20,6 +20,7 @@ import {
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
+import { requestAnalysis } from './analysisClient'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -693,23 +694,7 @@ function App() {
       setCopyMessage('')
       setShareMessage('')
       try {
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(request),
-          signal: controller.signal,
-        })
-        const responseText = await response.text()
-        let payload: unknown
-        if (responseText) {
-          try { payload = JSON.parse(responseText) }
-          catch { if (response.ok) throw new Error('The analysis service returned an unreadable answer.') }
-        }
-        if (!response.ok) {
-          const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
-            ? payload.error : `The analysis service is unavailable (HTTP ${response.status}).`
-          throw new Error(message)
-        }
+        const payload = await requestAnalysis(request, { signal: controller.signal })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
           const snapshot = createSnapshot(requestId, active.context, payload)
@@ -805,7 +790,7 @@ function App() {
   }
 
   function retryAnalysis() {
-    if (!submittedRequest) return
+    if (!submittedRequest || isLoading) return
     const id = ++analysisRequestId.current
     setSubmittedRequest({ ...submittedRequest, id })
   }
@@ -973,7 +958,7 @@ function App() {
                   <p className="detail-help" id="detail-help">
                     {view === 'fan'
                       ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
-                      : 'Analyst view opens the reasoning, evidence and pass map. The answer, verdict and limitations are the same as in Fan view.'}
+                      : 'Analyst view opens the reasoning and evidence' + (needsPassMap(analysis) ? ', plus a pass map' : '') + '. The answer, verdict and limitations are the same as in Fan view.'}
                   </p>
                   {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} />}
                   <p className="checked-question">{submittedOpinion}</p>

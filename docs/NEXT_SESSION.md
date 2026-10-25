@@ -20,14 +20,14 @@ Implemented: "Checked against" line, explicit "Check again at [time]", immutable
 
 ### Limitations
 
-- No client-side timeout on `/api/analyze`; a request that never completes leaves "Checking…" showing.
+- ~~No client-side timeout~~ **Fixed:** `/api/analyze` now has a 45 s client deadline (`apps/web/src/analysisClient.ts`; the Foundry provider gives up at 30 s). On timeout the browser request is aborted, late completions are ignored, and an explicit "Try again" is offered (no automatic retry). The earlier answer, snapshots, comparison and edited composer text are kept. The abort does not guarantee the server or model stopped working. Verified offline (unit tests with injected timers) and in the browser against the local interpreter with a temporary 3 s deadline (reverted); the 45 s value itself was not exercised end to end.
 - Out-of-order response race not verified in the browser (submit is disabled while pending).
 - Dataset-mismatch path verified by unit tests only; the local API serves one dataset.
 - No component-level automated tests for App interactions; no real-device or screen-reader testing.
 - Local interpreter understands only the long wording "…than Northbridge."; the short wording is covered by an offline stub only.
 - Snapshots are session memory only (lost on refresh).
 - Foundry behaviour for this milestone is **unverified**. No live calls were made.
-- Analyst help text still mentions a pass map when none is shown.
+- ~~Analyst help text mentions a pass map when none is shown~~ Fixed: it now mentions the pass map only for passing-related claims.
 
 ## 2. Demo outline (110 seconds maximum)
 
@@ -66,5 +66,5 @@ Four calls cannot establish production reliability: consistency across repeat ru
 ## 4. Next actions (priority order)
 
 1. Review this plan before spending any model credits.
-2. Resolve any demonstrated release-blocking issues (for example, add an analysis-request timeout only if shown to block the demo).
+2. Resolve any demonstrated release-blocking issues.
 3. Obtain Rob's feedback and prepare deployment/submission materials.
