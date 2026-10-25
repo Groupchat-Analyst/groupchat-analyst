@@ -1,0 +1,29 @@
+{
+  "claims": [
+    {
+      "id": "c1",
+      "subject": "Northbridge",
+      "playerSubject": null,
+      "playerMetric": null,
+      "text": "Northbridge parked the bus (adopted an extremely defensive, low-block approach)",
+      "intent": "subjective-judgement",
+      "meaning": {
+        "category": "performance-judgement",
+        "description": "The claim judges Northbridge's overall tactical approach as highly defensive with limited attacking intent through the match so far.",
+        "comparison": null
+      },
+      "requiredEvidence": [
+        "possession",
+        "territorial-control",
+        "shots",
+        "attacking-events",
+        "passing"
+      ],
+      "timePeriod": {
+        "kind": "selected"
+      },
+      "historicalEventAnchor": null,
+      "clarificationNeeds": []
+    }
+  ]
+}

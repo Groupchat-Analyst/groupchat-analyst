@@ -125,6 +125,7 @@
 .check-again span { color: var(--muted); font-size: 13px; }
 .checked-against { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .checked-against strong { color: var(--accent); font-weight: 600; margin-right: 4px; }
+.context-only-note { margin: 6px 0 0; color: var(--muted); font-size: 13px; font-style: italic; }
 @media (prefers-reduced-motion: no-preference) {
   .what-changed { animation: moment-in 240ms ease-out; }
 }

@@ -31,9 +31,11 @@ import {
 import {
   buildShareCardModel,
   canonicalReply,
+  CONTEXT_ONLY_LABEL,
   describeEvidence,
   describePeriodLabel,
   isRoutineLimitation,
+  isUnsupportedJudgement,
   shareCardBlocks,
   shareCardText,
   type ShareCardModel,
@@ -173,25 +175,31 @@ function ClaimCard({
   result,
   index,
   roster,
+  take,
 }: {
   result: ClaimResult
   index: number
   roster: Roster
+  take?: string
 }) {
   const claim = result.claim
   const titleId = `claim-result-${index}`
+  const contextOnly = isUnsupportedJudgement(result)
   return (
     <article className="claim-result" aria-labelledby={titleId}>
       <h3 className="claim-number" id={titleId}>
         Claim {index + 1}
       </h3>
-      <p className="claim-display">{claim.text}</p>
+      <p className="claim-display">{take ?? claim.text}</p>
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
         >
           {result.assessment}
         </span>
+        {contextOnly && result.statistics.length > 0 && (
+          <p className="context-only-note">{CONTEXT_ONLY_LABEL}</p>
+        )}
         {result.statistics.length > 0 && (
           <div className="broad-stats">
             {result.statistics.map((statistic) => (
@@ -859,7 +867,7 @@ function App() {
 
   const claimBreakdown = analysis && (
     <div className="claim-result-list">
-      {analysis.claims.map((result, index) => <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} />)}
+      {analysis.claims.map((result, index) => <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? submittedOpinion || undefined : undefined} />)}
     </div>
   )
 

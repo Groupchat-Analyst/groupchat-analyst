@@ -18,6 +18,7 @@ import {
   describePeriodLabel,
   eventLine,
   isRoutineLimitation,
+  isUnsupportedJudgement,
   metricLabel,
   selectRelevantEvidence,
   type CardBlock,
@@ -74,6 +75,9 @@ export function checkedAgainst(analysis: Pick<AnalysisResponse, 'claims'>): stri
     const who = subject
       ? target && comparison?.operator !== undefined ? `${subject} vs ${target}` : subject
       : 'Both teams'
+    if (isUnsupportedJudgement(result)) {
+      return `${who} · defensive shape and positioning (not recorded, so no verdict) · ${describePeriodLabel(result.periodLabel)}`
+    }
     const metrics = comparison
       ? [comparison.metric]
       : [...new Set([...result.statistics, ...result.playerStatistics].map(({ metric }) => metric))]
@@ -491,9 +495,10 @@ export function snapshotReply(snapshot: AnswerSnapshot): string {
   return canonicalReply(snapshot.analysis)
 }
 
-/** Whether a pass map is a relevant explanation for any claim in the answer. */
+/** Whether a pass map is a relevant explanation for any claim in the answer. Broad judgements never qualify. */
 export function needsPassMap(analysis: Pick<AnalysisResponse, 'claims'>): boolean {
   return analysis.claims.some(({ claim }) =>
+    claim.intent !== 'subjective-judgement' &&
     claim.requiredEvidence.some((kind) =>
       kind === 'passing' || kind === 'possession-losses' || kind === 'build-up-phase'),
   )

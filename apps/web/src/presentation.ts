@@ -127,10 +127,25 @@ export function isRoutineLimitation(result: ClaimResult): boolean {
   )
 }
 
+/** A broad tactical judgement whose required shape/positioning evidence is not recorded, so nothing recorded can establish or disprove it. */
+export function isUnsupportedJudgement(result: ClaimResult): boolean {
+  return (
+    result.claim.intent === 'subjective-judgement' &&
+    result.assessment === 'insufficient evidence for a firm conclusion' &&
+    result.evidenceAvailability.some(
+      ({ kind, available }) => kind === 'territorial-control' && !available,
+    )
+  )
+}
+
+export const CONTEXT_ONLY_LABEL = "Context only — can't establish defensive shape or positioning"
+
 export type ShareCardClaim = {
   text: string
   /** Null for statistical requests, which have no verdict to show. */
   verdict: string | null
+  /** Figures are background context, not evidence for the judgement. */
+  contextOnly: boolean
   facts: string[]
   moments: string[]
   counter: string[]
@@ -203,6 +218,7 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
       result.assessment === 'statistics provided'
         ? null
         : ASSESSMENT_LABELS[result.assessment],
+    contextOnly: isUnsupportedJudgement(result),
     facts: [...stats, ...playerStats],
     moments: shown.map(({ reference }) => eventLine(reference, roster)),
     counter: shownCounter.map(({ reference }) => eventLine(reference, roster)),
@@ -297,7 +313,9 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
     } else if (claim.verdict) {
       blocks.push({ kind: 'heading', text: `Verdict: ${claim.verdict}` })
     }
-    if (claim.facts.length > 0) blocks.push({ kind: 'label', text: 'Key facts' })
+    if (claim.facts.length > 0) {
+      blocks.push({ kind: 'label', text: claim.contextOnly ? CONTEXT_ONLY_LABEL : 'Key facts' })
+    }
     for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact })
     if (claim.moments.length > 0) {
       blocks.push({ kind: 'label', text: 'Selected recorded moments' })

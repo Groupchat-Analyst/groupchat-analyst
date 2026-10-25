@@ -91,3 +91,15 @@ test('clarification state does not excuse a guessed player metric or mismatched 
     analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(mismatched)),
   )
 })
+
+test('call-3 interpretation from the 90b7e97 run quotes the user wording, not the model paraphrase', async () => {
+  const saved = JSON.parse(
+    await readFile(new URL('./fixtures/foundry-90b7e97-call3-interpretation.json', import.meta.url), 'utf8'),
+  )
+  assert.match(saved.claims[0].text, /extremely defensive, low-block/)
+  const result = await analyzeOpinion(request('Northbridge parked the bus.', 57), replay(saved))
+  assert.match(result.fanReply, /“Northbridge parked the bus”/)
+  assert.doesNotMatch(result.fanReply, /extremely defensive|low-block/)
+  assert.match(result.fanReply, /defensive shape/)
+  assert.equal(result.claims[0].claim.text, saved.claims[0].text)
+})

@@ -1811,12 +1811,13 @@ function fanAnswerForClaim(
   events: MatchEvent[],
   advanced: EvidenceCalculation,
   selectedClock: MatchClock,
+  userWording?: string,
 ): string {
   const claim = result.claim
-  const quote = claim.text.replace(/[.!?]+$/, '')
+  const quote = (userWording ?? claim.text).replace(/[.!?]+$/, '')
   if (claim.clarificationNeeds.length > 0) return claim.clarificationNeeds.join(' ')
   if (result.assessment === 'clarification needed') {
-    return `Quick check first — who or what do you mean by “${claim.text}”?`
+    return `Quick check first — who or what do you mean by “${quote}”?`
   }
   if (result.assessment === 'unavailable data' || claim.intent === 'unavailable-metric') {
     return `I can't tell you that one. ${result.limitation}`
@@ -1934,12 +1935,23 @@ function createFanReply(
   advanced: EvidenceCalculation,
   events: MatchEvent[],
   selectedClock: MatchClock,
+  opinion = '',
 ): string {
   if (claims.length === 0) {
     return "I couldn't find a football claim in that. Try naming a team or player and what you want to know."
   }
+  const original = opinion.trim()
+  // Only the user's own words may be quoted back; a lone claim is the whole take.
+  const wordingFor = (result: ClaimResult): string | undefined =>
+    claims.length === 1 && original !== ''
+      ? original
+      : original.toLowerCase().includes(result.claim.text.trim().toLowerCase())
+        ? result.claim.text
+        : undefined
   return claims
-    .map((result) => fanAnswerForClaim(result, fixture, events, advanced, selectedClock))
+    .map((result) =>
+      fanAnswerForClaim(result, fixture, events, advanced, selectedClock, wordingFor(result)),
+    )
     .join(' ')
 }
 
@@ -2241,6 +2253,7 @@ export async function analyzeOpinion(
       advanced,
       eventsThroughSelectedTime,
       request.selectedClock,
+      request.opinion,
     ),
     selectedTime,
     selectedPeriodLabel,
