@@ -80,6 +80,12 @@ Current walkthrough is **local-provider verified** (local interpreter), not Foun
 | 1:10–1:35 (25s) | Switch to Analyst: before/after figures, windows, evidence records, coverage. Open "Share what changed" preview and download the receipt. |
 | 1:35–1:50 (15s) | Vision only, **not implemented**: a messaging companion that brings this into the group chat. No messaging, accounts or chat ingestion exist today. |
 
+## 2a. Guided demo and native sharing (branch feature/submission-clarity)
+
+- "See how one minute changes the take" appears only in the untouched initial state. It seeks the replay to 57′, sets Match so far and fills the draft; it never submits. A compact "Move to 58′" appears after a relevant 57′ answer, and the existing "Check again" appears only once 58′ is committed.
+- "Share the receipts" (single card and what-changed card) is shown only where `navigator.canShare({files})` is true. It reuses the download PNG, prepared ahead of the tap and keyed by card content; cancellation is silent; copy/download remain. No delivery is claimed. Sharing makes no analysis requests.
+- Verified: unit tests, local-provider browser journey (desktop and 390 px emulation), forced-500 failure path, and request counting with a stubbed `navigator.share`. **Native share is unverified on a real device** until tested on an iPhone against the hosted candidate.
+
 ## 3. Proposed Foundry plan (NOT AUTHORISED FOR EXECUTION)
 
 Do not run without explicit approval after review. Use the existing server-side Foundry host with the stored configuration; do not print credentials. All four use **Match so far**.
