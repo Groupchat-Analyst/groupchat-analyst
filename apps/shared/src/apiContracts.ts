@@ -13,6 +13,7 @@ export type EvidenceKind =
   | 'physical-measurements'
   | 'build-up-phase'
   | 'lineups'
+  | 'shot-location'
 
 /** Describes the claim's meaning, independently of its requested operation or time scope. */
 export type ClaimMeaningCategory =

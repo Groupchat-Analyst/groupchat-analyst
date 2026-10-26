@@ -31,6 +31,10 @@ import {
 } from '../../shared/src/match.js'
 import { resolveDataset } from './datasets.js'
 import {
+  parseCountAssertion,
+  type CountAssertion,
+} from '../../shared/src/countAssertions.js'
+import {
   InterpretationProviderError,
   type InterpretationProvider,
 } from './providers/provider.js'
@@ -69,6 +73,8 @@ function isUnsupportedBuildUpPassingScope(claim: InterpretedClaim): boolean {
 }
 
 const UNAVAILABLE_EVIDENCE: Partial<Record<EvidenceKind, string>> = {
+  'shot-location':
+    'Shot records have no pitch coordinates or zone, so whether a shot came from inside or outside the box is not recorded. Free-text event descriptions are not location data, and no other shot count is substituted.',
   'territorial-control':
     'The fixture includes selected event locations, but not continuous field-position, territory, or defensive-shape tracking.',
   'physical-measurements':
@@ -208,6 +214,100 @@ function statValue(
   }
   // An unsupported metric must never inherit a shot count.
   return null
+}
+
+function countAssertionFor(claim: InterpretedClaim): CountAssertion | undefined {
+  if (
+    claim.intent !== 'factual-claim' ||
+    !claim.subject ||
+    claim.playerSubject ||
+    claim.meaning.comparison ||
+    claim.clarificationNeeds.length > 0
+  ) {
+    return undefined
+  }
+  const assertion = parseCountAssertion(claim.text)
+  return assertion?.team === claim.subject ? assertion : undefined
+}
+
+/** Numerator and denominator for a count assertion over the claim's own window. */
+function assertionCounts(
+  assertion: CountAssertion,
+  events: MatchEvent[],
+): { numerator: MatchEvent[]; denominator: MatchEvent[] } {
+  const shots = events.filter(
+    (event) => event.type === 'shot' && event.team === assertion.team,
+  )
+  const metric = assertion.kind === 'none' ? assertion.metric : 'shots-on-target'
+  return {
+    numerator: shots.filter((event) => matchesMetric(event, metric)),
+    denominator: shots,
+  }
+}
+
+function assertionVerdict(
+  assertion: CountAssertion,
+  counts: ReturnType<typeof assertionCounts>,
+): ClaimResult['assessment'] {
+  const numerator = counts.numerator.length
+  const denominator = counts.denominator.length
+  if (assertion.kind === 'none') {
+    return numerator === 0 ? 'supported' : 'contradicted'
+  }
+  // A universal claim over zero recorded attempts is not settled by the data.
+  if (denominator === 0) return 'insufficient evidence for a firm conclusion'
+  const holds =
+    assertion.quantifier === 'every'
+      ? numerator === denominator
+      : numerator === 0
+  return holds !== assertion.negated ? 'supported' : 'contradicted'
+}
+
+function assertionMetricLabel(metric: ClaimMetric): string {
+  return metric === 'shots-on-target' ? 'shots on target' : metric.replaceAll('-', ' ')
+}
+
+function countAssertionAnswer(
+  result: ClaimResult,
+  assertion: CountAssertion,
+  fan: boolean,
+): string {
+  const trace = result.calculations[0]
+  const team = assertion.team
+  const n = trace?.numerator ?? 0
+  const d = trace?.denominator ?? 0
+  const lead =
+    result.assessment === 'supported'
+      ? 'Yes — '
+      : result.assessment === 'contradicted'
+        ? 'No — '
+        : fan
+          ? "The records can't settle this one: "
+          : 'The records cannot settle this: '
+  let body: string
+  if (assertion.kind === 'none') {
+    const label = assertionMetricLabel(assertion.metric)
+    body = n === 0
+      ? `${team} have no recorded ${label} (0 of ${d} recorded shots).`
+      : `${team} have ${n} recorded ${label}${assertion.metric === 'shots' ? '' : ` from ${d} recorded shots`}.`
+  } else if (d === 0) {
+    body = `${team} have no recorded shots, so there is nothing to test “${assertion.quantifier === 'every' ? 'every' : 'none'} shot on target” against.`
+  } else {
+    const rate = `${n} of ${team}'s ${d} recorded shots ${n === 1 ? 'was' : 'were'} on target`
+    body = assertion.quantifier === 'every'
+      ? assertion.negated
+        ? result.assessment === 'supported'
+          ? `not every shot was on target: ${rate}.`
+          : `every ${team} shot was on target (${rate}).`
+        : result.assessment === 'supported'
+          ? `every ${team} shot was on target (${rate}).`
+          : `${rate}, so not every shot was.`
+      : result.assessment === 'supported'
+        ? `none of ${team}'s ${d} recorded shots was on target.`
+        : `${rate}.`
+  }
+  const sentence = `${lead}${body}`
+  return `${sentence} This counts recorded shot events over ${result.periodLabel}; it says nothing about chance quality.`
 }
 
 function selectedPlayerEntities(claim: InterpretedClaim): PlayerEntityReference[] {
@@ -484,6 +584,25 @@ function evidenceForClaim(
           description: `${pass.outcome === 'complete' ? 'Completed' : 'Incomplete'} pass by ${pass.playerId}, intended for ${pass.receiverId}.`,
         },
       })
+    }
+    return [...evidence.values()]
+  }
+
+  const countAssertion = countAssertionFor(claim)
+  if (countAssertion) {
+    const counts = assertionCounts(countAssertion, events)
+    const numeratorIds = new Set(counts.numerator.map(({ id }) => id))
+    const numeratorSupports =
+      countAssertion.kind === 'none'
+        ? false
+        : countAssertion.quantifier === 'every' && !countAssertion.negated
+    for (const event of counts.denominator) {
+      const inNumerator = numeratorIds.has(event.id)
+      const role: ClaimEvidence['role'] =
+        countAssertion.kind === 'none'
+          ? inNumerator ? 'challenging' : 'context'
+          : inNumerator === numeratorSupports ? 'supporting' : 'challenging'
+      evidence.set(event.id, { role, reference: reference(event, roster) })
     }
     return [...evidence.values()]
   }
@@ -814,7 +933,25 @@ function evidenceForClaim(
 function calculationTraces(
   claim: InterpretedClaim,
   advanced: EvidenceCalculation,
+  events: MatchEvent[] = [],
 ): CalculationTrace[] {
+  const countAssertion = countAssertionFor(claim)
+  if (countAssertion) {
+    const counts = assertionCounts(countAssertion, events)
+    const metric = countAssertion.kind === 'none' ? countAssertion.metric : 'shots-on-target'
+    return [
+      {
+        team: countAssertion.team,
+        metric,
+        value: counts.numerator.length,
+        numerator: counts.numerator.length,
+        denominator: counts.denominator.length,
+        numeratorRecordIds: counts.numerator.map(({ id }) => id),
+        denominatorRecordIds: counts.denominator.map(({ id }) => id),
+        denominatorDescription: `All ${counts.denominator.length} recorded ${countAssertion.team} shots in the claim's window; ${assertionMetricLabel(metric)} are the recorded shots whose outcome matches.`,
+      },
+    ]
+  }
   if (
     isUnsupportedBuildUpPassingScope(claim) ||
     claim.clarificationNeeds.length > 0 ||
@@ -1010,6 +1147,15 @@ function makeLimitation(
   if (claim.intent === 'unrecognized-language') {
     if (classifyOpinion(claim.text)?.topic === 'prediction') return topicLimitation('prediction')
     return 'The local interpreter cannot reliably identify the requested football evidence. No unrelated statistics or events were selected.'
+  }
+  const countAssertion = countAssertionFor(claim)
+  if (countAssertion) {
+    const zeroAttempts =
+      countAssertion.kind === 'universal' &&
+      result === 'insufficient evidence for a firm conclusion'
+    return zeroAttempts
+      ? `${countAssertion.team} have no recorded shots in this window, so a claim about all of their shots cannot be tested. Zero attempts is a recorded absence, not a verdict.`
+      : `Judged only on recorded shot outcomes (goal and saved count as on target) for ${countAssertion.team}; a zero count means no such record exists, and nothing here measures chance quality or shot location.`
   }
   const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion) {
@@ -1322,6 +1468,14 @@ function assessOneClaim(
     }
   }
 
+  const countAssertion = countAssertionFor(claim)
+  if (countAssertion) {
+    assessment = assertionVerdict(
+      countAssertion,
+      assertionCounts(countAssertion, scopedEvents),
+    )
+  }
+
   return {
     claim,
     assessment,
@@ -1342,7 +1496,7 @@ function assessOneClaim(
         )
       : [],
     calculations: canRetrieveSubjectEvidence
-      ? calculationTraces(claim, advanced)
+      ? calculationTraces(claim, advanced, scopedEvents)
       : [],
     limitation: makeLimitation(claim, resolvedAvailability, assessment, advanced),
   }
@@ -1646,6 +1800,8 @@ function answerForClaim(
   if (claim.intent === 'unavailable-metric') return result.limitation
   if (claim.intent === 'unrecognized-language') return result.limitation
   if (claim.intent === 'coaching-question') return coachingSentence(result)
+  const answerAssertion = countAssertionFor(claim)
+  if (answerAssertion) return countAssertionAnswer(result, answerAssertion, false)
   const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion) {
     const goal = events.find(
@@ -1697,7 +1853,8 @@ function answerForClaim(
           : passDataLimitation(result)
             ? ` ${passDataLimitation(result)}`
             : ''
-      return `${comparison}${limitation}`
+      const comparisonScope = historicalScope(claim, events)
+      return `${comparison}${limitation}${comparisonScope ? ` ${comparisonScope}` : ''}`
     }
   }
   if (claim.meaning.category === 'historical-circumstance') {
@@ -1941,6 +2098,8 @@ function fanAnswerForClaim(
     return "I couldn't match that to something I can check in this match, and I haven't picked out unrelated figures instead. Try naming a team or player and what you want to know."
   }
   if (claim.intent === 'coaching-question') return coachingSentence(result)
+  const fanAssertion = countAssertionFor(claim)
+  if (fanAssertion) return countAssertionAnswer(result, fanAssertion, true)
   const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
   if (halfTimeAssertion) {
     const goal = events.find(
@@ -1989,7 +2148,8 @@ function fanAnswerForClaim(
           : passDataLimitation(result)
             ? ` ${passDataLimitation(result)}`
             : ''
-      return `${comparison}${note}`
+      const scope = fanScope(claim, events)
+      return `${comparison}${note}${scope ? ` ${scope}` : ''}`
     }
   }
   if (claim.meaning.category === 'historical-circumstance') {

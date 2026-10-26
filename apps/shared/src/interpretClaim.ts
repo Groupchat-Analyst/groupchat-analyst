@@ -65,9 +65,43 @@ function findLeadingTeam(text: string): MatchTeam | undefined {
   )
 }
 
+const bothTeamsPattern =
+  /^both\s+(?:teams|sides)\s+(?<negation>(?:did|have|has)\s+not\s+|didn['’]t\s+|haven['’]t\s+)?(?:had|have|has|recorded|took|made)\s+(?:the\s+)?(?:same(?:\s+number\s+of)?|equal(?:\s+number\s+of)?)\s+(?<metric>shots\s+on\s+target|shots|goals|possession)[.!?]*$/i
+
+/** "Both teams had the same number of X": a symmetric equality over the named metric. */
+function parseBothTeams(text: string): ComparisonClaim | undefined {
+  const groups = bothTeamsPattern.exec(text)?.groups
+  if (!groups) return undefined
+  const word = groups.metric.toLowerCase().replace(/\s+/g, ' ')
+  const metric: ClaimMetric =
+    word === 'goals'
+      ? 'goals'
+      : word === 'shots on target'
+        ? 'shots-on-target'
+        : word === 'possession'
+          ? 'possession-percentage'
+          : 'shots'
+  const label = metric === 'possession-percentage' ? 'possession' : word
+  const negated = Boolean(groups.negation)
+  const [subject, opponent] = TEAMS
+  return {
+    kind: 'comparison',
+    text,
+    subject,
+    opponent,
+    metric,
+    comparison: negated ? 'not-equal' : 'equal',
+    summary: negated
+      ? `Both teams did not have the same number of ${label}: ${subject} and ${opponent} differ.`
+      : `Both teams had the same number of ${label}: ${subject} and ${opponent} are level.`,
+  }
+}
+
 function parseComparison(
   text: string,
 ): ComparisonClaim | ClarificationClaim | undefined {
+  const both = parseBothTeams(text)
+  if (both) return both
   const parsed = comparisonPattern.exec(text)
   if (!parsed?.groups) return undefined
 

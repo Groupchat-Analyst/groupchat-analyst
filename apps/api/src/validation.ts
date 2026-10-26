@@ -29,6 +29,7 @@ const evidenceKinds: EvidenceKind[] = [
   'physical-measurements',
   'build-up-phase',
   'lineups',
+  'shot-location',
 ]
 const meaningCategories: ClaimMeaningCategory[] = [
   'factual-comparison',
@@ -215,8 +216,20 @@ function requireStringArray(value: unknown, label: string): string[] {
 
 export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
 
-const halfTimeAssertionPattern =
-  /^(Northbridge|Eastport)\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?|scored)\s+before half[- ]time[.!?]?$/i
+const halfTimePhrase =
+  '(?:before\\s+half[- ]time|by\\s+half[- ]time|(?:in|during)\\s+the\\s+first\\s+half)'
+const halfTimeAssertionPattern = new RegExp(
+  `^(Northbridge|Eastport)\\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?|scored)\\s+${halfTimePhrase}[.!?]?$`,
+  'i',
+)
+const halfTimeNegatedPattern = new RegExp(
+  `^(?:Northbridge|Eastport)\\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?\\s+${halfTimePhrase}[.!?]?$`,
+  'i',
+)
+const halfTimeScoringContext = new RegExp(
+  `(?:\\b(?:score|scores|scored|scoring|goal|goals)\\b.{0,80}\\b${halfTimePhrase}|\\b${halfTimePhrase}.{0,80}\\b(?:score|scores|scored|scoring|goal|goals)\\b)`,
+  'i',
+)
 
 export function goalBeforeHalfTimeAssertion(
   value: unknown,
@@ -263,9 +276,7 @@ export function goalBeforeHalfTimeAssertion(
   ) {
     return undefined
   }
-  return /^(?:Northbridge|Eastport)\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before half[- ]time[.!?]?$/i.test(
-    value.text.trim(),
-  )
+  return halfTimeNegatedPattern.test(value.text.trim())
     ? 'did-not-score'
     : 'scored'
 }
@@ -303,9 +314,7 @@ function hasAmbiguousHalfTimeScoringClaim(value: Record<string, unknown>): boole
   if (!subject || goalBeforeHalfTimeAssertion(value, true)) return false
   return (
     new RegExp(`\\b${subject}\\b`, 'i').test(text) &&
-    /(?:\b(?:score|scores|scored|scoring|goal|goals)\b.{0,80}\bbefore half[- ]time\b|\bbefore half[- ]time\b.{0,80}\b(?:score|scores|scored|scoring|goal|goals)\b)/i.test(
-      text,
-    )
+    halfTimeScoringContext.test(text)
   )
 }
 
@@ -637,7 +646,7 @@ export function validateInterpretation(
         claim.intent !== 'unavailable-metric') ||
       (claim.intent === 'unavailable-metric' &&
         !requiredEvidence.some((kind) =>
-          ['physical-measurements', 'player-events'].includes(kind),
+          ['physical-measurements', 'player-events', 'shot-location'].includes(kind),
         ))
     ) {
       throw new Error(`${label} intent does not match its evidence request.`)
@@ -746,10 +755,12 @@ export function validateInterpretation(
         !anchorEvent ||
         anchorEvent.type !== 'shot' ||
         anchorEvent.outcome !== 'goal' ||
-        (subject !== null && anchorEvent.team !== subject)
+        (subject !== null &&
+          meaning.category === 'historical-circumstance' &&
+          anchorEvent.team !== subject)
       ) {
         throw new Error(
-          `${label} before-event period must anchor to a goal by its named subject.`,
+          `${label} before-event period must anchor to a recorded goal${meaning.category === 'historical-circumstance' ? ' by its named subject' : ''}.`,
         )
       }
       if (

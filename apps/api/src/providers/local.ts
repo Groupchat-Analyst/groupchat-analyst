@@ -13,6 +13,11 @@ import type {
 } from '../../../shared/src/apiContracts.js'
 import type { PlayerEntityReference } from '../../../shared/src/apiContracts.js'
 import { interpretClaim } from '../../../shared/src/interpretClaim.js'
+import {
+  mentionsShotLocation,
+  parseCountAssertion,
+  type CountAssertion,
+} from '../../../shared/src/countAssertions.js'
 import { classifyOpinion, evidenceForTopic } from '../../../shared/src/opinionTopics.js'
 import type {
   InterpretationContext,
@@ -355,7 +360,10 @@ function meaningCategory(text: string): ClaimMeaningCategory {
     return 'coaching-question'
   }
   if (/against the run of play/i.test(text)) return 'historical-circumstance'
-  if (/\bscor(?:e|es|ed)\s+before\s+half[- ]time\b/i.test(text)) {
+  if (
+    /\bscor(?:e|es|ed)\s+(?:before|by)\s+half[- ]time\b/i.test(text) ||
+    /\bscor(?:e|es|ed)\b[^.]*\b(?:in|during)\s+the\s+first\s+half\b/i.test(text)
+  ) {
     return 'historical-circumstance'
   }
   if (/\b(?:control(?:led)?|possession|dominat(?:ed|es)?|luck(?:y)?|deserv(?:ed)?|played|perform(?:ed|ance)?|comfortable|better|worse)\b/i.test(text)) {
@@ -458,21 +466,164 @@ function clarificationQuestion(text: string): string {
   return 'Which team is this claim about?'
 }
 
+const GOAL_PHRASE =
+  /\s*\b(?:just\s+)?before\s+(?:the|that)\s+(?<which>first|opening|last|latest|most\s+recent)?\s*(?<noun>goal|opener|equali[sz]er)\b/i
+
+type GoalReference =
+  | { goal: MatchEvent }
+  | { goal?: undefined; clarification: string }
+
+function goalLabel(goal: MatchEvent): string {
+  return `${goal.team} ${formatMatchClock(goal.clock)}`
+}
+
+/**
+ * Resolves "before the goal" against goals recorded up to the selected time.
+ * A bare "the goal" is accepted only when exactly one goal exists; otherwise the
+ * user is asked which goal, rather than silently choosing one.
+ */
+function resolveReferencedGoal(
+  text: string,
+  events: MatchEvent[],
+): GoalReference | undefined {
+  const groups = GOAL_PHRASE.exec(text)?.groups
+  if (!groups) return undefined
+  const goals = events.filter(
+    (event) => event.type === 'shot' && event.outcome === 'goal',
+  )
+  if (goals.length === 0) {
+    return {
+      clarification:
+        'No goal is recorded at or before the selected match time, so “before the goal” has nothing to anchor to.',
+    }
+  }
+  const which = groups.which?.toLowerCase().replace(/\s+/g, ' ')
+  const noun = groups.noun.toLowerCase()
+  if (which === 'first' || which === 'opening' || noun === 'opener') {
+    return { goal: goals[0] }
+  }
+  if (which === 'last' || which === 'latest' || which === 'most recent') {
+    return { goal: goals[goals.length - 1] }
+  }
+  if (/^equali[sz]er$/.test(noun)) {
+    const score: Record<MatchTeam, number> = { Northbridge: 0, Eastport: 0 }
+    const equalisers: MatchEvent[] = []
+    for (const goal of goals) {
+      const behind = score[goal.team] < score[goal.team === 'Northbridge' ? 'Eastport' : 'Northbridge']
+      score[goal.team] += 1
+      if (behind && score.Northbridge === score.Eastport) equalisers.push(goal)
+    }
+    if (equalisers.length === 1) return { goal: equalisers[0] }
+    return {
+      clarification: equalisers.length === 0
+        ? 'No equaliser is recorded at or before the selected match time. Name the goal you mean, for example “before Eastport scored”.'
+        : `Which equaliser do you mean: ${equalisers.map(goalLabel).join(' or ')}?`,
+    }
+  }
+  if (goals.length === 1) return { goal: goals[0] }
+  return {
+    clarification: `Which goal do you mean by “before the goal”: ${goals.map(goalLabel).join(' or ')}? Name the scorer, for example “before Eastport scored”.`,
+  }
+}
+
+const COUNT_EVIDENCE: Record<'shots' | 'shots-on-target' | 'goals', EvidenceKind> = {
+  shots: 'shots',
+  'shots-on-target': 'shots-on-target',
+  goals: 'goals',
+}
+
+function describeAssertion(assertion: CountAssertion): string {
+  if (assertion.kind === 'none') {
+    return `Whether ${assertion.team} recorded no ${assertion.metric.replaceAll('-', ' ')} in the selected period (a zero count of ${assertion.metric.replaceAll('-', ' ')}).`
+  }
+  const quantifier = assertion.quantifier === 'every'
+    ? assertion.negated
+      ? 'not every'
+      : 'every'
+    : 'none of'
+  return `Whether ${quantifier} one of ${assertion.team}'s recorded shots in the selected period was on target; evaluated against all of that team's recorded shots.`
+}
+
+/**
+ * Single-team zero/universal count assertions and shot-position wording.
+ * Shot records carry no coordinates or zone, so position wording is an explicit
+ * unrecorded-data claim rather than a substitute shot count.
+ */
+function assertionClaimFromText(
+  text: string,
+  index: number,
+  context: InterpretationContext,
+  forcedPlayer?: PlayerEntityReference,
+): InterpretedClaim | undefined {
+  const assertion = parseCountAssertion(text)
+  const base = {
+    id: `claim-${index + 1}`,
+    playerSubject: null,
+    playerMetric: null,
+    text,
+    timePeriod: { kind: 'selected' as const },
+    historicalEventAnchor: null,
+  }
+  if (assertion) {
+    return {
+      ...base,
+      subject: assertion.team,
+      intent: 'factual-claim',
+      meaning: {
+        category: 'other',
+        description: describeAssertion(assertion),
+        comparison: null,
+      },
+      requiredEvidence:
+        assertion.kind === 'none'
+          ? [COUNT_EVIDENCE[assertion.metric]]
+          : ['shots', 'shots-on-target'],
+      clarificationNeeds: [],
+    }
+  }
+  if (!mentionsShotLocation(text)) return undefined
+  const players = forcedPlayer ? [forcedPlayer] : mentionedPlayers(text, context.players)
+  const player = players.length === 1 ? players[0] : null
+  const teams = TEAMS.filter((team) =>
+    new RegExp(`\\b${team}\\b`, 'i').test(text),
+  )
+  const subject = player?.team ?? (teams.length === 1 ? teams[0] : null)
+  return {
+    ...base,
+    subject,
+    playerSubject: player,
+    intent: 'unavailable-metric',
+    meaning: {
+      category: 'other',
+      description: 'Where shots were taken from (inside or outside the box) is not a recorded field.',
+      comparison: null,
+    },
+    requiredEvidence: ['shot-location'],
+    clarificationNeeds: subject ? [] : ['Which team’s shots do you mean?'],
+  }
+}
+
 function claimFromText(
   text: string,
   index: number,
   context: InterpretationContext,
+  forcedPlayer?: PlayerEntityReference,
 ): InterpretedClaim {
-  const playerMentions = mentionedPlayers(text, context.players)
+  const assertionClaim = assertionClaimFromText(text, index, context, forcedPlayer)
+  if (assertionClaim) return assertionClaim
+  const playerMentions = forcedPlayer
+    ? [forcedPlayer]
+    : mentionedPlayers(text, context.players)
   const playerComparison = parsePlayerComparison(text, playerMentions)
   const passRequest = parsePassCompletionRequest(text)
   const passAssertion = parsePassCompletionAssertion(text)
   const runningDistance = parseRunningDistanceComparison(text)
   const singleStatistic = parseSingleStatisticRequest(text)
   const metricComparison = passRequest ?? passAssertion ?? runningDistance
+  const referencedGoal = resolveReferencedGoal(text, context.events)
   const parsedClaim = metricComparison || singleStatistic
     ? undefined
-    : interpretClaim(text).claims[0]
+    : interpretClaim(text.replace(GOAL_PHRASE, '')).claims[0]
   const playerSubject = playerComparison?.subjectPlayer ??
     (playerMentions.length === 1 ? playerMentions[0] : null)
   const requestedPlayerMetric = playerComparison
@@ -609,6 +760,9 @@ function claimFromText(
     description = 'The local interpreter cannot reliably identify this football statistic or comparison.'
   }
 
+  if (forcedPlayer) {
+    description = `${description} (assessed separately for ${forcedPlayer.name}, ${forcedPlayer.team})`.slice(0, 300)
+  }
   const categoryForText = category
   const namedScorer = /against the run of play/i.test(text) && playerSubject
     ? playerSubject
@@ -621,7 +775,9 @@ function claimFromText(
     /\bbefore\s+(?:Northbridge|Eastport)\s+scored\b/i.test(text) ||
     /\bbefore\s+(?:[\p{L}][\p{L}'’.-]*\s+){0,2}scored\b/iu.test(text)
   const anchorTeam = namedScorer?.team ?? beforeGoalTeam ?? subject
-  const goalReference = hasHistoricalGoalScope
+  const goalReference = referencedGoal
+    ? referencedGoal.goal
+    : hasHistoricalGoalScope
     ? findGoalAnchor(
         context.events,
         anchorTeam,
@@ -660,6 +816,11 @@ function claimFromText(
   }
   if (!subject && category !== 'coaching-question' && playerMentions.length < 2) {
     clarificationNeeds.push(clarificationQuestion(text))
+  }
+  if (referencedGoal?.goal) {
+    description = `${description} Counts recorded play strictly before the ${goalLabel(referencedGoal.goal)} goal, which is excluded.`
+  } else if (referencedGoal) {
+    clarificationNeeds.push(referencedGoal.clarification)
   }
   if (hasHistoricalGoalScope && !goalReference) {
     clarificationNeeds.push(
@@ -735,10 +896,27 @@ export class LocalInterpretationProvider implements InterpretationProvider {
     opinion: string,
     context: InterpretationContext,
   ): Promise<unknown> {
+    const claims = splitOpinion(opinion).flatMap((text) => {
+      const mentions = mentionedPlayers(text, context.players)
+      const sharedJudgement =
+        mentions.length >= 2 &&
+        mentions.length <= 4 &&
+        !/\b(?:compare|comparison|than|versus|vs\.?)\b/i.test(text) &&
+        !parseCountAssertion(text) &&
+        !mentionsShotLocation(text) &&
+        classifyOpinion(text) !== undefined
+      // One judgement about several named players is assessed separately for each.
+      return sharedJudgement
+        ? [...mentions]
+            .sort((a, b) => playerMentionPosition(text, a) - playerMentionPosition(text, b))
+            .map((player) => claimFromText(text, 0, context, player))
+        : [claimFromText(text, 0, context)]
+    })
     return {
-      claims: splitOpinion(opinion).map((text, index) =>
-        claimFromText(text, index, context),
-      ),
+      claims: claims.map((claim, index) => ({
+        ...claim,
+        id: `claim-${index + 1}`,
+      })),
     }
   }
 }
