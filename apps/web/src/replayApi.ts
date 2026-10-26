@@ -60,11 +60,12 @@ export function isMatchReplayResponse(
 export async function fetchReplayFrame(
   clock: MatchClock,
   signal: AbortSignal,
+  datasetId?: string,
 ): Promise<MatchReplayResponse> {
   const response = await fetch('/api/replay', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ selectedClock: clock }),
+    body: JSON.stringify(datasetId ? { selectedClock: clock, datasetId } : { selectedClock: clock }),
     signal,
   })
   let payload: unknown
@@ -76,6 +77,9 @@ export async function fetchReplayFrame(
   if (!response.ok) throw new Error('The synthetic replay is unavailable.')
   if (!isMatchReplayResponse(payload, formatMatchClock(clock))) {
     throw new Error('The replay service returned an incomplete match moment.')
+  }
+  if (datasetId && payload.datasetId !== datasetId) {
+    throw new Error('The replay service returned a moment from a different match.')
   }
   return payload
 }

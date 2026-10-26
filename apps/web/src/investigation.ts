@@ -11,7 +11,7 @@ import {
 import type { SubmissionContext } from './matchday.ts'
 import {
   ASSESSMENT_LABELS,
-  SYNTHETIC_LABEL,
+  sourceFooter,
   blocksToText,
   canonicalReply,
   describeEvidence,
@@ -482,7 +482,7 @@ export function buildChangeCard(
   })
   for (const caveat of comparison.caveats) blocks.push({ kind: 'note', text: `Note: ${caveat}` })
   for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
-  blocks.push({ kind: 'footer', text: SYNTHETIC_LABEL })
+  blocks.push({ kind: 'footer', text: sourceFooter(_later.analysis) })
   return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
 

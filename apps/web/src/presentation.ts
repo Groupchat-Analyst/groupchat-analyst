@@ -4,6 +4,7 @@ import type {
   ClaimResult,
   EvidenceReference,
 } from '../../shared/src/apiContracts'
+import { findCatalogEntry } from '../../shared/src/datasetCatalog.ts'
 
 type Roster = ReadonlyArray<{ id: string; name: string }>
 
@@ -158,6 +159,7 @@ export type ShareCardModel = {
   scope: string
   answer: string
   claims: ShareCardClaim[]
+  footer?: string
   extended: boolean
 }
 
@@ -269,6 +271,7 @@ export function buildShareCardModel(
       roster,
     ),
     claims,
+    footer: sourceFooter(analysis),
     extended: claims.length >= EXTENDED_CLAIM_COUNT || lines > EXTENDED_LINE_BUDGET,
   }
 }
@@ -288,6 +291,15 @@ export type CardBlockKind =
 export type CardBlock = { kind: CardBlockKind; text: string }
 
 export const SYNTHETIC_LABEL = 'Synthetic data · fictional match'
+
+/** Names the fixture and how the opinion was read, so a shared card makes sense outside the app. */
+export function sourceFooter(analysis: AnalysisResponse): string {
+  const dataset = analysis.evidenceFoundation.dataset
+  const entry = findCatalogEntry(dataset?.id)
+  const match = entry ? `${entry.name} v${dataset.version}` : null
+  const reader = analysis.provider === 'local' ? 'read by local rules' : 'read by Foundry (server-side)'
+  return [SYNTHETIC_LABEL, match, reader].filter(Boolean).join(' · ')
+}
 
 /** Single source of truth for the card: the on-screen card, copied text and exported image all use these blocks. */
 export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
@@ -333,7 +345,7 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
       blocks.push({ kind: 'note', text: `Limitation: ${limitation}` })
     }
   })
-  blocks.push({ kind: 'footer', text: SYNTHETIC_LABEL })
+  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL })
   return blocks
 }
 

@@ -11,17 +11,20 @@ export type SubmissionContext = {
   opinion: string
   selectedClock: MatchClock
   period: AnalysisPeriod
+  datasetId?: string
 }
 
 export function createSubmissionContext(
   opinion: string,
   selectedClock: MatchClock,
   period: AnalysisPeriod,
+  datasetId?: string,
 ): SubmissionContext {
   return {
     opinion,
     selectedClock: { ...selectedClock },
     period,
+    ...(datasetId ? { datasetId } : {}),
   }
 }
 
@@ -30,6 +33,7 @@ export function createAnalysisRequest(context: SubmissionContext): AnalysisReque
     opinion: context.opinion,
     selectedClock: { ...context.selectedClock },
     period: context.period,
+    ...(context.datasetId ? { datasetId: context.datasetId } : {}),
   }
 }
 

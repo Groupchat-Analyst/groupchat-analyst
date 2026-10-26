@@ -58,7 +58,7 @@ import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isR
 import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
-import { getQuestionSuggestions } from './suggestions'
+import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../../shared/src/datasetCatalog'
 import './App.css'
 import './matchday.css'
 
@@ -68,14 +68,6 @@ const INITIAL_MATCH_TIME: MatchClock = {
   period: 2,
   minute: 57,
 }
-
-const KEY_MOMENTS: KeyMoment[] = [
-  { label: '45+3′ · Northbridge goal', clock: { period: 1, minute: 45, stoppageMinutes: 3 } },
-  { label: '57′ · before equaliser', clock: { period: 2, minute: 57 } },
-  { label: '58′ · equaliser', clock: { period: 2, minute: 58 } },
-  { label: '83′ · Eastport lead', clock: { period: 2, minute: 83 } },
-  { label: '90+4′ · full-time', clock: { period: 2, minute: 90, stoppageMinutes: 4 } },
-]
 
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (typeof value !== 'object' || value === null) return false
@@ -647,13 +639,19 @@ function WhatChanged({
   )
 }
 
-function App() {
+export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; autoDemo?: boolean }) {
+  const dataset = findCatalogEntry(datasetId)!
+  const KEY_MOMENTS: KeyMoment[] = dataset.moments
+  const isBaseline = datasetId === BASELINE_DATASET_ID
   const replay = useMemo(
     () =>
-      new ReplayController(MATCH_TIME_OPTIONS, INITIAL_MATCH_TIME, fetchReplayFrame, {
-        dwellMs: REPLAY_DWELL_MS,
-      }),
-    [],
+      new ReplayController(
+        MATCH_TIME_OPTIONS,
+        INITIAL_MATCH_TIME,
+        (clock, signal) => fetchReplayFrame(clock, signal, datasetId),
+        { dwellMs: REPLAY_DWELL_MS },
+      ),
+    [datasetId],
   )
   const replaySnapshot = useSyncExternalStore(
     replay.subscribe,
@@ -708,7 +706,7 @@ function App() {
     replaySnapshot.status === 'loading' &&
     (replaySnapshot.displayedClock === null ||
       clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
-  const suggestions = getQuestionSuggestions(selectedClock)
+  const examples = dataset.examples
   const shareModel = useMemo<ShareCardModel | null>(
     () => (analysis && submittedContext ? buildShareCardModel(submittedContext.opinion, analysis) : null),
     [analysis, submittedContext],
@@ -762,6 +760,7 @@ function App() {
       try {
         const payload = await requestAnalysis(request, { signal: controller.signal })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
+        if (payload.evidenceFoundation.dataset?.id !== datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
           const snapshot = createSnapshot(requestId, active.context, payload)
           const baseline = active.baseline
@@ -788,7 +787,7 @@ function App() {
     }
     void loadAnalysis()
     return () => controller.abort()
-  }, [submittedRequest])
+  }, [submittedRequest, datasetId])
 
   const [answerBelowFold, setAnswerBelowFold] = useState(false)
 
@@ -827,15 +826,28 @@ function App() {
     document.getElementById('opinion-input')?.focus()
   }
 
+  function fillExample(example: DatasetExample) {
+    setPeriod(example.period)
+    replay.seek(example.clock)
+    setOpinion(example.text)
+    document.getElementById('opinion-input')?.focus()
+  }
+
   // Prepares the demonstration only; submitting stays an explicit user action.
   function startDemo() {
-    if (demo !== 'offer') return
+    if (demo !== 'offer' || !isBaseline) return
     setDemoActive(true)
     setPeriod('match-so-far')
     replay.seek(DEMO_CLOCK)
     setOpinion(DEMO_TAKE)
     document.getElementById('opinion-input')?.focus()
   }
+
+  useEffect(() => {
+    if (autoDemo && isBaseline) startDemo()
+    // Runs once when the match opens from the home page demonstration link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function shareCard(kind: 'single' | 'change') {
     const target = kind === 'single' ? singleShare : changeShare
@@ -862,7 +874,7 @@ function App() {
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(trimmedOpinion, selectedClock, period),
+      context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId),
       baseline: null,
     })
   }
@@ -874,7 +886,7 @@ function App() {
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period),
+      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period, datasetId),
       baseline: shown,
     })
   }
@@ -955,23 +967,24 @@ function App() {
 
   return (
     <main className="page-shell analyst-shell" id="main-content">
-      <a className="skip-link" href="#opinion-input">Skip to your take</a>
+      <a className="skip-link" href="#opinion-input">Skip to your opinion</a>
       <header className="site-header">
-        <a className="brand" href="/" aria-label="Groupchat Analyst home">
+        <a className="brand" href="#/" aria-label="Groupchat Analyst home">
           <span className="brand-mark" aria-hidden="true">g<span>.</span></span>
           <span>Groupchat<span className="brand-light">Analyst</span></span>
         </a>
+        <nav className="site-nav" aria-label="Matches"><a href="#/matches">All matches</a></nav>
         <span className="demo-label"><span aria-hidden="true" />Synthetic demo</span>
       </header>
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
-          <p className="intro-description">          <span className="intro-long">Check your group chat’s football takes against the match—then share the evidence.</span><span className="intro-short">Check takes against the match—then share the evidence.</span></p>
-                    {demo === 'offer' && (
-                      <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
-                    )}
-                  </div>
+          <h1 id="page-title">{dataset.name}<span> · Northbridge v Eastport</span></h1>
+          <p className="intro-description">Fictional replay. {dataset.description} Check an opinion against the recorded evidence, then move the clock and check again.</p>
+          {demo === 'offer' && isBaseline && (
+            <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
+          )}
+        </div>
 
         <div className="workspace-grid">
           <div className="match-column">
@@ -989,7 +1002,7 @@ function App() {
           </div>
           <div className="conversation-column">
             <form className="opinion-form" onSubmit={submitOpinion}>
-              <label className="opinion-label" htmlFor="opinion-input">What’s your take?</label>
+              <label className="opinion-label" htmlFor="opinion-input">What’s your opinion?</label>
               <textarea
                 id="opinion-input" value={opinion} onChange={(event) => setOpinion(event.currentTarget.value)}
                 placeholder="Ask about this moment, e.g. How many shots did Eastport have?"
@@ -1022,21 +1035,21 @@ function App() {
                   {isLoadingSubmit ? 'Checking…' : isSeeking ? 'Moving…' : 'Check this moment'}<ArrowIcon />
                 </button>
               </div>
-              <div className="suggestions" role="group" aria-label="Suggested questions">
-                <span>Try asking</span>
-                {suggestions.map((question) => (
-                  <button key={question.id} type="button" onClick={() => fillQuestion(question.text)}>{question.text}</button>
+              <div className="suggestions" role="group" aria-label="Example opinions">
+                <span>Example opinions (fill the box; nothing is sent until you check)</span>
+                {examples.map((example) => (
+                  <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${example.shows} · ${formatMatchClock(example.clock)}`}>{example.text}</button>
                 ))}
               </div>
               <p className="input-hint" id="input-hint">Synthetic match: every performance and result is invented.</p>
-              {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the take is read.</p>}
+              {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
             </form>
 
             <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
-              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same take again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
+              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same opinion again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
               {requestError && (
                 <div className="api-error" role="alert">
-                  <strong>We couldn’t check that take.</strong><p>{requestError}</p>
+                  <strong>We couldn’t check that opinion.</strong><p>{requestError}</p>
                   <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
                 </div>
               )}
@@ -1056,20 +1069,20 @@ function App() {
                   </p>
                   {demo === 'step-to-next-minute' && (
                     <div className="demo-note" role="status">
-                      <span>Same take, one minute later in the fictional replay.</span>
+                      <span>Same opinion, one minute later in the fictional replay.</span>
                       <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
                     </div>
                   )}
                   {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
-                  {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same take against the new evidence.</p>}
+                  {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
                   {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
                   <p className="checked-question">{submittedOpinion}</p>
-                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved take above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
+                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved opinion above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
                   {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
                   {canCheckAgain && displayedClock && (
                     <div className="check-again">
                       <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
-                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved take, not your edit' : ''}.</span>
+                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.</span>
                     </div>
                   )}
                   <p className="server-summary">{canonicalReply(analysis)}</p>
@@ -1146,7 +1159,7 @@ function App() {
           <div>
             <p>Northbridge and Eastport are fictional teams using real-player names. Every performance and result is invented.</p>
             <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
-            <p>The guided demonstration only prepares a fictional 57′ replay and its take; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
+            <p>The guided demonstration only prepares a fictional 57′ replay and its opinion; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
             <p>“Share the receipts” appears only where your browser can share image files. It hands the card image to your device’s share sheet and cannot tell whether anything was sent. Copy and download are always available.</p>
             <p>Match statistics use the selected time and evidence period. Possession uses recorded controlled time only; contested and out-of-play time are excluded. Build-up and pressure observations cover selected samples.</p>
             <p>Player tracking, video, running distance, defensive shape and calibrated expected goals are not recorded. A missing measurement is not a zero.</p>
@@ -1163,5 +1176,3 @@ function App() {
     </main>
   )
 }
-
-export default App
