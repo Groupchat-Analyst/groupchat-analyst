@@ -17,7 +17,6 @@ import {
   calculateEvidence,
   classifyPitchArea,
   EVIDENCE_CAPABILITIES,
-  SYNTHETIC_MATCH_EVIDENCE,
   type EvidenceCalculation,
   type SyntheticMatchEvidence,
 } from '../../shared/src/evidence.js'
@@ -25,12 +24,12 @@ import {
   analyzeMatch,
   elapsedMatchMinute,
   formatMatchClock,
-  SYNTHETIC_MATCH_EVENTS,
   TEAMS,
   type MatchEvent,
   type MatchClock,
   type MatchTeam,
 } from '../../shared/src/match.js'
+import { resolveDataset } from './datasets.js'
 import {
   InterpretationProviderError,
   type InterpretationProvider,
@@ -76,12 +75,13 @@ const UNAVAILABLE_EVIDENCE: Partial<Record<EvidenceKind, string>> = {
     'Running distance and other physical measurements are not recorded; this fixture has no physical-data or continuous-tracking source.',
 }
 
-function reference(event: MatchEvent): EvidenceReference {
+function reference(
+  event: MatchEvent,
+  players: SyntheticMatchEvidence['players'],
+): EvidenceReference {
   const shooter =
     event.type === 'shot' && event.playerId
-      ? SYNTHETIC_MATCH_EVIDENCE.players.find(
-          ({ id }) => id === event.playerId,
-        )
+      ? players.find(({ id }) => id === event.playerId)
       : undefined
   return {
     id: event.id,
@@ -441,6 +441,7 @@ function evidenceForClaim(
   events: MatchEvent[],
   availability: EvidenceAvailability[],
   advanced: EvidenceCalculation,
+  roster: SyntheticMatchEvidence['players'],
   anchorEvent?: MatchEvent,
 ): ClaimEvidence[] {
   if (
@@ -500,7 +501,7 @@ function evidenceForClaim(
         evidence.set(event.id, {
           role:
             halfTimeAssertion === 'scored' ? 'supporting' : 'challenging',
-          reference: reference(event),
+          reference: reference(event, roster),
         })
       }
     }
@@ -662,7 +663,7 @@ function evidenceForClaim(
     if (claim.historicalEventAnchor && anchorEvent) {
       evidence.set(anchorEvent.id, {
         role: 'anchor',
-        reference: reference(anchorEvent),
+        reference: reference(anchorEvent, roster),
       })
     }
     return [...evidence.values()]
@@ -696,7 +697,7 @@ function evidenceForClaim(
         role = 'challenging'
       }
     }
-    evidence.set(event.id, { role, reference: reference(event) })
+    evidence.set(event.id, { role, reference: reference(event, roster) })
   }
 
   const addEvidence = (
@@ -803,7 +804,7 @@ function evidenceForClaim(
   if (claim.historicalEventAnchor && anchorEvent) {
     evidence.set(anchorEvent.id, {
       role: 'anchor',
-      reference: reference(anchorEvent),
+      reference: reference(anchorEvent, roster),
     })
   }
 
@@ -1329,6 +1330,7 @@ function assessOneClaim(
           scopedEvents,
           resolvedAvailability,
           advanced,
+          fixture.players,
           anchorEvent,
         )
       : [],
@@ -2235,10 +2237,12 @@ function createEvidenceFoundation(
 export async function analyzeOpinion(
   input: unknown,
   provider: InterpretationProvider = new LocalInterpretationProvider(),
-  fixture: SyntheticMatchEvidence = SYNTHETIC_MATCH_EVIDENCE,
+  fixtureOverride?: SyntheticMatchEvidence,
 ): Promise<AnalysisResponse> {
   const request = parseAnalysisRequest(input)
-  const matchEvents = SYNTHETIC_MATCH_EVENTS
+  const dataset = resolveDataset(request.datasetId)
+  const fixture = fixtureOverride ?? dataset.evidence
+  const matchEvents = dataset.events
   const matchSoFar = analyzeMatch(
     matchEvents,
     request.selectedClock,
@@ -2371,7 +2375,9 @@ export async function analyzeOpinion(
     selectedPeriodLabel,
     score: matchSoFar.score,
     periodStatistics,
-    periodEvents: matchAnalysis.periodEvents.map(reference),
+    periodEvents: matchAnalysis.periodEvents.map((event) =>
+      reference(event, fixture.players),
+    ),
     evidenceFoundation: createEvidenceFoundation(
       advanced,
       selectedPeriodLabel,

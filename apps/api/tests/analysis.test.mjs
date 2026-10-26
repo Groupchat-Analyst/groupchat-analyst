@@ -192,7 +192,7 @@ test('rejects invalid model interpretation instead of returning a success-shaped
 test('rejects client-supplied statistics and invalid selected times', async () => {
   await assert.rejects(
     analyzeOpinion({ ...request(''), statistics: { Northbridge: 99 } }),
-    /must contain only opinion, selectedClock, and period/,
+    /must contain only opinion, selectedClock, period, and optionally datasetId/,
   )
   await assert.rejects(
     analyzeOpinion(request('', { period: 1, minute: 46 })),

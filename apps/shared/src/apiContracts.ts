@@ -88,9 +88,12 @@ export type AnalysisRequest = {
   opinion: string
   selectedClock: MatchClock
   period: AnalysisPeriod
+  datasetId?: string
 }
 
 export type MatchReplayResponse = {
+  datasetId?: string
+  datasetVersion?: string
   selectedTime: string
   score: Record<MatchTeam, number>
   events: Array<{

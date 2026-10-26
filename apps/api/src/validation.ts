@@ -4,6 +4,7 @@ import {
   type MatchEvent,
   type MatchClock,
 } from '../../shared/src/match.js'
+import { findCatalogEntry } from '../../shared/src/datasetCatalog.js'
 import type {
   AnalysisRequest,
   ClaimIntent,
@@ -147,13 +148,20 @@ function isClock(value: unknown): value is MatchClock {
 }
 
 export function parseAnalysisRequest(value: unknown): AnalysisRequest {
+  const baseKeys = ['opinion', 'selectedClock', 'period']
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['opinion', 'selectedClock', 'period'])
+    !(
+      hasExactKeys(value, baseKeys) ||
+      hasExactKeys(value, [...baseKeys, 'datasetId'])
+    )
   ) {
     throw new InputValidationError(
-      'Request must contain only opinion, selectedClock, and period.',
+      'Request must contain only opinion, selectedClock, period, and optionally datasetId.',
     )
+  }
+  if ('datasetId' in value && !findCatalogEntry(value.datasetId)) {
+    throw new InputValidationError('datasetId is not a supported match.')
   }
   if (typeof value.opinion !== 'string' || value.opinion.length > 2000) {
     throw new InputValidationError('Opinion must be text no longer than 2,000 characters.')
@@ -172,6 +180,7 @@ export function parseAnalysisRequest(value: unknown): AnalysisRequest {
     opinion: value.opinion.trim(),
     selectedClock: value.selectedClock,
     period: value.period as AnalysisPeriod,
+    ...('datasetId' in value ? { datasetId: value.datasetId as string } : {}),
   }
 }
 
