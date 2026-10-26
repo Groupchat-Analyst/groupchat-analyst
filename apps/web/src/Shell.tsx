@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BASELINE_DATASET_ID, DATASET_CATALOG } from '../../shared/src/datasetCatalog'
-import { formatMatchClock } from '../../shared/src/matchClock'
+import { DATASET_CATALOG } from '../../shared/src/datasetCatalog'
+import { BASELINE_DATASET_ID } from '../../shared/src/datasetCatalog'
 import { MatchView } from './App'
 import { matchHash, parseRoute, type Route } from './routes'
 import './App.css'
@@ -67,7 +67,7 @@ function Matches({ unknownId }: { unknownId?: string }) {
               <a className="match-card" href={matchHash(entry.id)}>
                 <strong>{entry.name}</strong>
                 <span>{entry.description}</span>
-                <span className="match-meta">Fictional · key moments from {formatMatchClock(entry.moments[0].clock)}</span>
+                <span className="match-meta">Fictional · v{entry.version} · {entry.moments.length} key moments · {entry.examples.length} example opinions</span>
               </a>
             </li>
           ))}

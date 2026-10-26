@@ -1,5 +1,19 @@
 # Next-session handoff
 
+## 0. Latest: `feature/explore-more-matches` (read this first)
+
+Branch from `main` (after PR #7). Commits: `68f98bd` Saka/player-language repair; `fb523a2` second synthetic fixture and integrity validator; `9ba9e25` dataset catalog + API allowlist + `datasetId`; `d59bc27` omitted-opponent and distance phrasing, catalog moments and verified examples; then the web commit (home, match selector, dataset-aware match view, opinion wording, fixture-named share footer) and docs.
+
+- **Datasets:** Original (`northbridge-eastport-analysis-demo` 3.0.0, hash `fb5335ff…` unchanged) and Return (`northbridge-eastport-return-demo` 1.0.0). Metadata lives in `apps/shared/src/datasetCatalog.ts` (also moments and examples); data resolution is `apps/api/src/datasets.ts`. Requests without `datasetId` keep baseline behaviour; unknown IDs fail with 400.
+- **Web:** `Shell.tsx` hash-routes `#/`, `#/matches`, `#/match/<id>[/demo]` (`routes.ts`); `MatchView` in `App.tsx` is keyed by dataset so a switch resets draft, answers, comparison, replay and prepared images. Responses and replay frames whose dataset differs from the request are rejected.
+- **Checks:** API 207, web 113, `tsc -b`, lint, build, `git diff --check` pass. Browser (desktop + 390 px emulation, local stack): guided 57′→58′, match switch, failure path, switch during a pending request, stubbed native share (1 PNG, no extra analysis call).
+- **Language:** [LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md): 42 inputs, 35 pass, 2 partial, 5 fail (negated goal, pre-goal chronology, “every”, zero shots on target, shot location). “Saka and Rice have been poor” gives a clumsy clarification.
+- **Not verified:** native share on a real phone; any live Foundry call for the current work (prompt and schema unchanged; earlier live ledgers belong to the earlier version); keyboard/screen-reader re-test. The browser harness needed DOM `click()` for several controls.
+- **Foundry access recommendation and proposed (unauthorised) live set:** [SUBMISSION.md](./SUBMISSION.md).
+- **Known gaps:** the captured Foundry replay tests were not extended to the new fixture; no automated component tests for `MatchView`/`Shell`; the home page and match list were not given a separate accessibility audit.
+
+The sections below are the earlier handoff, kept for history.
+
 **Hackathon candidate (current):** see [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) and [PR_DESCRIPTION.md](./PR_DESCRIPTION.md). Hosting is now planned as **public, no sign-in, local provider only**; the earlier invited-`preview-user` plan is archived as [PRIVATE_PREVIEW_PLAN_SUPERSEDED.md](./PRIVATE_PREVIEW_PLAN_SUPERSEDED.md), and the long former README is [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md). Section 1c's deployment notes below describe the earlier invited-access arrangement and are superseded by the runbook. Nothing has been deployed; feature development is frozen.
 
 Application code at `feature/take-investigation` commit `76e3037` (timeout fix `41edbc8`, handoff `8f2bbaf`, comparison safeguards `ed7d5c7`); later repairs are listed in sections 1a–1c. All match data is fictional/synthetic.
