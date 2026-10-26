@@ -87,8 +87,16 @@ test('unavailable data is stated plainly without substituting figures', async ()
   assert.doesNotMatch(result.fanReply, BANNED)
 })
 
-test('unrecognised wording is not silently reinterpreted', async () => {
+test('a defensive-approach take is recognised and limited honestly, not refused or backed by unrelated figures', async () => {
   const result = await analyzeOpinion(request('Northbridge parked the bus.'))
+  assert.equal(result.claims[0].claim.intent, 'subjective-judgement')
+  assert.equal(result.claims[0].assessment, 'insufficient evidence for a firm conclusion')
+  assert.match(result.fanReply, /defensive shape or positioning/)
+  assert.doesNotMatch(result.fanReply, /couldn't match|\d+%|shots|passes/i)
+})
+
+test('genuinely unrecognised wording is not silently reinterpreted', async () => {
+  const result = await analyzeOpinion(request('Northbridge zibbled the quux.'))
   assert.equal(result.claims[0].assessment, 'unrecognized language')
   assert.match(result.fanReply, /couldn't match that/)
   assert.doesNotMatch(result.fanReply, /possession|shots|passes/i)

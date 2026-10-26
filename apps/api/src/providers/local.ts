@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/src/apiContracts.js'
 import type { PlayerEntityReference } from '../../../shared/src/apiContracts.js'
 import { interpretClaim } from '../../../shared/src/interpretClaim.js'
+import { classifyOpinion, evidenceForTopic } from '../../../shared/src/opinionTopics.js'
 import type {
   InterpretationContext,
   InterpretationProvider,
@@ -251,7 +252,8 @@ function playerMetricRequest(
   if (/\b(?:how\s+far|running\s+distance|distance\s+covered|how\s+much\s+ground)\b/i.test(text)) {
     return { metric: 'running-distance', intent: 'unavailable-metric' }
   }
-  const request = /\bhow\s+many\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|passes|recoveries|pressure observations|pressures)\b/i.exec(text)
+  const request = /\bhow\s+many\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|passes|recoveries|pressure observations|pressures)\b/i.exec(text) ??
+    /(?:['’]s|\b(?:his|their))\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|pass completion|passes|recoveries|pressure observations)\b/i.exec(text)
   const minutesRequest = /\bhow\s+many\s+minutes\b|\bhow\s+long\b/i.test(text)
   if (!request && minutesRequest) {
     return { metric: 'minutes-played', intent: 'statistical-request' }
@@ -271,7 +273,9 @@ function playerMetricRequest(
               ? 'pressure-observations'
               : phrase === 'pass attempts' || phrase === 'passes'
                 ? 'pass-attempts'
-                : 'pass-completions'
+                : phrase === 'pass completion'
+                  ? 'pass-completion-percentage'
+                  : 'pass-completions'
   return { metric, intent: 'statistical-request' }
 }
 
@@ -444,7 +448,10 @@ function resolveSubject(
 }
 
 function clarificationQuestion(text: string): string {
-  const pronoun = /\b(them|they|their|he|she|him|her)\b/i.exec(text)?.[1]
+  const pronoun = /\b(them|they|their|he|she|him|her|his)\b/i.exec(text)?.[1]
+  if (pronoun && /^(?:he|she|him|her|his)$/i.test(pronoun)) {
+    return `Which player does “${pronoun.toLowerCase()}” refer to in this claim?`
+  }
   if (pronoun) {
     return `Which team does “${pronoun.toLowerCase()}” refer to in this claim?`
   }
@@ -565,6 +572,31 @@ function claimFromText(
     description = parsedClaim.summary
   }
 
+  const topic =
+    !comparison &&
+    !playerComparison &&
+    !singleStatistic &&
+    !metricComparison &&
+    !requestedPlayerMetric &&
+    parsedClaim?.kind !== 'comparison' &&
+    category !== 'coaching-question' &&
+    category !== 'historical-circumstance'
+      ? classifyOpinion(text)
+      : undefined
+  if (topic && topic.topic === 'physical-condition') {
+    category = 'other'
+    intent = 'unavailable-metric'
+    description = `${playerSubject?.name ?? subject ?? 'The side'}'s physical condition (fitness, injury, exertion) is not recorded in this fixture.`
+  } else if (topic && topic.topic !== 'prediction') {
+    category = 'performance-judgement'
+    intent = 'subjective-judgement'
+    description = text
+  } else if (topic) {
+    category = 'other'
+    intent = 'unrecognized-language'
+    description = 'A prediction about what happens next cannot be checked against recorded events.'
+  }
+
   if (
     !comparison &&
     !singleStatistic &&
@@ -671,7 +703,11 @@ function claimFromText(
       description,
       comparison,
     },
-    requiredEvidence: requestedPlayerMetric
+    requiredEvidence: topic && topic.topic !== 'prediction'
+      ? evidenceForTopic(topic.topic, playerSubject !== null)
+      : topic
+        ? ['attacking-events']
+      : requestedPlayerMetric
       ? requiredEvidence(text, requestedPlayerMetric.metric)
       : playerSubject &&
         /\b(?:how\s+did|how\s+has|performance|perform(?:ed)?)\b/i.test(text)

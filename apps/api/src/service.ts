@@ -37,6 +37,11 @@ import {
 } from './providers/provider.js'
 import { LocalInterpretationProvider } from './providers/local.js'
 import {
+  classifyOpinion,
+  DEFENSIVE_SHAPE_PATTERN,
+  topicLimitation,
+} from '../../shared/src/opinionTopics.js'
+import {
   goalBeforeHalfTimeAssertion,
   hasExplicitBuildUpPassingScope,
   normalizeKnownInterpretation,
@@ -979,6 +984,9 @@ function makeLimitation(
     return claim.clarificationNeeds.join(' ')
   }
   if (claim.intent === 'unavailable-metric') {
+    if (claim.requiredEvidence.includes('physical-measurements') && classifyOpinion(claim.text)?.topic === 'physical-condition') {
+      return `${topicLimitation('physical-condition')} There is no physical-data or continuous-tracking source.`
+    }
     return unavailable.length > 0
       ? unavailable.join(' ')
       : 'The requested metric is not recorded in this synthetic fixture.'
@@ -992,6 +1000,7 @@ function makeLimitation(
       : 'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.'
   }
   if (claim.intent === 'unrecognized-language') {
+    if (classifyOpinion(claim.text)?.topic === 'prediction') return topicLimitation('prediction')
     return 'The local interpreter cannot reliably identify the requested football evidence. No unrelated statistics or events were selected.'
   }
   const halfTimeAssertion = goalBeforeHalfTimeAssertion(claim)
@@ -1039,6 +1048,14 @@ function makeLimitation(
       ? 'This is a filtered result from the versioned, selected-sample build-up annotations; they do not cover the match continuously.'
       : 'This is an all-pass-turnover breakdown.'
     return `${scope} Recorded turnover locations ${teamSummary}: ${areaCounts} (${turnovers.length} eligible recorded turnovers). These records do not establish why possession was lost; linked passes and any selected pressure observations describe associations, not tactical causes.`
+  }
+  const topic = claim.intent === 'subjective-judgement' && claim.meaning.category === 'performance-judgement'
+    ? classifyOpinion(claim.text)?.topic
+    : undefined
+  if (topic && topic !== 'defensive-approach' && topic !== 'pressure-progression') {
+    return claim.playerSubject
+      ? `${topicLimitation(topic)} Only sparse synthetic actions are attributed to ${claim.playerSubject.name}; no overall player rating or ranking is inferred.`
+      : topicLimitation(topic)
   }
   if (claim.playerSubject) {
     return `The fixture provides only sparse synthetic actions attributed to ${claim.playerSubject.name}; pass, shot, recovery, and selected pressure counts are not a complete performance measure. No overall player rating or ranking is inferred.`
@@ -1728,6 +1745,10 @@ function answerForClaim(
       return `${claim.subject} had ${own}% of recorded possession; ${opponentStat?.team} had ${opponent}%. ${aspect} Possession share alone cannot establish overall dominance.`
     }
   }
+  if (claim.playerSubject || claim.subject) {
+    const reply = topicReply(result, fixture, events, advanced)
+    if (reply) return reply
+  }
   if (claim.playerSubject) {
     const endElapsed = claimEndElapsed(claim, events, advanced)
     const answer = broadPlayerSentence(result, fixture, endElapsed)
@@ -1761,7 +1782,89 @@ function createSummary(
 }
 
 const possessionControlPattern = /possess|domina|in control|controll?ed|ran the (?:game|match)|bossed|outplay|had the ball/i
-const defensiveShapePattern = /park(?:ed|ing) the bus|low block|sat (?:deep|back)|defen[cs]\w*|deep|compact|shape|back (?:five|four|three)/i
+const defensiveShapePattern = new RegExp(
+  `${/park(?:ed|ing) the bus|low block|sat (?:deep|back)|defen[cs]\w*|deep|compact|shape|back (?:five|four|three)/i.source}|${DEFENSIVE_SHAPE_PATTERN.source}`,
+  'i',
+)
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/**
+ * Topic-specific recorded facts for a broad opinion about a player or team, followed by the
+ * shared limitation for that class of opinion. Returns undefined when the claim is not a
+ * classified broad opinion, so the existing wording applies.
+ */
+function topicReply(
+  result: ClaimResult,
+  fixture: SyntheticMatchEvidence,
+  events: MatchEvent[],
+  advanced: EvidenceCalculation,
+): string | undefined {
+  const claim = result.claim
+  if (claim.intent !== 'subjective-judgement' || claim.meaning.category !== 'performance-judgement') {
+    return undefined
+  }
+  const classification = classifyOpinion(claim.text)
+  if (!classification) return undefined
+  const { topic, negated } = classification
+  const player = claim.playerSubject
+  let facts: string | undefined
+  if (player) {
+    const endElapsed = claimEndElapsed(claim, events, advanced)
+    const participation = playerParticipation(player, fixture, endElapsed)
+    if (participation === 'not-yet-on-pitch' || participation === 'unused-substitute') {
+      return broadPlayerSentence(result, fixture, endElapsed)
+    }
+    const values = new Map(result.playerStatistics.map(({ metric, value }) => [metric, value]))
+    const num = (metric: PlayerStatistic['metric']) => {
+      const value = values.get(metric)
+      return typeof value === 'number' ? value : 0
+    }
+    const attempts = num('pass-attempts')
+    const completions = num('pass-completions')
+    if (topic === 'passing-quality') {
+      facts = attempts === 0
+        ? `${player.name} has no recorded pass attempts in this period.`
+        : `${player.name} completed ${completions} of ${attempts} recorded passes (${Number(((completions / attempts) * 100).toFixed(1))}%); ${plural(attempts - completions, 'recorded pass')} did not reach the intended receiver.`
+    } else if (topic === 'possession-losses') {
+      const lost = advanced.turnovers.filter(({ playerId }) => playerId === player.id)
+      const areas = lost.map(({ location }) => classifyPitchArea(location).replaceAll('-', ' '))
+      facts = lost.length === 0
+        ? `No turnovers are recorded against ${player.name} in this period (${plural(attempts, 'recorded pass attempt')}).`
+        : `${player.name} lost possession ${plural(lost.length, 'time')} through recorded incomplete passes (${areas.join(', ')}), from ${plural(attempts, 'recorded pass attempt')}.`
+    } else if (topic === 'attacking-output' || topic === 'finishing') {
+      const shots = num('shots')
+      facts = shots === 0
+        ? `${player.name} has no recorded shots in this period.`
+        : `${player.name} had ${plural(shots, 'recorded shot')}: ${num('shots-on-target')} on target and ${plural(num('goals'), 'goal')}.`
+    } else if (topic === 'involvement') {
+      const actions = attempts + num('shots') + num('recoveries') + num('pressure-observations')
+      facts = `${broadPlayerSentence(result, fixture, endElapsed)} That is ${plural(actions, 'recorded action')} (passes, shots, recoveries and selected pressure observations).`
+    } else {
+      facts = broadPlayerSentence(result, fixture, endElapsed)
+    }
+  } else if (claim.subject) {
+    const team = advanced.teams[claim.subject]
+    if (topic === 'passing-quality') {
+      facts = team.passCompletionPercentage === null
+        ? `${claim.subject} has no recorded pass attempts in this period.`
+        : `${claim.subject} completed ${team.completedPasses} of ${team.passAttempts} recorded passes (${team.passCompletionPercentage}%).`
+    } else if (topic === 'possession-losses') {
+      const losses = team.possessionLosses
+      facts = `${claim.subject} recorded losses of possession: defensive third ${losses['defensive-third'] ?? 'unavailable'}, middle third ${losses['middle-third'] ?? 'unavailable'}, final third ${losses['final-third'] ?? 'unavailable'}.`
+    } else if (topic === 'attacking-output' || topic === 'finishing' || topic === 'overall-performance' || topic === 'momentum') {
+      facts = statisticsSentence(result)
+    }
+  }
+  if (!player && (topic === 'defensive-approach' || topic === 'pressure-progression')) return undefined
+  const parts = [facts, negated ? "Negating a take doesn't change what the records can show; they can't settle it either way." : undefined, topicLimitation(topic)]
+  if (player && (topic === 'overall-performance' || topic === 'involvement')) {
+    parts.push(`For a specific count, ask “How many passes did ${player.name} complete?” or “How many shots did ${player.name} have?”`)
+  }
+  return parts.filter(Boolean).join(' ')
+}
 
 function concernsPossessionOrControl(claim: InterpretedClaim): boolean {
   return possessionControlPattern.test(claim.text) && !defensiveShapePattern.test(claim.text)
@@ -1823,6 +1926,9 @@ function fanAnswerForClaim(
     return `I can't tell you that one. ${result.limitation}`
   }
   if (claim.intent === 'unrecognized-language') {
+    if (classifyOpinion(claim.text)?.topic === 'prediction') {
+      return `That's a prediction about what happens next, and the records only cover play up to ${formatMatchClock(selectedClock)}. I can check what has happened so far — try asking about shots, possession or passes up to now.`
+    }
     return "I couldn't match that to something I can check in this match, and I haven't picked out unrelated figures instead. Try naming a team or player and what you want to know."
   }
   if (claim.intent === 'coaching-question') return coachingSentence(result)
@@ -1913,6 +2019,10 @@ function fanAnswerForClaim(
       return `${claim.subject} had ${own}% of recorded possession to ${opponentStat?.team}'s ${opponent}%. ${aspect} Possession alone doesn't settle overall dominance.`
     }
   }
+  if (claim.playerSubject || claim.subject) {
+    const reply = topicReply(result, fixture, events, advanced)
+    if (reply) return reply
+  }
   if (claim.playerSubject) {
     const answer = broadPlayerSentence(result, fixture, claimEndElapsed(claim, events, advanced))
     return `${answer} That's sparse data, so it isn't a full read on ${claim.playerSubject.name}'s game.`
@@ -1920,7 +2030,9 @@ function fanAnswerForClaim(
   if (claim.intent === 'subjective-judgement') {
     const shape = concernsDefensiveShape(claim)
       ? " Nothing here records defensive shape or positioning, and possession share doesn't tell you how a side set up."
-      : ''
+      : classifyOpinion(claim.text)?.topic === 'pressure-progression'
+        ? ` ${topicLimitation('pressure-progression')}`
+        : ''
     return `That's a bigger football opinion than the match events can settle: “${quote}”. I can only report what's recorded.${shape}`
   }
   if (result.assessment === 'insufficient evidence for a firm conclusion') {
