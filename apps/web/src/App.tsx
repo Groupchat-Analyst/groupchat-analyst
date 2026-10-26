@@ -54,6 +54,8 @@ import {
   type Comparison,
 } from './investigation'
 import { createBlocksImage, createShareCardImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
+import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
+import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
 import { getQuestionSuggestions } from './suggestions'
@@ -553,18 +555,43 @@ function ArrowIcon() {
   return <svg viewBox="0 0 20 20" width="20" height="20" fill="none" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
+// Renders the same PNG as the download ahead of time so the final Share tap keeps its user activation.
+// The result is keyed by card content, so a changed answer or comparison can never reuse an old image.
+function usePreparedImage(enabled: boolean, key: string | null, image: ShareCardImage | null, fileName: string): PreparedImage | null {
+  const [prepared, setPrepared] = useState<PreparedImage | null>(null)
+  useEffect(() => {
+    if (!enabled || !key || !image) return
+    let cancelled = false
+    svgToPngBlob(image, 2)
+      .then((blob) => {
+        if (!cancelled) setPrepared({ key, file: new File([blob], fileName, { type: 'image/png' }) })
+      })
+      .catch(() => {
+        if (!cancelled) setPrepared(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, key, image, fileName])
+  return enabled && prepared && prepared.key === key ? prepared : null
+}
+
 function WhatChanged({
   comparison,
   view,
   changeCard,
   onCopy,
   onDownload,
+  onShare,
+  shareReady,
 }: {
   comparison: { earlier: AnswerSnapshot; later: AnswerSnapshot; result: Comparison }
   view: 'fan' | 'analyst'
   changeCard: ChangeCard | null
   onCopy: () => void
   onDownload: () => void
+  onShare: (() => void) | null
+  shareReady: boolean
 }) {
   const { earlier, later, result } = comparison
   const separate = result.status !== 'comparable'
@@ -605,6 +632,7 @@ function WhatChanged({
         <details className="share-preview change-share">
           <summary>Share what changed</summary>
           <div className="share-row">
+            {onShare && <button className="secondary-button share-native" type="button" disabled={!shareReady} onClick={onShare}>{shareReady ? 'Share the receipts' : 'Preparing image…'}</button>}
             <button className="secondary-button" type="button" onClick={onCopy}>Copy what-changed text</button>
             <button className="secondary-button" type="button" onClick={onDownload}>{changeCard.extended ? 'Download extended card' : 'Download card image'}</button>
           </div>
@@ -685,6 +713,36 @@ function App() {
     () => (analysis && submittedContext ? buildShareCardModel(submittedContext.opinion, analysis) : null),
     [analysis, submittedContext],
   )
+  const [canNativeShare] = useState(() => supportsFileShare(navigator, new File([''], 'probe.png', { type: 'image/png' })))
+  const [demoActive, setDemoActive] = useState(false)
+  const sharingRef = useRef(false)
+  const singleShare = useMemo(
+    () => (shareModel ? { key: imageKey('single', shareCardBlocks(shareModel)), image: createShareCardImage(shareModel) } : null),
+    [shareModel],
+  )
+  const changeShare = useMemo(
+    () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks) } : null),
+    [changeCard],
+  )
+  const preparedSingle = usePreparedImage(canNativeShare, singleShare?.key ?? null, singleShare?.image ?? null, 'groupchat-analyst-card.png')
+  const preparedChange = usePreparedImage(canNativeShare, changeShare?.key ?? null, changeShare?.image ?? null, 'groupchat-analyst-what-changed.png')
+  const demo = demoStep({
+    active: demoActive,
+    draft: opinion,
+    hasSubmitted: shown !== null || submittedRequest !== null,
+    isLoading,
+    hasError: requestError !== '',
+    displayedClock,
+    requestedClock: selectedClock,
+    answer: shown
+      ? {
+          take: shown.context.opinion,
+          clock: shown.context.selectedClock,
+          period: shown.context.period,
+          relevant: isRelevantAnswer(shown.analysis.claims),
+        }
+      : null,
+  })
   useEffect(() => {
     replay.start()
     return () => replay.dispose()
@@ -767,6 +825,30 @@ function App() {
   function fillQuestion(text: string) {
     setOpinion(text)
     document.getElementById('opinion-input')?.focus()
+  }
+
+  // Prepares the demonstration only; submitting stays an explicit user action.
+  function startDemo() {
+    if (demo !== 'offer') return
+    setDemoActive(true)
+    setPeriod('match-so-far')
+    replay.seek(DEMO_CLOCK)
+    setOpinion(DEMO_TAKE)
+    document.getElementById('opinion-input')?.focus()
+  }
+
+  async function shareCard(kind: 'single' | 'change') {
+    const target = kind === 'single' ? singleShare : changeShare
+    const prepared = kind === 'single' ? preparedSingle : preparedChange
+    if (!target || sharingRef.current) return
+    sharingRef.current = true
+    try {
+      const outcome = await shareReceipts(navigator, prepared, target.key, kind === 'single' ? 'Groupchat Analyst receipt' : 'Groupchat Analyst: what changed')
+      setCopyMessage('')
+      setShareMessage(outcome.message)
+    } finally {
+      sharingRef.current = false
+    }
   }
 
   function submitOpinion(event: FormEvent<HTMLFormElement>) {
@@ -885,8 +967,11 @@ function App() {
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
           <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
-          <p className="intro-description"><span className="intro-long">Drop your football take. Check it against the match. Get the receipts.</span><span className="intro-short">Football takes. Match evidence.</span></p>
-        </div>
+          <p className="intro-description">          <span className="intro-long">Check your group chat’s football takes against the match—then share the evidence.</span><span className="intro-short">Check takes against the match—then share the evidence.</span></p>
+                    {demo === 'offer' && (
+                      <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
+                    )}
+                  </div>
 
         <div className="workspace-grid">
           <div className="match-column">
@@ -944,6 +1029,7 @@ function App() {
                 ))}
               </div>
               <p className="input-hint" id="input-hint">Synthetic match: every performance and result is invented.</p>
+              {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the take is read.</p>}
             </form>
 
             <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
@@ -968,7 +1054,15 @@ function App() {
                       ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
                       : 'Analyst view opens the reasoning and evidence' + (needsPassMap(analysis) ? ', plus a pass map' : '') + '. The answer, verdict and limitations are the same as in Fan view.'}
                   </p>
-                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} />}
+                  {demo === 'step-to-next-minute' && (
+                    <div className="demo-note" role="status">
+                      <span>Same take, one minute later in the fictional replay.</span>
+                      <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
+                    </div>
+                  )}
+                  {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
+                  {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same take against the new evidence.</p>}
+                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
                   <p className="checked-question">{submittedOpinion}</p>
                   {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved take above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
                   {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
@@ -1000,6 +1094,7 @@ function App() {
                     )}
                   </div>
                   <div className="share-row">
+                    {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
                     <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
                     <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
                     <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
@@ -1051,6 +1146,8 @@ function App() {
           <div>
             <p>Northbridge and Eastport are fictional teams using real-player names. Every performance and result is invented.</p>
             <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
+            <p>The guided demonstration only prepares a fictional 57′ replay and its take; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
+            <p>“Share the receipts” appears only where your browser can share image files. It hands the card image to your device’s share sheet and cannot tell whether anything was sent. Copy and download are always available.</p>
             <p>Match statistics use the selected time and evidence period. Possession uses recorded controlled time only; contested and out-of-play time are excluded. Build-up and pressure observations cover selected samples.</p>
             <p>Player tracking, video, running distance, defensive shape and calibrated expected goals are not recorded. A missing measurement is not a zero.</p>
             <p>First-half stoppage time is 45+N′; second-half stoppage is 90+N′. Recent-minute windows exclude half-time. Historical “before” periods exclude the anchored event and all later events.</p>
