@@ -41,7 +41,7 @@ const TOPIC_PATTERNS: Array<[OpinionTopic, RegExp]> = [
   ],
   [
     'physical-condition',
-    /\b(?:injur\w*|hurt|limping|knock|tired|tiring|fatigu\w*|exhausted|leg[s]? (?:have )?gone|fit(?:ness)?|stamina|sprint\w*|worked? (?:so )?hard|working hard|running (?:a lot|around))\b/i,
+    /\b(?:injur\w*|hurt|limping|knock|tired|tiring|fatigu\w*|exhausted|leg[s]? (?:have )?gone|fit(?:ness)?|stamina|sprint\w*|worked? (?:so )?hard|working hard|running (?:a lot|around)|covered\s+(?:more|less|greater|a lot of)\s+(?:distance|ground)|ran\s+(?:more|further|farther|a lot)|distance covered)\b/i,
   ],
   [
     'defensive-approach',

@@ -335,7 +335,7 @@ function parseRunningDistanceComparison(
   const teams = orderedTeams(text)
   if (
     teams.length !== 2 ||
-    !/\b(?:ran\s+(?:farther|further)|running\s+distance|covered\s+more\s+ground)\b/i.test(text)
+    !/\b(?:ran\s+(?:more|less|farther|further)|running\s+distance|covered\s+(?:more|less|greater|further|farther)\s+(?:distance|ground)|distance\s+covered)\b/i.test(text)
   ) {
     return undefined
   }

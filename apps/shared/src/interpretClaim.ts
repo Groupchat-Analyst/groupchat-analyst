@@ -47,7 +47,7 @@ const teamPattern = TEAMS.map((team) => team.replace(/[.*+?^${}()|[\]\\]/g, '\\$
   .join('|')
 
 const comparisonPattern = new RegExp(
-  `^(?<subject>${teamPattern})\\s+(?:(?<negation>did not|didn't)\\s+(?<negatedVerb>have|record|recorded|take|took|make|made|score|scored)\\s+(?<negatedOperator>more|fewer|less)\\s+(?<negatedMetric>shots on target|shots|goals|possession)\\s+than\\s+|(?<verb>had|have|has|recorded|took|made|scored)\\s+(?<operator>more|fewer|less|no more|no fewer|the same number of|same number of|as many)\\s+(?<metric>shots on target|shots|goals|possession)\\s+(?:than|as)\\s+)(?<opponent>${teamPattern})[.!?]*$`,
+  `^(?<subject>${teamPattern})\\s+(?:(?<negation>did not|didn't)\\s+(?<negatedVerb>have|record|recorded|take|took|make|made|score|scored)\\s+(?<negatedOperator>more|fewer|less)\\s+(?<negatedMetric>shots on target|shots|goals|possession)|(?<verb>had|have|has|recorded|took|made|scored)\\s+(?<operator>more|fewer|less|no more|no fewer|the same number of|same number of|as many)\\s+(?<metric>shots on target|shots|goals|possession))(?:\\s+(?:than|as)\\s+(?<opponent>${teamPattern}))?[.!?]*$`,
   'i',
 )
 
@@ -83,7 +83,10 @@ function parseComparison(
     metric,
   } = parsed.groups
   const subject = teamFromMatch(matchedSubject)
-  const opponent = teamFromMatch(matchedOpponent)
+  // Only two teams exist, so an omitted opponent ("Eastport had more shots") is the other team.
+  const opponent = matchedOpponent
+    ? teamFromMatch(matchedOpponent)
+    : TEAMS.find((team) => team !== subject)
   if (!subject || !opponent) return undefined
   if (subject === opponent) {
     return {

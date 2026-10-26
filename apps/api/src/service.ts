@@ -985,7 +985,14 @@ function makeLimitation(
     return claim.clarificationNeeds.join(' ')
   }
   if (claim.intent === 'unavailable-metric') {
-    if (claim.requiredEvidence.includes('physical-measurements') && classifyOpinion(claim.text)?.topic === 'physical-condition') {
+    const runningDistance =
+      claim.meaning.comparison?.metric === 'running-distance' ||
+      claim.playerMetric === 'running-distance'
+    if (
+      !runningDistance &&
+      claim.requiredEvidence.includes('physical-measurements') &&
+      classifyOpinion(claim.text)?.topic === 'physical-condition'
+    ) {
       return `${topicLimitation('physical-condition')} There is no physical-data or continuous-tracking source.`
     }
     return unavailable.length > 0
