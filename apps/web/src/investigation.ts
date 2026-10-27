@@ -11,7 +11,7 @@ import {
 import type { SubmissionContext } from './matchday.ts'
 import {
   ASSESSMENT_LABELS,
-  SYNTHETIC_LABEL,
+  sourceFooter,
   blocksToText,
   canonicalReply,
   describeEvidence,
@@ -377,7 +377,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     return {
       ...base,
       status: 'different-interpretation',
-      headline: `The two checks read this take differently, so I'm not comparing them directly.`,
+      headline: 'The two checks interpret this opinion differently, so they cannot be compared directly.',
       lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
       caveats: ['The interpreted claims differ, so no like-for-like change is reported.'],
     }
@@ -450,6 +450,7 @@ export function buildChangeCard(
   const extended = comparison.pairs.length > 1
   if (extended) blocks.push({ kind: 'notice', text: `Extended card · ${comparison.pairs.length} claims` })
   blocks.push(
+    { kind: 'label', text: 'Original wording' },
     { kind: 'take', text: `“${take}”` },
     {
       kind: 'scope',
@@ -482,7 +483,7 @@ export function buildChangeCard(
   })
   for (const caveat of comparison.caveats) blocks.push({ kind: 'note', text: `Note: ${caveat}` })
   for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
-  blocks.push({ kind: 'footer', text: SYNTHETIC_LABEL })
+  blocks.push({ kind: 'footer', text: sourceFooter(_later.analysis) })
   return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
 

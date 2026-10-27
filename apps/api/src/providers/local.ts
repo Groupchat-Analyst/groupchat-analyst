@@ -13,6 +13,14 @@ import type {
 } from '../../../shared/src/apiContracts.js'
 import type { PlayerEntityReference } from '../../../shared/src/apiContracts.js'
 import { interpretClaim } from '../../../shared/src/interpretClaim.js'
+import {
+  BEFORE_GOAL_PHRASE as GOAL_PHRASE,
+  mentionsShotLocation,
+  parseCountAssertion,
+  type CountAssertion,
+} from '../../../shared/src/countAssertions.js'
+import { classifyOpinion, evidenceForTopic } from '../../../shared/src/opinionTopics.js'
+import { canonicalizeSupportedFootballOpinion } from '../../../shared/src/localization.js'
 import type {
   InterpretationContext,
   InterpretationProvider,
@@ -87,6 +95,29 @@ function parsePassCompletionAssertion(
 
 }
 
+const COMPLETED_PASS_COUNT =
+  /\b(?:pass completions|complet(?:e|ed|es)\s+(?:(?:more|fewer|less|as\s+many|the\s+same\s+number\s+of)\s+)?passes|(?:more|fewer|less|as\s+many|the\s+same\s+number\s+of)\s+completed\s+passes|completed\s+passes|pass completion counts?)\b/i
+
+/** Team comparison of completed-pass counts (not attempts or completion percentage). */
+function parseCompletedPassCount(text: string): ParsedComparisonRequest | undefined {
+  if (!COMPLETED_PASS_COUNT.test(text)) return undefined
+  const teams = orderedTeams(text)
+  if (teams.length !== 2 || teams[0] === teams[1]) return undefined
+  const asMany = /\b(?:as\s+many|the\s+same\s+number\s+of)\b/i.test(text)
+  const negated = /\b(?:did\s+not|didn['’]t|not)\b/i.test(text)
+  const operator = asMany
+    ? negated ? 'not-equal' : 'equal'
+    : comparisonOperator(text)
+  if (!operator) return undefined
+  return {
+    subject: teams[0],
+    opponent: teams[1],
+    metric: 'pass-completions',
+    intent: 'factual-claim',
+    operator,
+  }
+}
+
 function normalizeName(value: string): string {
   return value
     .replace(/[Øø]/g, (letter) => letter.toLowerCase() === 'ø' ? 'o' : 'O')
@@ -100,21 +131,53 @@ function mentionedPlayers(
   players: InterpretationContext['players'],
 ): PlayerEntityReference[] {
   const normalizedText = ` ${normalizeName(text).replace(/[’']/g, ' ')} `
+  const spansOf = (name: string) => {
+    const normalizedName = normalizeName(name)
+    const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const expression = new RegExp(
+      `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+      'gu',
+    )
+    return [...normalizedText.matchAll(expression)].map(({ index }) => ({
+      start: index!,
+      end: index! + normalizedName.length,
+    }))
+  }
+  const fullNameSpans = players.flatMap((player) =>
+    normalizeName(player.name).split(/\s+/).length > 1
+      ? spansOf(player.name).map((span) => ({ playerId: player.id, ...span }))
+      : [],
+  )
+  const coveredByAnotherFullName = (
+    span: { start: number; end: number },
+    playerId: string,
+  ) =>
+    fullNameSpans.some(
+      (fullName) =>
+        fullName.playerId !== playerId &&
+        span.start >= fullName.start &&
+        span.end <= fullName.end,
+    )
   const strongMatches = players.filter((player) => {
     const parts = normalizeName(player.name).split(/\s+/)
-    const fullName = normalizeName(player.name)
-    return normalizedText.includes(` ${fullName} `) ||
-      (parts.length > 1 && normalizedText.includes(` ${parts[parts.length - 1]} `)) ||
-      (parts.length === 1 && normalizedText.includes(` ${parts[0]} `))
+    const fullNameMatches = spansOf(player.name)
+    if (fullNameMatches.length > 0) return true
+    const shortNameMatches = spansOf(parts[parts.length - 1])
+    return shortNameMatches.some(
+      (span) => !coveredByAnotherFullName(span, player.id),
+    )
   })
   const stronglyResolvedFirstNames = new Set(
     strongMatches.map(({ name }) => normalizeName(name).split(/\s+/)[0]),
   )
   const firstNameMatches = players.filter((player) => {
     const firstName = normalizeName(player.name).split(/\s+/)[0]
+    const firstNameMatches = spansOf(firstName)
     return (
       !stronglyResolvedFirstNames.has(firstName) &&
-      normalizedText.includes(` ${firstName} `) &&
+      firstNameMatches.some(
+        (span) => !coveredByAnotherFullName(span, player.id),
+      ) &&
       normalizeName(player.name).split(/\s+/).length > 1
     )
   })
@@ -129,7 +192,7 @@ function playerComparisonMetric(text: string): ClaimMetric | undefined {
   if (/\b(?:running distance|ran\s+(?:farther|further)|covered\s+more\s+ground)\b/i.test(text)) {
     return 'running-distance'
   }
-  if (/\b(?:pass completions|completed\s+(?:(?:more|fewer|less)\s+)?passes|pass completion counts?)\b/i.test(text)) {
+  if (COMPLETED_PASS_COUNT.test(text)) {
     return 'pass-completions'
   }
   if (/\b(?:pass(?:es)?\s+completion(?:\s+(?:percentage|rate))?|passing\s+accuracy|percentage\s+of\s+(?:(?:their|his|her)\s+)?passes|completion\s+rates?)\b/i.test(text)) {
@@ -177,7 +240,9 @@ function playerMentionPosition(text: string, player: PlayerEntityReference): num
   const positions = names
     .map((name) => normalizedText.search(new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)))
     .filter((position) => position >= 0)
-  return positions.length ? Math.min(...positions) : Number.POSITIVE_INFINITY
+  if (positions.length) return Math.min(...positions)
+  const firstName = normalizeName(player.name).split(/\s+/)[0]
+  return normalizedText.search(new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
 }
 
 function parsePlayerComparison(
@@ -188,6 +253,9 @@ function parsePlayerComparison(
   opponentPlayer: PlayerEntityReference
 } | undefined {
   if (mentions.length !== 2) {
+    return undefined
+  }
+  if (playerMentionPosition(text, mentions[0]) === playerMentionPosition(text, mentions[1])) {
     return undefined
   }
 
@@ -251,7 +319,8 @@ function playerMetricRequest(
   if (/\b(?:how\s+far|running\s+distance|distance\s+covered|how\s+much\s+ground)\b/i.test(text)) {
     return { metric: 'running-distance', intent: 'unavailable-metric' }
   }
-  const request = /\bhow\s+many\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|passes|recoveries|pressure observations|pressures)\b/i.exec(text)
+  const request = /\bhow\s+many\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|passes|recoveries|pressure observations|pressures)\b/i.exec(text) ??
+    /(?:['’]s|\b(?:his|their))\s+(shots\s+on\s+target|shots|goals|pass attempts|pass completions|pass completion|passes|recoveries|pressure observations)\b/i.exec(text)
   const minutesRequest = /\bhow\s+many\s+minutes\b|\bhow\s+long\b/i.test(text)
   if (!request && minutesRequest) {
     return { metric: 'minutes-played', intent: 'statistical-request' }
@@ -269,9 +338,13 @@ function playerMetricRequest(
             ? 'recoveries'
             : phrase === 'pressure observations' || phrase === 'pressures'
               ? 'pressure-observations'
-              : phrase === 'pass attempts' || phrase === 'passes'
+              : phrase === 'passes' && /\bcomplete\b/i.test(text)
+                ? 'pass-completions'
+                : phrase === 'pass attempts' || phrase === 'passes'
                 ? 'pass-attempts'
-                : 'pass-completions'
+                : phrase === 'pass completion'
+                  ? 'pass-completion-percentage'
+                  : 'pass-completions'
   return { metric, intent: 'statistical-request' }
 }
 
@@ -331,7 +404,7 @@ function parseRunningDistanceComparison(
   const teams = orderedTeams(text)
   if (
     teams.length !== 2 ||
-    !/\b(?:ran\s+(?:farther|further)|running\s+distance|covered\s+more\s+ground)\b/i.test(text)
+    !/\b(?:ran\s+(?:more|less|farther|further)|running\s+distance|covered\s+(?:more|less|greater|further|farther)\s+(?:distance|ground)|distance\s+covered)\b/i.test(text)
   ) {
     return undefined
   }
@@ -351,7 +424,10 @@ function meaningCategory(text: string): ClaimMeaningCategory {
     return 'coaching-question'
   }
   if (/against the run of play/i.test(text)) return 'historical-circumstance'
-  if (/\bscor(?:e|es|ed)\s+before\s+half[- ]time\b/i.test(text)) {
+  if (
+    /\bscor(?:e|es|ed)\s+(?:before|by)\s+half[- ]time\b/i.test(text) ||
+    /\bscor(?:e|es|ed)\b[^.]*\b(?:in|during)\s+the\s+first\s+half\b/i.test(text)
+  ) {
     return 'historical-circumstance'
   }
   if (/\b(?:control(?:led)?|possession|dominat(?:ed|es)?|luck(?:y)?|deserv(?:ed)?|played|perform(?:ed|ance)?|comfortable|better|worse)\b/i.test(text)) {
@@ -444,33 +520,197 @@ function resolveSubject(
 }
 
 function clarificationQuestion(text: string): string {
-  const pronoun = /\b(them|they|their|he|she|him|her)\b/i.exec(text)?.[1]
+  const pronoun = /\b(them|they|their|he|she|him|her|his)\b/i.exec(text)?.[1]
+  if (pronoun && /^(?:he|she|him|her|his)$/i.test(pronoun)) {
+    return `Which player does “${pronoun.toLowerCase()}” refer to in this claim?`
+  }
   if (pronoun) {
     return `Which team does “${pronoun.toLowerCase()}” refer to in this claim?`
   }
   return 'Which team is this claim about?'
 }
 
+type GoalReference =
+  | { goal: MatchEvent }
+  | { goal?: undefined; clarification: string }
+
+function goalLabel(goal: MatchEvent): string {
+  return `${goal.team} ${formatMatchClock(goal.clock)}`
+}
+
+/**
+ * Resolves "before the goal" against goals recorded up to the selected time.
+ * A bare "the goal" is accepted only when exactly one goal exists; otherwise the
+ * user is asked which goal, rather than silently choosing one.
+ */
+function resolveReferencedGoal(
+  text: string,
+  events: MatchEvent[],
+): GoalReference | undefined {
+  const groups = GOAL_PHRASE.exec(text)?.groups
+  if (!groups) return undefined
+  const goals = events.filter(
+    (event) => event.type === 'shot' && event.outcome === 'goal',
+  )
+  if (goals.length === 0) {
+    return {
+      clarification:
+        'No goal is recorded at or before the selected match time, so “before the goal” has nothing to anchor to.',
+    }
+  }
+  const which = groups.which?.toLowerCase().replace(/\s+/g, ' ')
+  const noun = groups.noun.toLowerCase()
+  if (which === 'first' || which === 'opening' || noun === 'opener') {
+    return { goal: goals[0] }
+  }
+  if (which === 'last' || which === 'latest' || which === 'most recent') {
+    return { goal: goals[goals.length - 1] }
+  }
+  if (/^equali[sz]er$/.test(noun)) {
+    const score: Record<MatchTeam, number> = { Northbridge: 0, Eastport: 0 }
+    const equalisers: MatchEvent[] = []
+    for (const goal of goals) {
+      const behind = score[goal.team] < score[goal.team === 'Northbridge' ? 'Eastport' : 'Northbridge']
+      score[goal.team] += 1
+      if (behind && score.Northbridge === score.Eastport) equalisers.push(goal)
+    }
+    if (equalisers.length === 1) return { goal: equalisers[0] }
+    return {
+      clarification: equalisers.length === 0
+        ? 'No equaliser is recorded at or before the selected match time. Name the goal you mean, for example “before Eastport scored”.'
+        : `Which equaliser do you mean: ${equalisers.map(goalLabel).join(' or ')}?`,
+    }
+  }
+  if (goals.length === 1) return { goal: goals[0] }
+  return {
+    clarification: `Which goal do you mean by “before the goal”: ${goals.map(goalLabel).join(' or ')}? Name the scorer, for example “before Eastport scored”.`,
+  }
+}
+
+const COUNT_EVIDENCE: Record<'shots' | 'shots-on-target' | 'goals', EvidenceKind> = {
+  shots: 'shots',
+  'shots-on-target': 'shots-on-target',
+  goals: 'goals',
+}
+
+function describeAssertion(assertion: CountAssertion): string {
+  if (assertion.kind !== 'universal') {
+    const who = assertion.player?.name ?? assertion.team
+    return `Whether ${who}'s recorded ${assertion.metric.replaceAll('-', ' ')} count is ${assertion.kind === 'none' ? 'zero' : 'greater than zero'} in the claim's evidence window.`
+  }
+  const quantifier = assertion.quantifier === 'every'
+    ? assertion.negated
+      ? 'not every'
+      : 'every'
+    : 'none of'
+  return `Whether ${quantifier} one of ${assertion.team}'s recorded shots in the selected period was on target; evaluated against all of that team's recorded shots.`
+}
+
+/**
+ * Single-team zero/universal count assertions and shot-position wording.
+ * Shot records carry no coordinates or zone, so position wording is an explicit
+ * unrecorded-data claim rather than a substitute shot count.
+ */
+function assertionClaimFromText(
+  text: string,
+  index: number,
+  context: InterpretationContext,
+  forcedPlayer?: PlayerEntityReference,
+): InterpretedClaim | undefined {
+  const players = forcedPlayer ? [forcedPlayer] : mentionedPlayers(text, context.players)
+  const player = players.length === 1 ? players[0] : null
+  const assertion = parseCountAssertion(text, player)
+  const base = {
+    id: `claim-${index + 1}`,
+    playerSubject: null,
+    playerMetric: null,
+    text,
+    timePeriod: { kind: 'selected' as const },
+    historicalEventAnchor: null,
+  }
+  if (assertion) {
+    return {
+      ...base,
+      subject: assertion.team,
+      playerSubject: assertion.player ?? null,
+      playerMetric: assertion.player && assertion.kind !== 'universal' ? assertion.metric : null,
+      intent: 'factual-claim',
+      meaning: {
+        category: 'other',
+        description: describeAssertion(assertion),
+        comparison: null,
+      },
+      requiredEvidence:
+        assertion.kind !== 'universal'
+          ? [COUNT_EVIDENCE[assertion.metric]]
+          : ['shots', 'shots-on-target'],
+      clarificationNeeds: [],
+    }
+  }
+  if (!mentionsShotLocation(text)) return undefined
+  const teams = TEAMS.filter((team) =>
+    new RegExp(`\\b${team}\\b`, 'i').test(text),
+  )
+  const subject = player?.team ?? (teams.length === 1 ? teams[0] : null)
+  return {
+    ...base,
+    subject,
+    playerSubject: player,
+    intent: 'unavailable-metric',
+    meaning: {
+      category: 'other',
+      description: 'Where shots were taken from (inside or outside the box) is not a recorded field.',
+      comparison: null,
+    },
+    requiredEvidence: ['shot-location'],
+    clarificationNeeds: subject ? [] : ['Which team’s shots do you mean?'],
+  }
+}
+
 function claimFromText(
   text: string,
   index: number,
   context: InterpretationContext,
+  forcedPlayer?: PlayerEntityReference,
 ): InterpretedClaim {
-  const playerMentions = mentionedPlayers(text, context.players)
+  const referencedGoal = resolveReferencedGoal(text, context.events)
+  const assertionClaim = assertionClaimFromText(
+    referencedGoal ? text.replace(GOAL_PHRASE, '').trim() : text,
+    index,
+    context,
+    forcedPlayer,
+  )
+  if (assertionClaim) {
+    return {
+      ...assertionClaim,
+      text,
+      ...(referencedGoal?.goal ? {
+        timePeriod: { kind: 'before-event', eventId: referencedGoal.goal.id },
+        historicalEventAnchor: {
+          eventId: referencedGoal.goal.id,
+          relationship: `Goal by ${referencedGoal.goal.team} at ${formatMatchClock(referencedGoal.goal.clock)}`,
+        },
+      } : referencedGoal ? { clarificationNeeds: [referencedGoal.clarification] } : {}),
+    }
+  }
+  const playerMentions = forcedPlayer
+    ? [forcedPlayer]
+    : mentionedPlayers(text, context.players)
   const playerComparison = parsePlayerComparison(text, playerMentions)
   const passRequest = parsePassCompletionRequest(text)
   const passAssertion = parsePassCompletionAssertion(text)
   const runningDistance = parseRunningDistanceComparison(text)
   const singleStatistic = parseSingleStatisticRequest(text)
-  const metricComparison = passRequest ?? passAssertion ?? runningDistance
+  const completedPasses = playerComparison ? undefined : parseCompletedPassCount(text)
+  const metricComparison = passRequest ?? passAssertion ?? completedPasses ?? runningDistance
   const parsedClaim = metricComparison || singleStatistic
     ? undefined
-    : interpretClaim(text).claims[0]
+    : interpretClaim(text.replace(GOAL_PHRASE, '')).claims[0]
   const playerSubject = playerComparison?.subjectPlayer ??
     (playerMentions.length === 1 ? playerMentions[0] : null)
   const requestedPlayerMetric = playerComparison
     ? undefined
-    : playerMetricRequest(text, playerSubject !== null)
+    : playerMetricRequest(text, playerSubject !== null || playerMentions.length > 1)
   const subject =
     playerSubject?.team ??
     metricComparison?.subject ??
@@ -528,9 +768,10 @@ function claimFromText(
       ? `Compare ${playerComparison.subjectPlayer.name} and ${playerComparison.opponentPlayer.name} on recorded ${metric.replaceAll('-', ' ')} in the selected period.`
       : `Whether ${playerComparison.subjectPlayer.name}'s recorded ${metric.replaceAll('-', ' ')} value ${relation} ${playerComparison.opponentPlayer.name}'s.`
   } else if (requestedPlayerMetric) {
+    const requestedPlayer = playerSubject?.name ?? 'the named player'
     description = requestedPlayerMetric.metric === 'running-distance'
-      ? `Running distance for ${playerSubject?.name} is not recorded in this fixture.`
-      : `Report ${requestedPlayerMetric.metric.replaceAll('-', ' ')} for ${playerSubject?.name} from selected synthetic records.`
+      ? `Running distance for ${requestedPlayer} is not recorded in this fixture.`
+      : `Report ${requestedPlayerMetric.metric.replaceAll('-', ' ')} for ${requestedPlayer} from selected synthetic records.`
   } else if (metricComparison) {
     metric = metricComparison.metric
     comparison = {
@@ -540,12 +781,14 @@ function claimFromText(
       operator:
         passRequest
           ? 'comparison-request'
-          : passAssertion?.operator ?? 'greater-than',
+          : metricComparison.operator ?? 'greater-than',
     }
     category = 'factual-comparison'
     intent = metricComparison.intent
     description = passRequest
       ? 'Compare both teams’ recorded pass attempts, completions, and completion percentages in the selected period.'
+      : completedPasses
+        ? `${completedPasses.subject}'s recorded completed passes (a count, not attempts or completion percentage) compared with ${completedPasses.opponent}'s: ${completedPasses.operator}.`
       : passAssertion
         ? `${metricComparison.subject}'s recorded pass completion percentage is ${passAssertion.operator === 'less-than' ? 'lower' : 'higher'} than ${metricComparison.opponent}'s.`
         : `${metricComparison.subject} ran farther than ${metricComparison.opponent}; compare running distance.`
@@ -565,6 +808,31 @@ function claimFromText(
     description = parsedClaim.summary
   }
 
+  const topic =
+    !comparison &&
+    !playerComparison &&
+    !singleStatistic &&
+    !metricComparison &&
+    !requestedPlayerMetric &&
+    parsedClaim?.kind !== 'comparison' &&
+    category !== 'coaching-question' &&
+    category !== 'historical-circumstance'
+      ? classifyOpinion(text)
+      : undefined
+  if (topic && topic.topic === 'physical-condition') {
+    category = 'other'
+    intent = 'unavailable-metric'
+    description = `${playerSubject?.name ?? subject ?? 'The side'}'s physical condition (fitness, injury, exertion) is not recorded in this fixture.`
+  } else if (topic && topic.topic !== 'prediction') {
+    category = 'performance-judgement'
+    intent = 'subjective-judgement'
+    description = text
+  } else if (topic) {
+    category = 'other'
+    intent = 'unrecognized-language'
+    description = 'A prediction about what happens next cannot be checked against recorded events.'
+  }
+
   if (
     !comparison &&
     !singleStatistic &&
@@ -577,6 +845,9 @@ function claimFromText(
     description = 'The local interpreter cannot reliably identify this football statistic or comparison.'
   }
 
+  if (forcedPlayer) {
+    description = `${description} (assessed separately for ${forcedPlayer.name}, ${forcedPlayer.team})`.slice(0, 300)
+  }
   const categoryForText = category
   const namedScorer = /against the run of play/i.test(text) && playerSubject
     ? playerSubject
@@ -589,7 +860,9 @@ function claimFromText(
     /\bbefore\s+(?:Northbridge|Eastport)\s+scored\b/i.test(text) ||
     /\bbefore\s+(?:[\p{L}][\p{L}'’.-]*\s+){0,2}scored\b/iu.test(text)
   const anchorTeam = namedScorer?.team ?? beforeGoalTeam ?? subject
-  const goalReference = hasHistoricalGoalScope
+  const goalReference = referencedGoal
+    ? referencedGoal.goal
+    : hasHistoricalGoalScope
     ? findGoalAnchor(
         context.events,
         anchorTeam,
@@ -608,6 +881,18 @@ function claimFromText(
   const clarificationNeeds: string[] = []
   const comparisonPrompt =
     /\b(?:compare|comparison|than|versus|vs\.?)\b/i.test(text)
+  const namedTeams = TEAMS.filter((team) => new RegExp(`\\b${team}\\b`, 'i').test(text))
+  if (
+    !comparison &&
+    /\b(?:than|versus|vs\.?|compared\s+(?:with|to))\b/i.test(text) &&
+    /\b(?:shots?|goals?|possession|passes|passing|completion|accuracy|recoveries|distance|minutes)\b/i.test(text) &&
+    namedTeams.length < 2 &&
+    playerMentions.length < 2
+  ) {
+    clarificationNeeds.push(
+      'I cannot resolve both sides of this comparison. Which two teams or players from this fixture do you mean?',
+    )
+  }
   if (
     playerMentions.length > 1 &&
     !playerComparison &&
@@ -628,6 +913,11 @@ function claimFromText(
   }
   if (!subject && category !== 'coaching-question' && playerMentions.length < 2) {
     clarificationNeeds.push(clarificationQuestion(text))
+  }
+  if (referencedGoal?.goal) {
+    description = `${description} Counts recorded play strictly before the ${goalLabel(referencedGoal.goal)} goal, which is excluded.`
+  } else if (referencedGoal) {
+    clarificationNeeds.push(referencedGoal.clarification)
   }
   if (hasHistoricalGoalScope && !goalReference) {
     clarificationNeeds.push(
@@ -671,7 +961,11 @@ function claimFromText(
       description,
       comparison,
     },
-    requiredEvidence: requestedPlayerMetric
+    requiredEvidence: topic && topic.topic !== 'prediction'
+      ? evidenceForTopic(topic.topic, playerSubject !== null)
+      : topic
+        ? ['attacking-events']
+      : requestedPlayerMetric
       ? requiredEvidence(text, requestedPlayerMetric.metric)
       : playerSubject &&
         /\b(?:how\s+did|how\s+has|performance|perform(?:ed)?)\b/i.test(text)
@@ -699,10 +993,29 @@ export class LocalInterpretationProvider implements InterpretationProvider {
     opinion: string,
     context: InterpretationContext,
   ): Promise<unknown> {
+    const locallyInterpretableOpinion = canonicalizeSupportedFootballOpinion(opinion)
+    const claims = splitOpinion(locallyInterpretableOpinion).flatMap((text) => {
+      const mentions = mentionedPlayers(text, context.players)
+      const sharedJudgement =
+        mentions.length >= 2 &&
+        mentions.length <= 4 &&
+        new Set(mentions.map((player) => playerMentionPosition(text, player))).size === mentions.length &&
+        !/\b(?:compare|comparison|than|versus|vs\.?)\b/i.test(text) &&
+        !parseCountAssertion(text) &&
+        !mentionsShotLocation(text) &&
+        classifyOpinion(text) !== undefined
+      // One judgement about several named players is assessed separately for each.
+      return sharedJudgement
+        ? [...mentions]
+            .sort((a, b) => playerMentionPosition(text, a) - playerMentionPosition(text, b))
+            .map((player) => claimFromText(text, 0, context, player))
+        : [claimFromText(text, 0, context)]
+    })
     return {
-      claims: splitOpinion(opinion).map((text, index) =>
-        claimFromText(text, index, context),
-      ),
+      claims: claims.map((claim, index) => ({
+        ...claim,
+        id: `claim-${index + 1}`,
+      })),
     }
   }
 }

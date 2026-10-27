@@ -5,18 +5,20 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type RefObject,
 } from 'react'
 import type {
   AnalysisResponse,
   ClaimResult,
   EvidenceReference,
+  PlayerResolutionOption,
 } from '../../shared/src/apiContracts'
 import {
   formatMatchClock,
   getMatchTimeOptions,
-  TEAMS,
   type AnalysisPeriod,
   type MatchClock,
+  type MatchTeam,
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
@@ -32,12 +34,12 @@ import {
   buildShareCardModel,
   canonicalReply,
   CONTEXT_ONLY_LABEL,
+  blocksToText,
   describeEvidence,
   describePeriodLabel,
   isRoutineLimitation,
   isUnsupportedJudgement,
   shareCardBlocks,
-  shareCardText,
   type ShareCardModel,
 } from './presentation'
 import {
@@ -53,29 +55,56 @@ import {
   type ChangeCard,
   type Comparison,
 } from './investigation'
-import { createBlocksImage, createShareCardImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
+import { createBlocksImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
 import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
-import { getQuestionSuggestions } from './suggestions'
+import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../../shared/src/datasetCatalog'
+import { localizedExample, translateNarrative, translateText } from '../../shared/src/localization'
+import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
+import { LanguageSelector, LocalizedMarkup } from './localization'
+import { useLocalization } from './localizationContext'
 import './App.css'
 import './matchday.css'
 
 const MATCH_TIME_OPTIONS = getMatchTimeOptions()
 const REPLAY_DWELL_MS = 900
 const INITIAL_MATCH_TIME: MatchClock = {
-  period: 2,
-  minute: 57,
+  period: 1,
+  minute: 1,
 }
 
-const KEY_MOMENTS: KeyMoment[] = [
-  { label: '45+3′ · Northbridge goal', clock: { period: 1, minute: 45, stoppageMinutes: 3 } },
-  { label: '57′ · before equaliser', clock: { period: 2, minute: 57 } },
-  { label: '58′ · equaliser', clock: { period: 2, minute: 58 } },
-  { label: '83′ · Eastport lead', clock: { period: 2, minute: 83 } },
-  { label: '90+4′ · full-time', clock: { period: 2, minute: 90, stoppageMinutes: 4 } },
-]
+type RequestOperation =
+  | { kind: 'analysis' }
+  | {
+      kind: 'resolve-player'
+      continuation: string
+      claimId: string
+      playerId: string
+      snapshotId: number
+    }
+  | { kind: 'recheck-resolved-player'; continuation: string }
+
+type SubmittedRequest = {
+  id: number
+  context: SubmissionContext
+  baseline: AnswerSnapshot | null
+  operation: RequestOperation
+}
+
+function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOption {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    'team' in value &&
+    typeof value.team === 'string'
+  )
+}
 
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (typeof value !== 'object' || value === null) return false
@@ -90,6 +119,11 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
     (value.provider === 'local' || value.provider === 'foundry') &&
     'claims' in value &&
     Array.isArray(value.claims) &&
+    (!('playerResolutionContinuation' in value) ||
+      typeof value.playerResolutionContinuation === 'string') &&
+    (!('selectedPlayers' in value) ||
+      (Array.isArray(value.selectedPlayers) &&
+        value.selectedPlayers.every(isPlayerResolutionOption))) &&
     (!('fanReply' in value) || value.fanReply === undefined || typeof value.fanReply === 'string') &&
     'periodEvents' in value &&
     Array.isArray(value.periodEvents) &&
@@ -114,7 +148,17 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
         'playerStatistics' in claim &&
         Array.isArray(claim.playerStatistics) &&
         'playerCalculations' in claim &&
-        Array.isArray(claim.playerCalculations),
+        Array.isArray(claim.playerCalculations) &&
+        (!('reply' in claim) || typeof claim.reply === 'string') &&
+        (!('playerResolution' in claim) ||
+          (typeof claim.playerResolution === 'object' &&
+            claim.playerResolution !== null &&
+            'continuation' in claim.playerResolution &&
+            typeof claim.playerResolution.continuation === 'string' &&
+            'candidates' in claim.playerResolution &&
+            Array.isArray(claim.playerResolution.candidates) &&
+            claim.playerResolution.candidates.length > 1 &&
+            claim.playerResolution.candidates.every(isPlayerResolutionOption))),
     )
   )
 }
@@ -139,38 +183,67 @@ function referenceList(references: EvidenceReference[], roster: Roster) {
           </li>
         ))}
       </ul>
-      <TechnicalRecord references={references} />
+      <TechnicalRecord references={references} roster={roster} />
     </>
   )
 }
 
-function TechnicalRecord({ references }: { references: EvidenceReference[] }) {
+function TechnicalRecord({
+  references,
+  roster,
+}: {
+  references: EvidenceReference[]
+  roster: Roster
+}) {
   return (
-    <details className="technical-record">
-      <summary>Technical record · IDs and original wording</summary>
-      <ul>
-        {references.map((reference) => (
-          <li key={reference.id}><code>{reference.id}</code> · {reference.time} · {reference.team} · {reference.description}</li>
-        ))}
-      </ul>
-    </details>
+    <LocalizedMarkup>
+      <details className="technical-record">
+        <summary>Technical record · IDs and original source wording (English)</summary>
+        <p>The descriptions above are localized. The records below retain original English source wording.</p>
+        <ul>
+          {references.map((reference) => (
+            <li key={reference.id}>
+              <code>{reference.id}</code> · {reference.time} · {reference.team}
+              <p>{describeEvidence(reference.description, roster)}</p>
+              <p>
+                <strong>Original source wording (English):</strong>{' '}
+                <span data-original-source="true">{reference.description}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </LocalizedMarkup>
   )
 }
 
-function metricLabel(metric: string): string {
-  if (metric === 'shots-on-target') return 'shots on target'
-  if (metric === 'possession-percentage') return 'possession'
-  if (metric === 'pass-completion-percentage') return 'pass completion'
-  if (metric === 'pass-attempts') return 'pass attempts'
-  if (metric === 'pass-completions') return 'pass completions'
-  if (metric === 'minutes-played') return 'selected-window minutes'
-  if (metric === 'recoveries') return 'recorded recoveries'
-  if (metric === 'pressure-observations') return 'selected pressure observations'
-  return metric
+function metricLabel(
+  metric: string,
+  language: ReturnType<typeof useLocalization>['language'],
+  value?: number,
+): string {
+  const label = metric === 'shots-on-target' ? 'shots on target'
+    : metric === 'possession-percentage' ? 'possession'
+      : metric === 'pass-completion-percentage' ? 'pass completion'
+        : metric === 'pass-attempts' ? 'pass attempts'
+          : metric === 'pass-completions' ? 'pass completions'
+            : metric === 'minutes-played' ? 'elapsed participation minutes (recorded window; added time included)'
+              : metric === 'recoveries' ? 'recorded recoveries'
+                : metric === 'pressure-observations' ? 'selected pressure observations'
+                  : metric.replaceAll('-', ' ')
+  if (language === 'ar' && value !== undefined && !metric.includes('percentage')) {
+    const countedLabel = translateNarrative(`${value} ${label}`, language)
+    const prefix = `${value} `
+    if (countedLabel.startsWith(prefix)) return countedLabel.slice(prefix.length)
+  }
+  return translateText(label, language)
 }
 
-function evidenceLabel(kind: string): string {
-  return kind.replaceAll('-', ' ')
+function evidenceLabel(
+  kind: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  return translateText(kind.replaceAll('-', ' '), language)
 }
 
 function ClaimCard({
@@ -178,21 +251,25 @@ function ClaimCard({
   index,
   roster,
   take,
+  datasetId,
 }: {
   result: ClaimResult
   index: number
   roster: Roster
   take?: string
+  datasetId: string
 }) {
+  const { language } = useLocalization()
   const claim = result.claim
   const titleId = `claim-result-${index}`
   const contextOnly = isUnsupportedJudgement(result)
   return (
+    <LocalizedMarkup>
     <article className="claim-result" aria-labelledby={titleId}>
       <h3 className="claim-number" id={titleId}>
         Claim {index + 1}
       </h3>
-      <p className="claim-display">{take ?? claim.text}</p>
+      <p className="claim-display" data-original-opinion="true">{take ?? claim.text}</p>
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
@@ -211,7 +288,7 @@ function ClaimCard({
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric)}
+                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
                 </span>
               </p>
             ))}
@@ -221,12 +298,17 @@ function ClaimCard({
           <div className="broad-stats" aria-label="Player statistics">
             {result.playerStatistics.map((statistic) => (
               <p key={`${statistic.playerId}-${statistic.metric}`}>
-                <strong>{statistic.playerName}</strong>
+                <strong>{localizedPlayerName(
+                        datasetId,
+                        statistic.playerId,
+                        statistic.playerName,
+                        language,
+                      )}</strong>
                 <span>
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric)}
+                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
                 </span>
               </p>
             ))}
@@ -262,7 +344,7 @@ function ClaimCard({
               {result.evidenceAvailability.map((item) => (
                 <li key={item.kind} className={item.available ? 'available' : 'unavailable'}>
                   <strong>
-                    {evidenceLabel(item.kind)} · {item.available ? 'available' : 'not recorded'}
+                    {evidenceLabel(item.kind, language)} · {item.available ? 'available' : 'not recorded'}
                   </strong>
                   <span>{item.detail}</span>
                 </li>
@@ -312,7 +394,7 @@ function ClaimCard({
               </div>
             )}
             <section>
-              <h3>All {result.evidence.length} claim evidence references</h3>
+              <h3>{translateNarrative(`All ${result.evidence.length} claim evidence references`, language)}</h3>
               <ul className="claim-reference-list">
                 {result.evidence.map(({ role, reference }) => (
                   <li key={`${role}-${reference.id}`}>
@@ -324,7 +406,10 @@ function ClaimCard({
                   </li>
                 ))}
               </ul>
-              <TechnicalRecord references={result.evidence.map(({ reference }) => reference)} />
+              <TechnicalRecord
+                references={result.evidence.map(({ reference }) => reference)}
+                roster={roster}
+              />
             </section>
           {result.calculations.length > 0 || result.playerCalculations.length > 0 ? (
             <details className="calculation-traces">
@@ -344,13 +429,15 @@ function ClaimCard({
               ))}
               {result.playerCalculations.map((trace) => (
                 <section key={`${trace.playerId}-${trace.metric}`}>
-                  <h4>{trace.playerName} · {trace.metric.replaceAll('-', ' ')}</h4>
+                  <h4>{trace.playerName} · {trace.metric === 'minutes-played' ? 'participation within recorded window' : trace.metric.replaceAll('-', ' ')}</h4>
                   <p>
-                    {trace.metric === 'pass-completion-percentage'
+                    {trace.metric === 'minutes-played'
+                      ? `${trace.value ?? 0} ${translateText('elapsed minutes', language)}`
+                      : trace.metric === 'pass-completion-percentage'
                       ? `${trace.numerator}/${trace.denominator} (${trace.value === null ? 'rate not available' : `${trace.value}%`})`
                       : trace.metric === 'pass-completions'
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
-                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric)}`}
+                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
                   </p>
                   <p>{trace.denominatorDescription}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
@@ -366,17 +453,78 @@ function ClaimCard({
       )}
       </details>
     </article>
+    </LocalizedMarkup>
+  )
+}
+
+function PlayerResolutionPicker({
+  result,
+  busy,
+  requestError,
+  onChoose,
+  onRetry,
+}: {
+  result: ClaimResult
+  busy: boolean
+  requestError: string
+  onChoose: (claimId: string, continuation: string, playerId: string) => void
+  onRetry: () => void
+}) {
+  const { language } = useLocalization()
+  const resolution = result.playerResolution
+  if (!resolution) return null
+  return (
+    <LocalizedMarkup>
+      <section className="player-resolution-picker" aria-label="Player clarification">
+        <p>{translateText('Choose a player', language)}</p>
+        <div className="player-choice-buttons">
+          {resolution.candidates.map((candidate) => (
+            <button
+              className="secondary-button"
+              type="button"
+              key={candidate.id}
+              disabled={busy}
+              onClick={() =>
+                onChoose(result.claim.id, resolution.continuation, candidate.id)
+              }
+            >
+              <bdi dir="auto">{candidate.name}</bdi>
+              <span> · </span>
+              <bdi dir="auto">{candidate.team}</bdi>
+            </button>
+          ))}
+        </div>
+        {busy && (
+          <p role="status">{translateText('Resolving your selection…', language)}</p>
+        )}
+        {requestError && !busy && (
+          <div role="alert">
+            <p>{translateText('Player selection failed.', language)}</p>
+            <details className="msg-evidence">
+              <summary>{translateText('Details', language)}</summary>
+              <p>{translateNarrative(requestError, language)}</p>
+            </details>
+            <button className="secondary-button" type="button" onClick={onRetry}>
+              {translateText('Try again', language)}
+            </button>
+          </div>
+        )}
+      </section>
+    </LocalizedMarkup>
   )
 }
 
 function EvidenceFoundationPanel({
   foundation,
+  selectedPeriodLabel,
 }: {
   foundation: AnalysisResponse['evidenceFoundation']
+  selectedPeriodLabel: string
 }) {
   const roster = foundation.players
   const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   return (
+    <LocalizedMarkup>
     <details className="evidence-foundation">
       <summary className="foundation-summary">
         <div>
@@ -391,7 +539,7 @@ function EvidenceFoundationPanel({
         contested play and time out of play are excluded.
       </p>
       <div className="advanced-team-grid">
-        {TEAMS.map((team) => {
+        {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => {
           const metrics = foundation.teams[team]
           const lossValues = Object.values(metrics.possessionLosses)
           const lossCount = lossValues.some((value) => value === null)
@@ -519,7 +667,7 @@ function EvidenceFoundationPanel({
       </details>
       <details className="all-references">
         <summary>View fictional matchday squads and participation</summary>
-        {TEAMS.map((team) => (
+        {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => (
           <section key={team}>
             <h3>{team} · starting XI</h3>
             <ol className="interval-list">
@@ -528,7 +676,7 @@ function EvidenceFoundationPanel({
                 .map((player) => (
                   <li key={player.id}>
                     <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <span>{player.minutesInWindow} elapsed participation minutes within {selectedPeriodLabel} (added time included) · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -539,7 +687,7 @@ function EvidenceFoundationPanel({
                 .map((player) => (
                   <li key={player.id}>
                     <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <span>{player.minutesInWindow} elapsed participation minutes within {selectedPeriodLabel} (added time included) · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -548,6 +696,7 @@ function EvidenceFoundationPanel({
       </details>
       </div>
     </details>
+    </LocalizedMarkup>
   )
 }
 
@@ -594,8 +743,10 @@ function WhatChanged({
   shareReady: boolean
 }) {
   const { earlier, later, result } = comparison
+  const { language } = useLocalization()
   const separate = result.status !== 'comparable'
   return (
+    <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
       <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
       <p className="change-headline">{result.headline}</p>
@@ -623,7 +774,7 @@ function WhatChanged({
       {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
       {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
-        <summary>Earlier answer · {result.earlierTime} · {earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</summary>
+        <summary>{translateNarrative(`Earlier answer · ${result.earlierTime} · ${earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}`, language)}</summary>
         <p className="server-summary">{snapshotReply(earlier)}</p>
         {checkedAgainst(earlier.analysis).length > 0 && <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(earlier.analysis).join('; ')}</p>}
         <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
@@ -638,22 +789,178 @@ function WhatChanged({
           </div>
           <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
             {changeCard.blocks.map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
       )}
     </section>
+    </LocalizedMarkup>
   )
 }
 
-function App() {
+function scopePeriod(period: AnalysisPeriod): string {
+  return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+}
+
+function localizedShareModel(
+  model: ShareCardModel,
+  language: ReturnType<typeof useLocalization>['language'],
+  datasetId: string,
+): ShareCardModel {
+  return {
+    ...model,
+    scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language),
+    answer: localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
+    claims: model.claims.map((claim) => ({
+      ...claim,
+      text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
+      verdict: claim.verdict ? localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language) : null,
+      facts: claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      moments: claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      limitations: claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+    })),
+    footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
+  }
+}
+
+function localizedShareCardBlocks(
+  model: ShareCardModel,
+  language: ReturnType<typeof useLocalization>['language'],
+  datasetId: string,
+) {
+  return shareCardBlocks(model).map((block) => ({
+    ...block,
+    text: block.kind === 'take'
+      ? block.text
+      : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
+  }))
+}
+
+// One question and its reply, frozen at the minute and period it was asked.
+function TurnMessages({
+  turn,
+  view,
+  messageRef,
+  onResolvePlayer,
+  onRetryPlayerSelection,
+  isResolving,
+  requestError,
+  datasetId,
+}: {
+  turn: AnswerSnapshot
+  view: 'fan' | 'analyst'
+  datasetId: string
+  messageRef?: RefObject<HTMLDivElement | null>
+  onResolvePlayer: (claimId: string, continuation: string, playerId: string) => void
+  onRetryPlayerSelection: () => void
+  isResolving: boolean
+  requestError: string
+}) {
+  const { language } = useLocalization()
+  const { analysis, context } = turn
+  const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
+  const checked = checkedAgainst(analysis)
+  const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
+  const evidenceClaims = analysis.claims
+    .map((result, index) => ({ result, index }))
+    .filter(({ result }) => !result.playerResolution)
+  const answeredReplies = analysis.claims
+    .filter(({ playerResolution }) => !playerResolution)
+    .map(({ reply }) => reply)
+    .filter((reply): reply is string => Boolean(reply))
+  const notes = analysis.claims.flatMap((result) => [
+    ...(!result.playerResolution
+      ? result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' }))
+      : []),
+    ...(!result.playerResolution && !isRoutineLimitation(result)
+      ? [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]
+      : []),
+  ])
+  return (
+    <LocalizedMarkup>
+    <>
+      <div className="msg msg-user">
+        <p className="msg-label">{translateText('You', language)} · {translateText('Original wording', language)} · {scope}</p>
+        <p className="msg-text" data-original-opinion="true" dir="auto">{context.opinion}</p>
+      </div>
+      <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
+        <p className="msg-label">Groupchat Analyst · {scope}</p>
+        {(playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis)) && (
+          <p className="msg-text">
+            {translateNarrative(
+              playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis),
+              language,
+            )}
+          </p>
+        )}
+        {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
+          <ul className="msg-claims" aria-label="Claims in this opinion">
+            {evidenceClaims.map(({ result, index }) => (
+              <li key={result.claim.id}>
+                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}>{result.assessment}</span>
+                <span>Claim {index + 1}: {result.claim.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join('; ')}</p>}
+        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
+        {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
+        {playerChoices.map((result) => (
+          <PlayerResolutionPicker
+            key={result.claim.id}
+            result={result}
+            busy={isResolving}
+            requestError={requestError}
+            onChoose={onResolvePlayer}
+            onRetry={onRetryPlayerSelection}
+          />
+        ))}
+        {evidenceClaims.length > 0 && (
+          <details className="msg-evidence" key={view} open={view === 'analyst'}>
+            <summary>How this was checked</summary>
+            <div className="claim-result-list">
+              {evidenceClaims.map(({ result, index }) => (
+                <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} datasetId={datasetId} />
+              ))}
+            </div>
+          </details>
+        )}
+        <p className="msg-attribution">
+          {translateText('Fictional match', language)} · {translateText(
+            analysis.provider === 'local'
+              ? 'Local rules · no model connection'
+              : 'Foundry · server-side interpretation',
+            language,
+          )}
+        </p>
+        {analysis.selectedPlayers && analysis.selectedPlayers.length > 0 && (
+          <p className="msg-attribution">
+            {translateText('Player selected by you; no additional model call was made.', language)}
+          </p>
+        )}
+      </div>
+    </>
+    </LocalizedMarkup>
+  )
+}
+
+export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; autoDemo?: boolean }) {
+  const { language } = useLocalization()
+  const dataset = findCatalogEntry(datasetId)!
+  const KEY_MOMENTS: KeyMoment[] = dataset.moments
+  const isBaseline = datasetId === BASELINE_DATASET_ID
   const replay = useMemo(
     () =>
-      new ReplayController(MATCH_TIME_OPTIONS, INITIAL_MATCH_TIME, fetchReplayFrame, {
-        dwellMs: REPLAY_DWELL_MS,
-      }),
-    [],
+      new ReplayController(
+        MATCH_TIME_OPTIONS,
+        INITIAL_MATCH_TIME,
+        (clock, signal) => fetchReplayFrame(clock, signal, datasetId, dataset.teams),
+        { dwellMs: REPLAY_DWELL_MS },
+      ),
+    [datasetId, dataset.teams],
   )
   const replaySnapshot = useSyncExternalStore(
     replay.subscribe,
@@ -663,13 +970,10 @@ function App() {
   const selectedClock = replaySnapshot.requested
   const [period, setPeriod] = useState<AnalysisPeriod>('match-so-far')
   const [opinion, setOpinion] = useState('')
-  const [submittedRequest, setSubmittedRequest] = useState<{
-    id: number
-    context: SubmissionContext
-    baseline: AnswerSnapshot | null
-  } | null>(null)
-  // The last successful answer is an immutable snapshot; failed requests never replace it.
-  const [shown, setShown] = useState<AnswerSnapshot | null>(null)
+  const [submittedRequest, setSubmittedRequest] = useState<SubmittedRequest | null>(null)
+  // Successful turns are immutable snapshots in order; failed requests never replace or reorder them.
+  const [transcript, setTranscript] = useState<AnswerSnapshot[]>([])
+  const shown = transcript.length > 0 ? transcript[transcript.length - 1] : null
   const [comparisonState, setComparisonState] = useState<{
     earlier: AnswerSnapshot
     later: AnswerSnapshot
@@ -683,7 +987,8 @@ function App() {
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
   const [view, setView] = useState<'fan' | 'analyst'>('fan')
   const analysisRequestId = useRef(0)
-  const answerRef = useRef<HTMLElement>(null)
+  const resolutionRequestId = useRef<number | null>(null)
+  const answerRef = useRef<HTMLDivElement>(null)
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
   const submittedOpinion = submittedContext?.opinion ?? ''
@@ -694,12 +999,30 @@ function App() {
   const displayedClock = replaySnapshot.displayedClock
   const canCheckAgain = Boolean(
     shown && displayedClock && !isLoadingSubmit &&
+      (!analysis?.claims.some(({ playerResolution }) => playerResolution) ||
+        analysis.playerResolutionContinuation) &&
       isLaterClock(displayedClock, shown.context.selectedClock),
+  )
+  const hasPlayerChoices = Boolean(
+    analysis?.claims.some(({ playerResolution }) => playerResolution),
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(
-    () => (comparison ? buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result) : null),
-    [comparison],
+    () => {
+      if (!comparison) return null
+      const card = buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result)
+      if (!card) return null
+      return {
+        ...card,
+        blocks: card.blocks.map((block) => ({
+          ...block,
+          text: block.kind === 'take'
+            ? block.text
+            : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
+        })),
+      }
+    },
+    [comparison, language, datasetId],
   )
   const hasUnresolvedSubject = Boolean(analysis?.claims.some(({ claim, assessment }) =>
     claim.subject === null && assessment === 'clarification needed'))
@@ -708,21 +1031,31 @@ function App() {
     replaySnapshot.status === 'loading' &&
     (replaySnapshot.displayedClock === null ||
       clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
-  const suggestions = getQuestionSuggestions(selectedClock)
+  const committedClock = replaySnapshot.displayedClock
+  const examples = committedClock
+    ? dataset.examples.filter(({ clock }) => !isLaterClock(clock, committedClock))
+    : []
   const shareModel = useMemo<ShareCardModel | null>(
-    () => (analysis && submittedContext ? buildShareCardModel(submittedContext.opinion, analysis) : null),
-    [analysis, submittedContext],
+    () => (analysis && submittedContext && !hasPlayerChoices
+      ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language, datasetId)
+      : null),
+    [analysis, submittedContext, language, hasPlayerChoices, datasetId],
   )
   const [canNativeShare] = useState(() => supportsFileShare(navigator, new File([''], 'probe.png', { type: 'image/png' })))
   const [demoActive, setDemoActive] = useState(false)
   const sharingRef = useRef(false)
   const singleShare = useMemo(
-    () => (shareModel ? { key: imageKey('single', shareCardBlocks(shareModel)), image: createShareCardImage(shareModel) } : null),
-    [shareModel],
+    () => (shareModel
+      ? {
+          key: imageKey('single', localizedShareCardBlocks(shareModel, language, datasetId)),
+          image: createBlocksImage(localizedShareCardBlocks(shareModel, language, datasetId), language),
+        }
+      : null),
+    [shareModel, language, datasetId],
   )
   const changeShare = useMemo(
-    () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks) } : null),
-    [changeCard],
+    () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks, language) } : null),
+    [changeCard, language],
   )
   const preparedSingle = usePreparedImage(canNativeShare, singleShare?.key ?? null, singleShare?.image ?? null, 'groupchat-analyst-card.png')
   const preparedChange = usePreparedImage(canNativeShare, changeShare?.key ?? null, changeShare?.image ?? null, 'groupchat-analyst-what-changed.png')
@@ -753,7 +1086,22 @@ function App() {
     const active = submittedRequest
     const controller = new AbortController()
     const requestId = active.id
-    const request = createAnalysisRequest(active.context)
+    const request =
+      active.operation.kind === 'resolve-player'
+        ? {
+            action: 'resolve-player',
+            continuation: active.operation.continuation,
+            claimId: active.operation.claimId,
+            playerId: active.operation.playerId,
+          }
+        : active.operation.kind === 'recheck-resolved-player'
+          ? {
+              action: 'recheck-resolved-player',
+              continuation: active.operation.continuation,
+              selectedClock: active.context.selectedClock,
+              period: active.context.period,
+            }
+          : createAnalysisRequest(active.context)
     async function loadAnalysis() {
       setIsLoading(true)
       setRequestError('')
@@ -762,13 +1110,37 @@ function App() {
       try {
         const payload = await requestAnalysis(request, { signal: controller.signal })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
+        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
-          const snapshot = createSnapshot(requestId, active.context, payload)
-          const baseline = active.baseline
-          setShown(snapshot)
-          setComparisonState(
-            baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
-          )
+          if (active.operation.kind === 'resolve-player' && active.baseline) {
+            const snapshot = createSnapshot(
+              active.operation.snapshotId,
+              active.baseline.context,
+              payload,
+            )
+            setTranscript((turns) =>
+              turns.map((turn) => (turn.id === snapshot.id ? snapshot : turn)),
+            )
+            setComparisonState((current) => {
+              if (!current) return current
+              const earlier =
+                current.earlier.id === snapshot.id ? snapshot : current.earlier
+              const later =
+                current.later.id === snapshot.id ? snapshot : current.later
+              return {
+                earlier,
+                later,
+                result: compareSnapshots(earlier, later),
+              }
+            })
+          } else {
+            const snapshot = createSnapshot(requestId, active.context, payload)
+            const baseline = active.baseline
+            setTranscript((turns) => [...turns, snapshot])
+            setComparisonState(
+              baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
+            )
+          }
         }
       } catch (error) {
         if (
@@ -779,6 +1151,12 @@ function App() {
         }
       } finally {
         if (
+          active.operation.kind === 'resolve-player' &&
+          resolutionRequestId.current === requestId
+        ) {
+          resolutionRequestId.current = null
+        }
+        if (
           !controller.signal.aborted &&
           isLatestRequest(requestId, analysisRequestId.current)
         ) {
@@ -788,7 +1166,7 @@ function App() {
     }
     void loadAnalysis()
     return () => controller.abort()
-  }, [submittedRequest])
+  }, [submittedRequest, datasetId])
 
   const [answerBelowFold, setAnswerBelowFold] = useState(false)
 
@@ -827,15 +1205,28 @@ function App() {
     document.getElementById('opinion-input')?.focus()
   }
 
+  function fillExample(example: DatasetExample) {
+    setPeriod(example.period)
+    replay.seek(example.clock)
+    setOpinion(localizeMatchText(localizedExample(example.text, language), datasetId, language))
+    document.getElementById('opinion-input')?.focus()
+  }
+
   // Prepares the demonstration only; submitting stays an explicit user action.
   function startDemo() {
-    if (demo !== 'offer') return
+    if (demo !== 'offer' || !isBaseline) return
     setDemoActive(true)
     setPeriod('match-so-far')
     replay.seek(DEMO_CLOCK)
-    setOpinion(DEMO_TAKE)
+    setOpinion(localizeMatchText(localizedExample(DEMO_TAKE, language), datasetId, language))
     document.getElementById('opinion-input')?.focus()
   }
+
+  useEffect(() => {
+    if (autoDemo && isBaseline) startDemo()
+    // Runs once when the match opens from the home page demonstration link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function shareCard(kind: 'single' | 'change') {
     const target = kind === 'single' ? singleShare : changeShare
@@ -857,13 +1248,12 @@ function App() {
     const trimmedOpinion = opinion.trim()
     if (!trimmedOpinion) return
     const id = ++analysisRequestId.current
-    setShown(null)
-    setComparisonState(null)
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(trimmedOpinion, selectedClock, period),
+      context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId, language),
       baseline: null,
+      operation: { kind: 'analysis' },
     })
   }
 
@@ -874,21 +1264,63 @@ function App() {
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period),
+      context: createSubmissionContext(
+        shown.context.opinion,
+        displayedClock,
+        shown.context.period,
+        datasetId,
+        shown.context.inputLanguage,
+      ),
       baseline: shown,
+      operation: shown.analysis.playerResolutionContinuation
+        ? {
+            kind: 'recheck-resolved-player',
+            continuation: shown.analysis.playerResolutionContinuation,
+          }
+        : { kind: 'analysis' },
+    })
+  }
+
+  function resolvePlayer(
+    claimId: string,
+    continuation: string,
+    playerId: string,
+  ) {
+    if (!shown || resolutionRequestId.current !== null || isLoading) return
+    const id = ++analysisRequestId.current
+    resolutionRequestId.current = id
+    setRequestError('')
+    setSubmittedRequest({
+      id,
+      context: shown.context,
+      baseline: shown,
+      operation: {
+        kind: 'resolve-player',
+        continuation,
+        claimId,
+        playerId,
+        snapshotId: shown.id,
+      },
     })
   }
 
   function retryAnalysis() {
     if (!submittedRequest || isLoading) return
     const id = ++analysisRequestId.current
+    if (submittedRequest.operation.kind === 'resolve-player') {
+      if (resolutionRequestId.current !== null) return
+      resolutionRequestId.current = id
+    }
+    setRequestError('')
     setSubmittedRequest({ ...submittedRequest, id })
   }
 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(canonicalReply(analysis))
+      await navigator.clipboard.writeText(
+        localizeMatchText(translateNarrative(canonicalReply(analysis), language), datasetId, language),
+      )
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -898,7 +1330,9 @@ function App() {
   async function copyShareCard() {
     if (!shareModel) return
     try {
-      await navigator.clipboard.writeText(shareCardText(shareModel))
+      await navigator.clipboard.writeText(
+        blocksToText(localizedShareCardBlocks(shareModel, language, datasetId)),
+      )
       setShareMessage('Card text copied.')
     } catch {
       setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
@@ -940,42 +1374,122 @@ function App() {
   }
 
   function downloadShareCard() {
-    if (shareModel) void downloadImage(createShareCardImage(shareModel), shareModel.extended, 'groupchat-analyst-card')
+    if (shareModel) void downloadImage(createBlocksImage(localizedShareCardBlocks(shareModel, language, datasetId), language), shareModel.extended, 'groupchat-analyst-card')
   }
 
   function downloadChangeCard() {
-    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks), changeCard.extended, 'groupchat-analyst-what-changed')
+    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks, language), changeCard.extended, 'groupchat-analyst-what-changed')
   }
 
-  const claimBreakdown = analysis && (
-    <div className="claim-result-list">
-      {analysis.claims.map((result, index) => <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? submittedOpinion || undefined : undefined} />)}
+  const latestActions = analysis && submittedContext && shown ? (
+    <div className="turn-actions">
+      {demo === 'step-to-next-minute' && (
+        <div className="demo-note" role="status">
+          <span>Same opinion, one minute later in the fictional replay.</span>
+          <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
+        </div>
+      )}
+      {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
+      {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
+      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
+      {opinion.trim() !== submittedOpinion && (
+        <p className="draft-notice">
+          {translateNarrative(
+            opinion.trim()
+              ? 'The latest reply is for the saved opinion above, not the wording now in the box. “Check this moment” submits the edited wording instead.'
+              : 'The latest reply is for the saved opinion above.',
+            language,
+          )}
+        </p>
+      )}
+      {hasMovedSinceAnswer && (
+        <p className="stale-answer-notice" role="status">
+          {translateNarrative(
+            `The latest reply is for ${formatMatchClock(submittedContext.selectedClock)} · ${scopePeriod(submittedContext.period)}. The replay is now at ${formatMatchClock(selectedClock)}; that answer has not been recalculated.`,
+            language,
+          )}
+        </p>
+      )}
+      {canCheckAgain && displayedClock && (
+        <div className="check-again">
+          <button className="secondary-button" type="button" onClick={checkAgain}>
+            {translateNarrative(`Check again at ${formatMatchClock(displayedClock)}`, language)}<ArrowIcon />
+          </button>
+          <span>
+            {translateNarrative(
+              `Same wording, same ${submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option${opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.`,
+              language,
+            )}
+          </span>
+        </div>
+      )}
+      {!hasPlayerChoices && (
+        <div className="share-row">
+          {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
+          <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
+          <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
+          <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
+          <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
+        </div>
+      )}
+      {shareModel && (
+        <details className="share-preview">
+          <summary>Preview share card</summary>
+          <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
+            {localizedShareCardBlocks(shareModel, language, datasetId).map((block, index) => (
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+            ))}
+          </section>
+        </details>
+      )}
     </div>
+  ) : null
+
+  const resolutionOperation =
+    submittedRequest?.operation.kind === 'resolve-player'
+      ? submittedRequest.operation
+      : null
+  const isResolvingShown = Boolean(
+    resolutionOperation &&
+      submittedRequest?.baseline?.id === shown?.id &&
+      isLoading,
   )
+  const pending =
+    submittedRequest &&
+    submittedRequest.operation.kind !== 'resolve-player' &&
+    (isLoading || requestError !== '')
+      ? submittedRequest
+      : null
+  const pendingScope = pending ? `${formatMatchClock(pending.context.selectedClock)} · ${scopePeriod(pending.context.period)}` : ''
 
   return (
+    <LocalizedMarkup datasetId={datasetId}>
     <main className="page-shell analyst-shell" id="main-content">
-      <a className="skip-link" href="#opinion-input">Skip to your take</a>
+      <a className="skip-link" href="#opinion-input">Skip to your opinion</a>
       <header className="site-header">
-        <a className="brand" href="/" aria-label="Groupchat Analyst home">
+        <a className="brand" href="#/" aria-label="Groupchat Analyst home">
           <span className="brand-mark" aria-hidden="true">g<span>.</span></span>
           <span>Groupchat<span className="brand-light">Analyst</span></span>
         </a>
+        <nav className="site-nav" aria-label="Matches"><a href="#/matches">All matches</a></nav>
         <span className="demo-label"><span aria-hidden="true" />Synthetic demo</span>
+        <LanguageSelector />
       </header>
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title">Big takes? <span>Bring the receipts.</span></h1>
-          <p className="intro-description">          <span className="intro-long">Check your group chat’s football takes against the match—then share the evidence.</span><span className="intro-short">Check takes against the match—then share the evidence.</span></p>
-                    {demo === 'offer' && (
-                      <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
-                    )}
-                  </div>
+          <h1 id="page-title"><bdi dir="auto">{dataset.teams[0]} v {dataset.teams[1]}</bdi><span> · {dataset.name}</span></h1>
+          <p className="intro-description">{dataset.scenario}</p>
+          {demo === 'offer' && isBaseline && (
+            <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
+          )}
+        </div>
 
         <div className="workspace-grid">
           <div className="match-column">
             <MatchHeader
+              datasetId={datasetId}
+              teams={dataset.teams}
               timeline={MATCH_TIME_OPTIONS}
               snapshot={replaySnapshot}
               keyMoments={KEY_MOMENTS}
@@ -988,12 +1502,73 @@ function App() {
             />
           </div>
           <div className="conversation-column">
+            <section className="conversation" aria-labelledby="conversation-title">
+              <div className="conversation-head">
+                <h2 id="conversation-title">Conversation</h2>
+                {transcript.length > 0 && (
+                  <div className="segmented-control view-control" role="group" aria-label="Answer detail">
+                    <button type="button" aria-pressed={view === 'fan'} onClick={() => setView('fan')}>Fan</button>
+                    <button type="button" aria-pressed={view === 'analyst'} onClick={() => setView('analyst')}>Analyst</button>
+                  </div>
+                )}
+              </div>
+              <div className="chat-log" role="log" aria-label="Opinions and answers" aria-busy={isLoadingSubmit}>
+                {transcript.length === 0 && !pending && (
+                  <div className="msg msg-bot">
+                    <p className="msg-label">Groupchat Analyst</p>
+                    <p className="msg-text">Pick an example or type an opinion. I’ll check it against this match at the minute you choose.</p>
+                  </div>
+                )}
+                {transcript.map((turn, index) => (
+                  <div className="chat-turn" key={turn.id}>
+                    <TurnMessages
+                      turn={turn}
+                      view={view}
+                      datasetId={datasetId}
+                      messageRef={index === transcript.length - 1 ? answerRef : undefined}
+                      onResolvePlayer={resolvePlayer}
+                      onRetryPlayerSelection={retryAnalysis}
+                      isResolving={isResolvingShown && turn.id === shown?.id}
+                      requestError={
+                        resolutionOperation?.snapshotId === turn.id &&
+                        !isLoading
+                          ? requestError
+                          : ''
+                      }
+                    />
+                    {index === transcript.length - 1 && latestActions}
+                  </div>
+                ))}
+                {pending && (
+                  <div className="chat-turn">
+                    <div className="msg msg-user">
+                      <p className="msg-label">You · {pendingScope}</p>
+                      <p className="msg-text" data-original-opinion="true" dir="auto">{pending.context.opinion}</p>
+                    </div>
+                    {isLoadingSubmit && (
+                      <div className="msg msg-bot" role="status">
+                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />Checking the match…</p>
+                      </div>
+                    )}
+                    {requestError && !isLoadingSubmit && (
+                      <div className="msg msg-bot msg-error" role="alert">
+                        <p className="msg-text">That check didn’t finish. Please try again.</p>
+                        {transcript.length > 0 && <p className="msg-note">Your earlier answer is still above.</p>}
+                        <details className="msg-evidence"><summary>Details</summary><p className="msg-note">{requestError}</p></details>
+                        <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+
             <form className="opinion-form" onSubmit={submitOpinion}>
-              <label className="opinion-label" htmlFor="opinion-input">What’s your take?</label>
+              <label className="opinion-label" htmlFor="opinion-input">Your opinion</label>
               <textarea
                 id="opinion-input" value={opinion} onChange={(event) => setOpinion(event.currentTarget.value)}
-                placeholder="Ask about this moment, e.g. How many shots did Eastport have?"
-                rows={3} required aria-describedby="input-hint"
+                placeholder={`Type an opinion, e.g. How many shots did ${dataset.teams[1]} have?`}
+                rows={3} required aria-describedby="input-hint" dir="auto"
               />
               <div className="composer-bottom">
                 <div className="scope-summary">
@@ -1022,104 +1597,22 @@ function App() {
                   {isLoadingSubmit ? 'Checking…' : isSeeking ? 'Moving…' : 'Check this moment'}<ArrowIcon />
                 </button>
               </div>
-              <div className="suggestions" role="group" aria-label="Suggested questions">
-                <span>Try asking</span>
-                {suggestions.map((question) => (
-                  <button key={question.id} type="button" onClick={() => fillQuestion(question.text)}>{question.text}</button>
-                ))}
-              </div>
-              <p className="input-hint" id="input-hint">Synthetic match: every performance and result is invented.</p>
-              {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the take is read.</p>}
-            </form>
-
-            <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
-              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same take again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
-              {requestError && (
-                <div className="api-error" role="alert">
-                  <strong>We couldn’t check that take.</strong><p>{requestError}</p>
-                  <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
+              {examples.length > 0 && (
+                <div className="suggestions" role="group" aria-label="Example opinions">
+                  <span>Examples (these fill the box; nothing is sent until you check)</span>
+                  {examples.map((example) => {
+                    const text = localizedExample(example.text, language)
+                    return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${translateNarrative(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
+                  })}
                 </div>
               )}
-              {analysis && submittedContext && (
-                <section className="claim-assessments" aria-labelledby="result-title" ref={answerRef} tabIndex={-1}>
-                  <div className="result-title-row">
-                    <h2 id="result-title">The answer</h2>
-                    <div className="segmented-control view-control" role="group" aria-label="Answer detail" aria-describedby="detail-help">
-                      <button type="button" aria-pressed={view === 'fan'} onClick={() => setView('fan')}>Fan</button>
-                      <button type="button" aria-pressed={view === 'analyst'} onClick={() => setView('analyst')}>Analyst</button>
-                    </div>
-                  </div>
-                  <p className="detail-help" id="detail-help">
-                    {view === 'fan'
-                      ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
-                      : 'Analyst view opens the reasoning and evidence' + (needsPassMap(analysis) ? ', plus a pass map' : '') + '. The answer, verdict and limitations are the same as in Fan view.'}
-                  </p>
-                  {demo === 'step-to-next-minute' && (
-                    <div className="demo-note" role="status">
-                      <span>Same take, one minute later in the fictional replay.</span>
-                      <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
-                    </div>
-                  )}
-                  {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
-                  {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same take against the new evidence.</p>}
-                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
-                  <p className="checked-question">{submittedOpinion}</p>
-                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved take above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
-                  {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
-                  {canCheckAgain && displayedClock && (
-                    <div className="check-again">
-                      <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
-                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved take, not your edit' : ''}.</span>
-                    </div>
-                  )}
-                  <p className="server-summary">{canonicalReply(analysis)}</p>
-                  {checkedAgainst(analysis).length > 0 && (
-                    <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(analysis).join('; ')}</p>
-                  )}
-                  <div className="answer-attribution"><span>Synthetic match</span><span>Submitted at {formatMatchClock(submittedContext.selectedClock)}</span><span>{submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</span><span>{analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'}</span></div>
-                  <div className="visible-limitations">
-                    {analysis.claims.flatMap((result) => [
-                      ...result.claim.clarificationNeeds.map((need) => ({
-                        key: `${result.claim.id}-${need}`,
-                        text: need,
-                        title: 'Clarification',
-                      })),
-                      ...(isRoutineLimitation(result)
-                        ? []
-                        : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
-                    ])
-                      .map((item) => <p key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
-                    {analysis.claims.length === 0 && (
-                      <p><strong>Limitation:</strong> The request was not interpreted as a supported claim.</p>
-                    )}
-                  </div>
-                  <div className="share-row">
-                    {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
-                    <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
-                    <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
-                    <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
-                    <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
-                  </div>
-                  {shareModel && (
-                    <details className="share-preview">
-                      <summary>Preview share card</summary>
-                      <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
-                        {shareCardBlocks(shareModel).map((block, index) => (
-                          <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
-                        ))}
-                      </section>
-                    </details>
-                  )}
-                  {analysis.claims.length > 0 ? view === 'fan' ? (
-                    <details className="answer-breakdown"><summary>Check the reasoning <span>{analysis.claims.length} {analysis.claims.length === 1 ? 'claim' : 'claims'}</span></summary>{claimBreakdown}</details>
-                  ) : <div className="analyst-breakdown"><p className="section-label">CLAIMS & EVIDENCE</p>{claimBreakdown}</div>
-                  : <p className="empty-evidence">Try naming a team or player and the part of the match you mean.</p>}
-                </section>
-              )}
-            </div>
+              <p className="input-hint" id="input-hint">Fictional match: every performance and result is invented.</p>
+              {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
+            </form>
+
 
             {analysis && view === 'analyst' && !hasUnresolvedSubject && needsPassMap(analysis) && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
-            {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />}
+            {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} selectedPeriodLabel={analysis.selectedPeriodLabel} />}
             {analysis && !hasUnresolvedSubject && (
               <details className="all-evidence match-events"><summary>Explore match events <span>{analysis.periodEvents.length} recorded</span></summary>{referenceList(analysis.periodEvents, analysis.evidenceFoundation.players)}</details>
             )}
@@ -1129,7 +1622,7 @@ function App() {
                 <label htmlFor="player-select">Fictional matchday squad</label>
                 <select id="player-select" value={selectedPlayerId} onChange={(event) => setSelectedPlayerId(event.currentTarget.value)}>
                   <option value="">Choose a player</option>
-                  {TEAMS.map((team) => <optgroup key={team} label={team}>{analysis.evidenceFoundation.players.filter((player) => player.team === team).map((player) => <option key={player.id} value={player.id}>{player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}</option>)}</optgroup>)}
+                  {(Object.keys(analysis.evidenceFoundation.teams) as MatchTeam[]).map((team) => <optgroup key={team} label={team}>{analysis.evidenceFoundation.players.filter((player) => player.team === team).map((player) => <option key={player.id} value={player.id}>{player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}</option>)}</optgroup>)}
                 </select>
                 <button className="secondary-button" type="button" disabled={!selectedPlayerId} onClick={() => {
                   const player = analysis.evidenceFoundation.players.find(({ id }) => id === selectedPlayerId)
@@ -1144,9 +1637,11 @@ function App() {
         <details className="about-demo">
           <summary>About this demo & its data</summary>
           <div>
-            <p>Northbridge and Eastport are fictional teams using real-player names. Every performance and result is invented.</p>
-            <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
-            <p>The guided demonstration only prepares a fictional 57′ replay and its take; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
+            <p>{`${dataset.teams[0]} and ${dataset.teams[1]} are fictional teams using real-player names. Every performance and result is invented.`}</p>
+            <p>{analysis
+              ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.`
+              : 'The analysis service has not yet reported how it reads questions.'}</p>
+            <p>The guided demonstration only prepares a fictional 57′ replay and its opinion; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
             <p>“Share the receipts” appears only where your browser can share image files. It hands the card image to your device’s share sheet and cannot tell whether anything was sent. Copy and download are always available.</p>
             <p>Match statistics use the selected time and evidence period. Possession uses recorded controlled time only; contested and out-of-play time are excluded. Build-up and pressure observations cover selected samples.</p>
             <p>Player tracking, video, running distance, defensive shape and calibrated expected goals are not recorded. A missing measurement is not a zero.</p>
@@ -1161,7 +1656,6 @@ function App() {
         </div>
       )}
     </main>
+    </LocalizedMarkup>
   )
 }
-
-export default App

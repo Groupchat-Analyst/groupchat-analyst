@@ -4,6 +4,8 @@ import type { MatchReplayResponse } from '../../shared/src/apiContracts'
 
 export type ReplayStatus = 'loading' | 'ready' | 'error'
 
+export const REPLAY_LOAD_ERROR = 'The match could not be loaded.'
+
 export type ReplaySnapshot = {
   /** Where the viewer asked to be. May run ahead of the displayed frame. */
   requested: MatchClock
@@ -42,9 +44,8 @@ const DEFAULT_TIMERS: Timers = {
 }
 
 /**
- * Loads replay frames one at a time. A seek only changes the requested
- * position; the displayed frame changes when the matching frame has arrived.
- * Responses for superseded positions are cached but never displayed.
+ * A seek cancels superseded work. Only the latest request may commit a frame;
+ * late responses are ignored even when the underlying loader cannot abort.
  */
 export class ReplayController {
   private readonly timeline: MatchClock[]
@@ -58,6 +59,9 @@ export class ReplayController {
   private inflightKey: string | null = null
   private dwellTimer: unknown = null
   private abortController: AbortController | null = null
+  private requestTimeout: unknown = null
+  private nextRequestId = 0
+  private activeRequestId: number | null = null
   private disposed = false
   private generation = 0
   private snapshot: ReplaySnapshot
@@ -100,6 +104,9 @@ export class ReplayController {
   seek(clock: MatchClock, keepPlaying = false): void {
     const target = this.timeline.find((item) => clockKey(item) === clockKey(clock))
     if (!target || this.disposed) return
+    if (this.inflightKey !== null && this.inflightKey !== clockKey(target)) {
+      this.cancelInFlight()
+    }
     this.clearDwell()
     this.update({
       requested: { ...target },
@@ -145,9 +152,7 @@ export class ReplayController {
     this.disposed = true
     this.generation += 1
     this.clearDwell()
-    this.abortController?.abort()
-    this.abortController = null
-    this.inflightKey = null
+    this.cancelInFlight()
     if (this.snapshot.playing) this.snapshot = { ...this.snapshot, playing: false }
   }
 
@@ -172,6 +177,18 @@ export class ReplayController {
       this.timers.clearTimeout(this.dwellTimer)
       this.dwellTimer = null
     }
+  }
+
+  private cancelInFlight(): void {
+    if (this.requestTimeout !== null) {
+      this.timers.clearTimeout(this.requestTimeout)
+      this.requestTimeout = null
+    }
+    this.activeRequestId = null
+    this.inflightKey = null
+    const controller = this.abortController
+    this.abortController = null
+    controller?.abort()
   }
 
   private pump(): void {
@@ -201,14 +218,17 @@ export class ReplayController {
     const key = clockKey(clock)
     const label = formatMatchClock(clock)
     const generation = this.generation
+    const requestId = ++this.nextRequestId
     const controller = new AbortController()
     this.abortController = controller
+    this.activeRequestId = requestId
     this.inflightKey = key
     let timedOut = false
     const timeout = this.timers.setTimeout(() => {
       timedOut = true
       controller.abort()
     }, this.timeoutMs)
+    this.requestTimeout = timeout
 
     this.loader(clock, controller.signal)
       .then((frame) => {
@@ -218,22 +238,21 @@ export class ReplayController {
         this.cache.set(key, frame)
         return null
       })
-      .catch((error: unknown) =>
-        timedOut
-          ? new Error('The replay took too long to respond.')
-          : error instanceof Error
-            ? error
-            : new Error('The replay is unavailable.'),
-      )
+      .catch(() => {
+        if (controller.signal.aborted && !timedOut) return null
+        return REPLAY_LOAD_ERROR
+      })
       .then((failure) => {
         this.timers.clearTimeout(timeout)
-        if (generation !== this.generation) return
+        if (generation !== this.generation || requestId !== this.activeRequestId) return
         this.inflightKey = null
         this.abortController = null
+        this.requestTimeout = null
+        this.activeRequestId = null
         if (this.disposed) return
         if (failure && clockKey(this.snapshot.requested) === key) {
           this.clearDwell()
-          this.update({ status: 'error', error: failure.message, playing: false })
+          this.update({ status: 'error', error: failure, playing: false })
           return
         }
         this.pump()

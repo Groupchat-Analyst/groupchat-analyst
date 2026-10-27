@@ -7,9 +7,11 @@ import {
   analyzeMatch,
   formatMatchClock,
   getMatchTimeOptions,
-  SYNTHETIC_MATCH_EVENTS,
   type MatchClock,
 } from '../../../shared/src/match.js'
+import { findCatalogEntry } from '../../../shared/src/datasetCatalog.js'
+import { toDisplay } from '../../../shared/src/teamNaming.js'
+import { resolveDataset } from '../datasets.js'
 import type { MatchReplayResponse } from '../../../shared/src/apiContracts.js'
 
 function isMatchClock(value: unknown): value is MatchClock {
@@ -36,14 +38,23 @@ function isMatchClock(value: unknown): value is MatchClock {
   )
 }
 
-export function getReplayFrame(clock: unknown): MatchReplayResponse {
+export function getReplayFrame(
+  clock: unknown,
+  datasetId?: unknown,
+): MatchReplayResponse {
   if (!isMatchClock(clock)) {
     throw new TypeError('Select a valid match time from the fictional fixture.')
   }
+  if (datasetId !== undefined && !findCatalogEntry(datasetId)) {
+    throw new TypeError('datasetId is not a supported match.')
+  }
+  const dataset = resolveDataset(datasetId)
 
-  const analysis = analyzeMatch(SYNTHETIC_MATCH_EVENTS, clock, 'match-so-far')
+  const analysis = analyzeMatch(dataset.events, clock, 'match-so-far')
 
-  return {
+  return toDisplay({
+    datasetId: dataset.id,
+    datasetVersion: dataset.version,
     selectedTime: formatMatchClock(clock),
     score: analysis.score,
     events: analysis.periodEvents.map((event) => ({
@@ -54,7 +65,7 @@ export function getReplayFrame(clock: unknown): MatchReplayResponse {
       type: event.type,
       ...(event.type === 'shot' ? { outcome: event.outcome } : {}),
     })),
-  }
+  }, dataset.naming)
 }
 
 export function createReplayHandler() {
@@ -73,11 +84,15 @@ export function createReplayHandler() {
     }
 
     try {
-      const clock =
-        typeof body === 'object' && body !== null && 'selectedClock' in body
-          ? body.selectedClock
-          : undefined
-      return { status: 200, jsonBody: getReplayFrame(clock) }
+      const record = typeof body === 'object' && body !== null ? body : {}
+      const clock = 'selectedClock' in record ? record.selectedClock : undefined
+      return {
+        status: 200,
+        jsonBody: getReplayFrame(
+          clock,
+          'datasetId' in record ? record.datasetId : undefined,
+        ),
+      }
     } catch (error) {
       if (error instanceof TypeError) {
         return { status: 400, jsonBody: { error: error.message } }

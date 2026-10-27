@@ -4,6 +4,7 @@ import {
   type MatchEvent,
   type MatchClock,
 } from '../../shared/src/match.js'
+import { findCatalogEntry } from '../../shared/src/datasetCatalog.js'
 import type {
   AnalysisRequest,
   ClaimIntent,
@@ -12,7 +13,9 @@ import type {
   ClaimOperator,
   EvidenceKind,
   InterpretedClaim,
+  PlayerResolutionRequest,
   PlayerEntityReference,
+  ResolvedPlayerRecheckRequest,
 } from '../../shared/src/apiContracts.js'
 
 const evidenceKinds: EvidenceKind[] = [
@@ -28,6 +31,7 @@ const evidenceKinds: EvidenceKind[] = [
   'physical-measurements',
   'build-up-phase',
   'lineups',
+  'shot-location',
 ]
 const meaningCategories: ClaimMeaningCategory[] = [
   'factual-comparison',
@@ -147,13 +151,25 @@ function isClock(value: unknown): value is MatchClock {
 }
 
 export function parseAnalysisRequest(value: unknown): AnalysisRequest {
+  const baseKeys = ['opinion', 'selectedClock', 'period']
+  const optionalKeys = ['datasetId', 'inputLanguage']
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['opinion', 'selectedClock', 'period'])
+    !baseKeys.every((key) => Object.hasOwn(value, key)) ||
+    Object.keys(value).some((key) => ![...baseKeys, ...optionalKeys].includes(key))
   ) {
     throw new InputValidationError(
-      'Request must contain only opinion, selectedClock, and period.',
+      'Request must contain only opinion, selectedClock, period, and optionally datasetId or inputLanguage.',
     )
+  }
+  if ('datasetId' in value && !findCatalogEntry(value.datasetId)) {
+    throw new InputValidationError('datasetId is not a supported match.')
+  }
+  if (
+    'inputLanguage' in value &&
+    !['en', 'es', 'fr', 'de', 'ar'].includes(String(value.inputLanguage))
+  ) {
+    throw new InputValidationError('Input language is not supported.')
   }
   if (typeof value.opinion !== 'string' || value.opinion.length > 2000) {
     throw new InputValidationError('Opinion must be text no longer than 2,000 characters.')
@@ -172,6 +188,52 @@ export function parseAnalysisRequest(value: unknown): AnalysisRequest {
     opinion: value.opinion.trim(),
     selectedClock: value.selectedClock,
     period: value.period as AnalysisPeriod,
+    ...('datasetId' in value ? { datasetId: value.datasetId as string } : {}),
+    ...('inputLanguage' in value
+      ? { inputLanguage: value.inputLanguage as AnalysisRequest['inputLanguage'] }
+      : {}),
+  }
+}
+
+export function parsePlayerResolutionRequest(
+  value: unknown,
+): PlayerResolutionRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['action', 'continuation', 'claimId', 'playerId']) ||
+    value.action !== 'resolve-player' ||
+    typeof value.continuation !== 'string' ||
+    typeof value.claimId !== 'string' ||
+    typeof value.playerId !== 'string'
+  ) {
+    throw new InputValidationError('Player selection request is invalid.')
+  }
+  return {
+    action: 'resolve-player',
+    continuation: value.continuation,
+    claimId: value.claimId,
+    playerId: value.playerId,
+  }
+}
+
+export function parseResolvedPlayerRecheckRequest(
+  value: unknown,
+): ResolvedPlayerRecheckRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['action', 'continuation', 'selectedClock', 'period']) ||
+    value.action !== 'recheck-resolved-player' ||
+    typeof value.continuation !== 'string' ||
+    !isClock(value.selectedClock) ||
+    (value.period !== 'match-so-far' && value.period !== 'last-10-minutes')
+  ) {
+    throw new InputValidationError('Resolved-player recheck request is invalid.')
+  }
+  return {
+    action: 'recheck-resolved-player',
+    continuation: value.continuation,
+    selectedClock: value.selectedClock,
+    period: value.period,
   }
 }
 
@@ -206,8 +268,20 @@ function requireStringArray(value: unknown, label: string): string[] {
 
 export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
 
-const halfTimeAssertionPattern =
-  /^(Northbridge|Eastport)\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?|scored)\s+before half[- ]time[.!?]?$/i
+const halfTimePhrase =
+  '(?:before\\s+half[- ]time|by\\s+half[- ]time|(?:in|during)\\s+the\\s+first\\s+half)'
+const halfTimeAssertionPattern = new RegExp(
+  `^(.+?)\\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?|(?:(?:has|have|had)\\s+)?scored)\\s+${halfTimePhrase}[.!?]?$`,
+  'i',
+)
+const halfTimeNegatedPattern = new RegExp(
+  `^.+?\\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?\\s+${halfTimePhrase}[.!?]?$`,
+  'i',
+)
+const halfTimeScoringContext = new RegExp(
+  `(?:\\b(?:score|scores|scored|scoring|goal|goals)\\b.{0,80}\\b${halfTimePhrase}|\\b${halfTimePhrase}.{0,80}\\b(?:score|scores|scored|scoring|goal|goals)\\b)`,
+  'i',
+)
 
 export function goalBeforeHalfTimeAssertion(
   value: unknown,
@@ -218,12 +292,19 @@ export function goalBeforeHalfTimeAssertion(
   if (
     !match ||
     typeof value.subject !== 'string' ||
-    value.subject.toLowerCase() !== match[1].toLowerCase()
+    (value.playerSubject !== null &&
+      (!isRecord(value.playerSubject) || typeof value.playerSubject.name !== 'string' ||
+        value.playerSubject.team !== value.subject))
   ) {
     return undefined
   }
+  const normalize = (name: string) => name.replace(/[Øø]/g, 'o').normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const name = isRecord(value.playerSubject) ? normalize(value.playerSubject.name as string) : normalize(value.subject)
+  const parts = name.split(/\s+/)
+  const aliases = value.playerSubject === null ? [name] : [name, parts[0], parts.at(-1)]
+  if (!aliases.includes(normalize(match[1]))) return undefined
   if (
-    value.playerSubject !== null ||
     value.playerMetric !== null ||
     !Array.isArray(value.clarificationNeeds) ||
     value.clarificationNeeds.length !== 0 ||
@@ -254,9 +335,7 @@ export function goalBeforeHalfTimeAssertion(
   ) {
     return undefined
   }
-  return /^(?:Northbridge|Eastport)\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\s+score(?:d)?(?:\s+(?:any\s+)?goals?)?\s+before half[- ]time[.!?]?$/i.test(
-    value.text.trim(),
-  )
+  return halfTimeNegatedPattern.test(value.text.trim())
     ? 'did-not-score'
     : 'scored'
 }
@@ -294,9 +373,7 @@ function hasAmbiguousHalfTimeScoringClaim(value: Record<string, unknown>): boole
   if (!subject || goalBeforeHalfTimeAssertion(value, true)) return false
   return (
     new RegExp(`\\b${subject}\\b`, 'i').test(text) &&
-    /(?:\b(?:score|scores|scored|scoring|goal|goals)\b.{0,80}\bbefore half[- ]time\b|\bbefore half[- ]time\b.{0,80}\b(?:score|scores|scored|scoring|goal|goals)\b)/i.test(
-      text,
-    )
+    halfTimeScoringContext.test(text)
   )
 }
 
@@ -607,7 +684,7 @@ export function validateInterpretation(
       !comparison &&
       subject === null &&
       playerSubject === null &&
-      playerMetric === null &&
+      meaning.category === 'other' &&
       Array.isArray(claim.clarificationNeeds) &&
       claim.clarificationNeeds.length > 0
     if (
@@ -619,7 +696,9 @@ export function validateInterpretation(
           !requiredEvidence.some((kind) =>
             ['shots', 'shots-on-target', 'goals', 'passing', 'player-events', 'lineups'].includes(kind),
           ))) ||
-      (playerMetric !== null && playerSubject === null) ||
+      (playerMetric !== null &&
+        playerSubject === null &&
+        !isClarificationState) ||
       (playerMetric !== null &&
         !requiredEvidence.includes(evidenceForMetric[playerMetric])) ||
       (comparison !== null && playerMetric !== null) ||
@@ -628,7 +707,7 @@ export function validateInterpretation(
         claim.intent !== 'unavailable-metric') ||
       (claim.intent === 'unavailable-metric' &&
         !requiredEvidence.some((kind) =>
-          ['physical-measurements', 'player-events'].includes(kind),
+          ['physical-measurements', 'player-events', 'shot-location'].includes(kind),
         ))
     ) {
       throw new Error(`${label} intent does not match its evidence request.`)
@@ -737,10 +816,12 @@ export function validateInterpretation(
         !anchorEvent ||
         anchorEvent.type !== 'shot' ||
         anchorEvent.outcome !== 'goal' ||
-        (subject !== null && anchorEvent.team !== subject)
+        (subject !== null &&
+          meaning.category === 'historical-circumstance' &&
+          anchorEvent.team !== subject)
       ) {
         throw new Error(
-          `${label} before-event period must anchor to a goal by its named subject.`,
+          `${label} before-event period must anchor to a recorded goal${meaning.category === 'historical-circumstance' ? ' by its named subject' : ''}.`,
         )
       }
       if (

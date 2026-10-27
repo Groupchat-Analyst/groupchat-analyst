@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MatchReplayResponse } from '../../shared/src/apiContracts'
-import { formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
-import { clockKey, type ReplaySnapshot } from './replayController'
+import type { MatchTeam } from '../../shared/src/matchClock'
+import { elapsedMatchMinute, formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
+import { clockKey, REPLAY_LOAD_ERROR, type ReplaySnapshot } from './replayController'
+import { teamMonogram } from './teamMonogram'
+import { LocalizedMarkup } from './localization'
+import { useLocalization } from './localizationContext'
+import { localizedTeamMonogram } from '../../shared/src/displayNames'
+import { translateText } from '../../shared/src/localization'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -9,6 +15,8 @@ type Replay = MatchReplayResponse
 type ReplayEvent = Replay['events'][number]
 
 type MatchHeaderProps = {
+  datasetId: string
+  teams: readonly [string, string]
   timeline: MatchClock[]
   snapshot: ReplaySnapshot
   keyMoments: KeyMoment[]
@@ -52,7 +60,7 @@ function useNewEventIds(frame: Replay | null): Set<string> {
   return tracked.added
 }
 
-function EventLog({ frame }: { frame: Replay | null }) {
+function EventLog({ frame, homeTeam }: { frame: Replay | null; homeTeam: string }) {
   const listRef = useRef<HTMLOListElement>(null)
   const added = useNewEventIds(frame)
   const count = frame?.events.length ?? 0
@@ -63,12 +71,12 @@ function EventLog({ frame }: { frame: Replay | null }) {
   }, [added, count])
 
   return (
-    <ol className="event-log-list" ref={listRef} aria-label="Recorded events in match order">
+    <ol className="event-log-list" ref={listRef} aria-label="Recorded events in match order" tabIndex={0}>
       {frame?.events.map((event) => (
         <li
           key={event.id}
           className={[
-            event.team === 'Northbridge' ? 'north-event' : 'east-event',
+            event.team === homeTeam ? 'north-event' : 'east-event',
             isGoal(event) ? 'is-goal' : '',
             added.has(event.id) ? 'is-new' : '',
           ].filter(Boolean).join(' ')}
@@ -87,6 +95,8 @@ function EventLog({ frame }: { frame: Replay | null }) {
 }
 
 export function MatchHeader({
+  datasetId,
+  teams,
   timeline,
   snapshot,
   keyMoments,
@@ -97,6 +107,7 @@ export function MatchHeader({
   onPause,
   onRetry,
 }: MatchHeaderProps) {
+  const { language } = useLocalization()
   const { requested, displayed, displayedClock, status, error, playing } = snapshot
   const last = timeline.length - 1
   const requestedIndex = timeline.findIndex((clock) => clockKey(clock) === clockKey(requested))
@@ -119,28 +130,29 @@ export function MatchHeader({
   const motion = playing ? `${dwellMs}ms linear` : '160ms ease-out'
 
   const scoreText = displayed
-    ? `${displayed.score.Northbridge} – ${displayed.score.Eastport}`
+    ? `${displayed.score[teams[0] as MatchTeam]} – ${displayed.score[teams[1] as MatchTeam]}`
     : '– –'
   const scoreChanged = useChangedFlag(scoreText)
 
   const announcement = displayed && !playing
-    ? `${displayed.selectedTime}. Northbridge ${displayed.score.Northbridge}, Eastport ${displayed.score.Eastport}.`
+    ? `${displayed.selectedTime}. ${teams[0]} ${displayed.score[teams[0] as MatchTeam]}, ${teams[1]} ${displayed.score[teams[1] as MatchTeam]}.`
     : ''
 
   return (
+    <LocalizedMarkup>
     <section className="match-header" aria-labelledby="match-header-title">
       <h2 id="match-header-title" className="visually-hidden">Fictional match replay</h2>
       <div className="scoreboard">
-        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">N</span>Northbridge</div>
+        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">{localizedTeamMonogram(datasetId, teams[0], language) ?? teamMonogram(teams[0])}</span>{teams[0]}</div>
         <div
           className={`score${scoreChanged ? ' is-changed' : ''}${displayed ? '' : ' is-empty'}`}
           aria-hidden="true"
         >
-          {scoreText}
+          <bdi dir="ltr">{scoreText}</bdi>
         </div>
-        <div className="team-name east">Eastport<span className="team-monogram east" aria-hidden="true">E</span></div>
+        <div className="team-name east">{teams[1]}<span className="team-monogram east" aria-hidden="true">{localizedTeamMonogram(datasetId, teams[1], language) ?? teamMonogram(teams[1])}</span></div>
         <div className="match-clock" aria-hidden="true">
-          <span className="clock-value">{displayedLabel ?? requestedLabel}</span>
+          <span className="clock-value" dir="ltr">{displayedLabel ?? requestedLabel}</span>
           <span className="clock-state">
             {error
               ? 'Showing the last loaded moment'
@@ -185,21 +197,29 @@ export function MatchHeader({
 
       {error && (
         <p className="replay-error" role="alert">
-          {error} <button type="button" className="link-button" onClick={onRetry}>Try again</button>
+          {translateText(
+            displayed ? `${REPLAY_LOAD_ERROR} The last loaded moment is still shown.` : REPLAY_LOAD_ERROR,
+            language,
+          )}{' '}
+          <button type="button" className="link-button" onClick={onRetry}>{translateText('Try again', language)}</button>
         </p>
       )}
 
       <div className="moment-chips" role="group" aria-label="Jump to a key moment">
-        {keyMoments.map(({ label, clock }) => (
-          <button
-            key={label}
-            type="button"
-            aria-pressed={clockKey(clock) === clockKey(requested)}
-            onClick={() => onSeek(clock)}
-          >
-            {label}
-          </button>
-        ))}
+        {keyMoments.map(({ label, clock }) => {
+          const hasOccurred = displayedClock !== null
+            && elapsedMatchMinute(clock) <= elapsedMatchMinute(displayedClock)
+          return (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={clockKey(clock) === clockKey(requested)}
+              onClick={() => onSeek(clock)}
+            >
+              {hasOccurred ? label : <><bdi dir="ltr">{formatMatchClock(clock)}</bdi> · <span>Recorded moment</span></>}
+            </button>
+          )
+        })}
       </div>
 
       <div className="latest-moment" aria-label="Latest recorded moment">
@@ -222,8 +242,9 @@ export function MatchHeader({
         <summary>
           All recorded events <span>{displayed ? `${displayed.events.length} through ${displayed.selectedTime}` : '…'}</span>
         </summary>
-        <EventLog frame={displayed} />
+        <EventLog frame={displayed} homeTeam={teams[0]} />
       </details>
     </section>
+    </LocalizedMarkup>
   )
 }

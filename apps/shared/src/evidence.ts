@@ -202,7 +202,7 @@ export const EVIDENCE_CAPABILITIES: EvidenceCapability[] = [
   },
 ]
 
-const HALF_ONE: Array<{
+export type SequenceSeed = {
   id: string
   team: MatchTeam | null
   status: PossessionStatus
@@ -213,7 +213,11 @@ const HALF_ONE: Array<{
   completedPasses: number
   lossArea?: PitchArea
   eventIds?: string[]
-}> = [
+  /** Optional roster-slot (0-10) of each passer; defaults to the baseline rotation. */
+  passers?: number[]
+}
+
+const HALF_ONE: SequenceSeed[] = [
   { id: 'sequence-01', team: 'Northbridge', status: 'controlled', start: { period: 1, minute: 1 }, end: { period: 1, minute: 8 }, endReason: 'turnover', passCount: 5, completedPasses: 4, lossArea: 'defensive-third' },
   { id: 'sequence-02', team: 'Eastport', status: 'controlled', start: { period: 1, minute: 8 }, end: { period: 1, minute: 12 }, endReason: 'turnover', passCount: 3, completedPasses: 2, lossArea: 'middle-third' },
   { id: 'sequence-03', team: 'Northbridge', status: 'controlled', start: { period: 1, minute: 12 }, end: { period: 1, minute: 18 }, endReason: 'turnover', passCount: 4, completedPasses: 3, lossArea: 'middle-third', eventIds: ['event-01'] },
@@ -228,7 +232,7 @@ const HALF_ONE: Array<{
   { id: 'sequence-12', team: 'Northbridge', status: 'controlled', start: { period: 1, minute: 45, stoppageMinutes: 2 }, end: { period: 1, minute: 45, stoppageMinutes: 3 }, endReason: 'goal', passCount: 1, completedPasses: 1, eventIds: ['event-07'] },
 ]
 
-const HALF_TWO: typeof HALF_ONE = [
+const HALF_TWO: SequenceSeed[] = [
   { id: 'sequence-13', team: 'Eastport', status: 'controlled', start: { period: 2, minute: 46 }, end: { period: 2, minute: 51 }, endReason: 'turnover', passCount: 4, completedPasses: 3, lossArea: 'middle-third', eventIds: ['event-08'] },
   { id: 'sequence-14', team: 'Northbridge', status: 'controlled', start: { period: 2, minute: 51 }, end: { period: 2, minute: 58 }, endReason: 'turnover', passCount: 5, completedPasses: 4, lossArea: 'middle-third', eventIds: ['event-09'] },
   { id: 'sequence-15', team: 'Eastport', status: 'controlled', start: { period: 2, minute: 58 }, end: { period: 2, minute: 62 }, endReason: 'turnover', passCount: 3, completedPasses: 2, lossArea: 'final-third', eventIds: ['event-10'] },
@@ -265,34 +269,43 @@ const ROSTERS: Record<MatchTeam, string[]> = {
   ],
 }
 
-const TEAM_PLAYER_IDS: Record<MatchTeam, string[]> = {
-  Northbridge: ROSTERS.Northbridge.map((_, index) =>
-    `north-player-${String(index + 1).padStart(2, '0')}`,
-  ),
-  Eastport: ROSTERS.Eastport.map((_, index) =>
-    `east-player-${String(index + 1).padStart(2, '0')}`,
-  ),
+function teamPlayerIds(rosters: Record<MatchTeam, string[]>): Record<MatchTeam, string[]> {
+  return {
+    Northbridge: rosters.Northbridge.map((_, index) =>
+      `north-player-${String(index + 1).padStart(2, '0')}`,
+    ),
+    Eastport: rosters.Eastport.map((_, index) =>
+      `east-player-${String(index + 1).padStart(2, '0')}`,
+    ),
+  }
 }
 
-const SUBSTITUTION_ELAPSED: Record<MatchTeam, number> = {
-  Northbridge: elapsedMatchMinute({ period: 2, minute: 65 }),
-  Eastport: elapsedMatchMinute({ period: 2, minute: 72 }),
-}
+const TEAM_PLAYER_IDS: Record<MatchTeam, string[]> = teamPlayerIds(ROSTERS)
 
-const SUBSTITUTION_OFF_ID: Record<MatchTeam, string> = {
-  Northbridge: 'north-player-02',
-  Eastport: 'east-player-03',
-}
+type SubstitutionRecord = SyntheticMatchEvidence['substitutions'][number]
 
-function activePlayersAt(team: MatchTeam, elapsed: number): string[] {
-  const active = TEAM_PLAYER_IDS[team].slice(0, 11)
-  if (elapsed >= SUBSTITUTION_ELAPSED[team]) {
-    active[active.indexOf(SUBSTITUTION_OFF_ID[team])] = TEAM_PLAYER_IDS[team][11]
+const BASELINE_SUBSTITUTIONS: SubstitutionRecord[] = [
+  { id: 'substitution-01', team: 'Northbridge', clock: { period: 2, minute: 65 }, playerOnId: 'north-player-12', playerOffId: 'north-player-02', provenance: 'synthetic' },
+  { id: 'substitution-02', team: 'Eastport', clock: { period: 2, minute: 72 }, playerOnId: 'east-player-12', playerOffId: 'east-player-03', provenance: 'synthetic' },
+]
+
+// A substitution applies from its exact timestamp onwards; each side always has 11 players on.
+function activePlayersAt(
+  team: MatchTeam,
+  elapsed: number,
+  substitutions: SubstitutionRecord[],
+  playerIds: Record<MatchTeam, string[]> = TEAM_PLAYER_IDS,
+): string[] {
+  const active = playerIds[team].slice(0, 11)
+  for (const substitution of substitutions) {
+    if (substitution.team === team && elapsed >= elapsedMatchMinute(substitution.clock)) {
+      active[active.indexOf(substitution.playerOffId)] = substitution.playerOnId
+    }
   }
   return active
 }
 
-function clockAtElapsed(value: number): MatchClock {
+export function matchClockAtElapsed(value: number): MatchClock {
   const minute = Math.floor(value)
   if (minute <= 48) {
     return minute <= 45
@@ -328,11 +341,29 @@ function passCoordinates(
   }
 }
 
+export type EvidenceSpec = {
+  dataset: SyntheticMatchEvidence['dataset']
+  seeds: SequenceSeed[]
+  substitutions: SubstitutionRecord[]
+  buildUpPossessionIds: string[]
+  /** Optional per-fixture roster (11 starters then substitutes); defaults to the baseline rosters. */
+  rosters?: Record<MatchTeam, string[]>
+  /** Possession whose mid-point carries one extra, explicitly annotated pressure observation. */
+  extraPressure?: { id: string; possessionId: string; team: MatchTeam; rosterSlot: number; location: PitchPoint }
+  coverage: SyntheticMatchEvidence['coverage']
+}
+
+export function buildSyntheticEvidence(spec: EvidenceSpec): SyntheticMatchEvidence {
+const { seeds: SEQUENCE_SEEDS, substitutions: subs } = spec
+const rosters = spec.rosters ?? ROSTERS
+const playerIds = teamPlayerIds(rosters)
+const activeAt = (team: MatchTeam, elapsed: number, substitutions: SubstitutionRecord[]) =>
+  activePlayersAt(team, elapsed, substitutions, playerIds)
 const players = (['Northbridge', 'Eastport'] as const).flatMap((team) =>
-  TEAM_PLAYER_IDS[team].map((id, index) => ({
+  playerIds[team].map((id, index) => ({
     id,
     team,
-    name: ROSTERS[team][index],
+    name: rosters[team][index],
     status: index < 11 ? 'starter' as const : 'substitute' as const,
     provenance: 'synthetic' as const,
   })),
@@ -364,11 +395,17 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
       endElapsed - 0.01,
       startElapsed + ((endElapsed - startElapsed) * (index + 1)) / (seed.passCount + 1),
     )
-    const clock = clockAtElapsed(Math.floor(time))
-    const active = activePlayersAt(seed.team, time)
-    const activePlayerIndex = (sequenceIndex + index) % active.length
+    const clock = matchClockAtElapsed(Math.floor(time))
+    const active = activeAt(seed.team, time, subs)
+    const activePlayerIndex = seed.passers
+      ? seed.passers[index] % active.length
+      : (sequenceIndex + index) % active.length
     const playerId = active[activePlayerIndex]
-    const receiverId = active[(activePlayerIndex + 1) % active.length]
+    const receiverId = active[
+      seed.passers?.[index + 1] !== undefined && index + 1 < seed.passCount
+        ? seed.passers[index + 1] % active.length
+        : (activePlayerIndex + 1) % active.length
+    ]
     const area: PitchArea =
       seed.lossArea ?? (index === 0 ? 'middle-third' : 'final-third')
     const coordinates = passCoordinates(
@@ -411,9 +448,10 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
         id: `recovery-${String(recoveries.length + 1).padStart(3, '0')}`,
         provenance: 'synthetic',
         team: seed.team === 'Northbridge' ? 'Eastport' : 'Northbridge',
-        playerId: activePlayersAt(
+        playerId: activeAt(
           seed.team === 'Northbridge' ? 'Eastport' : 'Northbridge',
           time,
+          subs,
         )[sequenceIndex % 11],
         clock,
         location,
@@ -429,8 +467,8 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
       provenance: 'synthetic',
       possessionId: seed.id,
       team: pressureTeam,
-      playerId: activePlayersAt(pressureTeam, pressureElapsed)[sequenceIndex % 11],
-      clock: clockAtElapsed(pressureElapsed),
+      playerId: activeAt(pressureTeam, pressureElapsed, subs)[sequenceIndex % 11],
+      clock: matchClockAtElapsed(pressureElapsed),
       location: { x: 44 + (sequenceIndex % 3) * 8, y: 25 + (sequenceIndex % 5) * 10 },
       type: sequenceIndex % 2 ? 'pressured-pass' : 'challenge',
     })
@@ -438,35 +476,29 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
 
 }
 
-const buildUpPossessionIds = new Set([
-    'sequence-01',
-    'sequence-02',
-    'sequence-04',
-    'sequence-03',
-    'sequence-14',
-    'sequence-15',
-    'sequence-18',
-    'sequence-24',
-  ])
+const buildUpPossessionIds = new Set(spec.buildUpPossessionIds)
 
-  const riceSequence = SEQUENCE_SEEDS[2]
-  const ricePressureElapsed =
-    elapsedMatchMinute(riceSequence.start) +
-    Math.floor(
-      (elapsedMatchMinute(riceSequence.end) -
-        elapsedMatchMinute(riceSequence.start)) /
-        2,
-    )
-  pressures.push({
-    id: 'pressure-build-up-01',
-    provenance: 'synthetic',
-    possessionId: riceSequence.id,
-    team: 'Eastport',
-    playerId: activePlayersAt('Eastport', ricePressureElapsed)[2],
-    clock: clockAtElapsed(ricePressureElapsed),
-    location: { x: 60, y: 45 },
-    type: 'pressured-pass',
-  })
+  const extra = spec.extraPressure
+  if (extra) {
+    const extraSequence = SEQUENCE_SEEDS.find(({ id }) => id === extra.possessionId)!
+    const extraElapsed =
+      elapsedMatchMinute(extraSequence.start) +
+      Math.floor(
+        (elapsedMatchMinute(extraSequence.end) -
+          elapsedMatchMinute(extraSequence.start)) /
+          2,
+      )
+    pressures.push({
+      id: extra.id,
+      provenance: 'synthetic',
+      possessionId: extraSequence.id,
+      team: extra.team,
+      playerId: activeAt(extra.team, extraElapsed, subs)[extra.rosterSlot],
+      clock: matchClockAtElapsed(extraElapsed),
+      location: extra.location,
+      type: 'pressured-pass',
+    })
+  }
 
   const buildUpAnnotations = [...buildUpPossessionIds].map((possessionId, index) => {
     const sequencePasses = passes.filter((pass) => pass.possessionId === possessionId)
@@ -488,7 +520,21 @@ const buildUpPossessionIds = new Set([
     }
   })
 
-export const SYNTHETIC_MATCH_EVIDENCE: SyntheticMatchEvidence = {
+return {
+  dataset: spec.dataset,
+  coverage: spec.coverage,
+  players,
+  substitutions: subs,
+  possessions,
+  passes,
+  turnovers,
+  recoveries,
+  pressures,
+  buildUpAnnotations,
+}
+}
+
+export const SYNTHETIC_MATCH_EVIDENCE: SyntheticMatchEvidence = buildSyntheticEvidence({
   dataset: {
     id: 'northbridge-eastport-analysis-demo',
     version: '3.0.0',
@@ -498,6 +544,13 @@ export const SYNTHETIC_MATCH_EVIDENCE: SyntheticMatchEvidence = {
     clockConvention: 'Period-aware match clock; first-half 45+N and second-half 90+N stoppage time; halftime excluded from played duration.',
     coordinateConvention: 'Normalized 0–100 pitch coordinates; both teams attack toward increasing x; thirds use x < 33.3, 33.3–<66.7, and >=66.7.',
   },
+  seeds: SEQUENCE_SEEDS,
+  substitutions: BASELINE_SUBSTITUTIONS,
+  buildUpPossessionIds: [
+    'sequence-01', 'sequence-02', 'sequence-04', 'sequence-03',
+    'sequence-14', 'sequence-15', 'sequence-18', 'sequence-24',
+  ],
+  extraPressure: { id: 'pressure-build-up-01', possessionId: 'sequence-03', team: 'Eastport', rosterSlot: 2, location: { x: 60, y: 45 } },
   coverage: {
     start: { period: 1, minute: 1 },
     end: { period: 2, minute: 90, stoppageMinutes: 4 },
@@ -506,18 +559,7 @@ export const SYNTHETIC_MATCH_EVIDENCE: SyntheticMatchEvidence = {
     completeForTurnovers: true,
     missingPeriods: [],
   },
-  players,
-  substitutions: [
-    { id: 'substitution-01', team: 'Northbridge', clock: { period: 2, minute: 65 }, playerOnId: 'north-player-12', playerOffId: 'north-player-02', provenance: 'synthetic' },
-    { id: 'substitution-02', team: 'Eastport', clock: { period: 2, minute: 72 }, playerOnId: 'east-player-12', playerOffId: 'east-player-03', provenance: 'synthetic' },
-  ],
-  possessions,
-  passes,
-  turnovers,
-  recoveries,
-  pressures,
-  buildUpAnnotations,
-}
+})
 
 export type TeamEvidenceMetrics = {
   possessionMinutes: number
@@ -656,8 +698,8 @@ export function calculateEvidence(
       id: interval.id,
       team: interval.team,
       status: interval.status,
-      start: clippedStart > intervalStart ? clockAtElapsed(clippedStart) : interval.start,
-      end: isClipped ? clockAtElapsed(clippedEnd) : interval.end,
+      start: clippedStart > intervalStart ? matchClockAtElapsed(clippedStart) : interval.start,
+      end: isClipped ? matchClockAtElapsed(clippedEnd) : interval.end,
       durationMinutes,
       ...(isClipped ? {} : { endReason: interval.endReason }),
       relatedEventIds: isClipped ? [] : interval.relatedEventIds,

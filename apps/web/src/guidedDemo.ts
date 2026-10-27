@@ -6,7 +6,7 @@ import type { MatchClock } from '../../shared/src/matchClock'
 export const DEMO_TAKE = 'Eastport had more shots on target than Northbridge.'
 export const DEMO_CLOCK: MatchClock = { period: 2, minute: 57 }
 export const DEMO_NEXT_CLOCK: MatchClock = { period: 2, minute: 58 }
-export const DEMO_ENTRY_LABEL = 'See how one minute changes the take'
+export const DEMO_ENTRY_LABEL = 'See how one minute changes the opinion'
 
 export type DemoInputs = {
   active: boolean

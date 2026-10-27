@@ -4,6 +4,7 @@ import type {
   ClaimResult,
   EvidenceReference,
 } from '../../shared/src/apiContracts'
+import { findCatalogEntry } from '../../shared/src/datasetCatalog.ts'
 
 type Roster = ReadonlyArray<{ id: string; name: string }>
 
@@ -52,7 +53,7 @@ const METRIC_LABELS: Record<string, string> = {
   recoveries: 'recoveries',
   'pressure-observations': 'pressure observations',
   'running-distance': 'running distance',
-  'minutes-played': 'minutes played',
+  'minutes-played': 'elapsed minutes of participation in recorded coverage (added time included)',
 }
 
 export function metricLabel(metric: string): string {
@@ -158,6 +159,7 @@ export type ShareCardModel = {
   scope: string
   answer: string
   claims: ShareCardClaim[]
+  footer?: string
   extended: boolean
 }
 
@@ -180,6 +182,7 @@ const SINGULAR: Record<string, string> = {
   'passes attempted': 'pass attempted',
   'passes completed': 'pass completed',
   'pressure observations': 'pressure observation',
+  'elapsed minutes of participation in recorded coverage (added time included)': 'elapsed minute of participation in recorded coverage (added time included)',
 }
 
 function statLabel(metric: string, value: number): string {
@@ -269,6 +272,7 @@ export function buildShareCardModel(
       roster,
     ),
     claims,
+    footer: sourceFooter(analysis),
     extended: claims.length >= EXTENDED_CLAIM_COUNT || lines > EXTENDED_LINE_BUDGET,
   }
 }
@@ -289,6 +293,20 @@ export type CardBlock = { kind: CardBlockKind; text: string }
 
 export const SYNTHETIC_LABEL = 'Synthetic data · fictional match'
 
+/** Names the fixture and how the opinion was read, so a shared card makes sense outside the app. */
+export function sourceFooter(analysis: AnalysisResponse): string {
+  const dataset = analysis.evidenceFoundation.dataset
+  const entry = findCatalogEntry(dataset?.id)
+  const match = entry && dataset
+    ? `${entry.teams[0]} v ${entry.teams[1]} · ${entry.name} v${dataset.version}`
+    : null
+  const reader = analysis.provider === 'local' ? 'read by local rules' : 'read by Foundry (server-side)'
+  const selection = analysis.selectedPlayers?.length
+    ? 'Player selected by you; no additional model call was made.'
+    : null
+  return [SYNTHETIC_LABEL, match, reader, selection].filter(Boolean).join(' · ')
+}
+
 /** Single source of truth for the card: the on-screen card, copied text and exported image all use these blocks. */
 export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
   const blocks: CardBlock[] = [{ kind: 'brand', text: 'Groupchat Analyst' }]
@@ -300,6 +318,7 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
     })
   }
   blocks.push(
+    { kind: 'label', text: 'Original wording' },
     { kind: 'take', text: `“${model.take}”` },
     { kind: 'scope', text: model.scope },
     { kind: 'answer', text: model.answer },
@@ -333,7 +352,7 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
       blocks.push({ kind: 'note', text: `Limitation: ${limitation}` })
     }
   })
-  blocks.push({ kind: 'footer', text: SYNTHETIC_LABEL })
+  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL })
   return blocks
 }
 

@@ -5,6 +5,7 @@ import type { MatchReplayResponse } from '../../shared/src/apiContracts'
 export function isMatchReplayResponse(
   value: unknown,
   selectedTime: string,
+  teams: readonly [string, string] = ['Northbridge', 'Eastport'],
 ): value is MatchReplayResponse {
   if (
     typeof value !== 'object' ||
@@ -20,17 +21,12 @@ export function isMatchReplayResponse(
     return false
   }
 
-  const score = value.score
-  if (
-    !('Northbridge' in score) ||
-    typeof score.Northbridge !== 'number' ||
-    !Number.isInteger(score.Northbridge) ||
-    !('Eastport' in score) ||
-    typeof score.Eastport !== 'number' ||
-    !Number.isInteger(score.Eastport) ||
-    score.Northbridge < 0 ||
-    score.Eastport < 0
-  ) {
+  const score = value.score as Record<string, unknown>
+  const validScore = (team: string) => {
+    const goals = score[team]
+    return typeof goals === 'number' && Number.isInteger(goals) && goals >= 0
+  }
+  if (!validScore(teams[0]) || !validScore(teams[1])) {
     return false
   }
 
@@ -43,7 +39,7 @@ export function isMatchReplayResponse(
       'time' in event &&
       typeof event.time === 'string' &&
       'team' in event &&
-      (event.team === 'Northbridge' || event.team === 'Eastport') &&
+      (event.team === teams[0] || event.team === teams[1]) &&
       'description' in event &&
       typeof event.description === 'string' &&
       'type' in event &&
@@ -60,11 +56,13 @@ export function isMatchReplayResponse(
 export async function fetchReplayFrame(
   clock: MatchClock,
   signal: AbortSignal,
+  datasetId?: string,
+  teams?: readonly [string, string],
 ): Promise<MatchReplayResponse> {
   const response = await fetch('/api/replay', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ selectedClock: clock }),
+    body: JSON.stringify(datasetId ? { selectedClock: clock, datasetId } : { selectedClock: clock }),
     signal,
   })
   let payload: unknown
@@ -74,8 +72,11 @@ export async function fetchReplayFrame(
     throw new Error('The replay service returned an unreadable match moment.')
   }
   if (!response.ok) throw new Error('The synthetic replay is unavailable.')
-  if (!isMatchReplayResponse(payload, formatMatchClock(clock))) {
+  if (!isMatchReplayResponse(payload, formatMatchClock(clock), teams)) {
     throw new Error('The replay service returned an incomplete match moment.')
+  }
+  if (datasetId && payload.datasetId !== datasetId) {
+    throw new Error('The replay service returned a moment from a different match.')
   }
   return payload
 }

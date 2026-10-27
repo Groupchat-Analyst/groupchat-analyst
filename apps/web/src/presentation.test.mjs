@@ -107,6 +107,63 @@ test('Eastport shots card uses only Eastport evidence and the authoritative stat
   assert.doesNotMatch(text, INTERNAL_ID_PATTERN)
 })
 
+test('duration receipt preserves the opinion, elapsed-window label, fixture version, and provider', () => {
+  const opinion = 'Saka has had a horrible game'
+  const answer = 'Bukayo Saka recorded contributions in the selected window.'
+  const result = {
+    claim: {
+      ...claimBase,
+      playerSubject: {
+        id: 'north-player-09',
+        name: 'Bukayo Saka',
+        team: 'Northbridge',
+      },
+      text: 'Bukayo Saka has had a horrible game so far.',
+      intent: 'subjective-judgement',
+    },
+    assessment: 'insufficient evidence for a firm conclusion',
+    statistics: [],
+    playerStatistics: [{
+      playerId: 'north-player-09',
+      playerName: 'Bukayo Saka',
+      team: 'Northbridge',
+      metric: 'minutes-played',
+      value: 62,
+      numerator: 62,
+      denominator: 62,
+      numeratorRecordIds: [],
+      denominatorRecordIds: [],
+    }],
+    evidence: [],
+    evidenceAvailability: [],
+    limitation: 'Recorded contributions cannot establish an overall performance rating.',
+  }
+  const analysis = {
+    summary: answer + SUMMARY_TRAILER,
+    fanReply: answer,
+    provider: 'foundry',
+    selectedPeriodLabel: 'Match so far through 60′',
+    evidenceFoundation: {
+      players: roster,
+      dataset: {
+        id: 'northbridge-eastport-return-demo',
+        version: '1.0.0',
+      },
+    },
+    claims: [result],
+  }
+  const model = buildShareCardModel(opinion, analysis)
+  const text = shareCardText(model)
+  const blocks = shareCardBlocks(model)
+
+  assert.match(text, /“Saka has had a horrible game”/)
+  assert.match(text, /62 elapsed minutes of participation in recorded coverage \(added time included\)/)
+  assert.match(text, /Northbridge v Eastport · Return match v1\.0\.0 · read by Foundry/)
+  assert.ok(blocks.some(({ kind, text: blockText }) =>
+    kind === 'bullet' && blockText.includes('62 elapsed minutes of participation in recorded coverage'),
+  ))
+})
+
 test('half-time goal card shows the supporting goal and one synthetic label', () => {
   const result = {
     claim: { ...claimBase, subject: 'Northbridge', text: 'Northbridge scored before half-time.' },

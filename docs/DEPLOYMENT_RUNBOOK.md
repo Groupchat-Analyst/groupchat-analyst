@@ -1,79 +1,91 @@
-# Hackathon deployment runbook (public, local-provider only)
+# Release and deployment runbook
 
-Status: **prepared, not executed.** No Azure resource exists, nothing has been deployed, and no billing has been changed. All match data is synthetic.
+Status: **prepared, not executed**. No Azure resource has been created and no deployment has run. The release candidate is `feature/explore-more-matches`; application work is in `4d845e3`, with the branch release handoff at `01f1ee9`. The public release must use the local-rules provider. This runbook does not authorize a merge, deployment, Foundry enablement or Azure change.
 
-## Candidate
+## Candidate and workflow
 
 | Item | Value |
 | --- | --- |
-| Source branch | `feature/take-investigation` |
-| Candidate commit | the head of the consolidated PR to `main` (record the exact SHA on the PR; the deployment must be built from `main` after merge, so the deployed SHA is the merge commit) |
-| Workflow | `.github/workflows/shared-preview.yml` ("Deploy shared preview"): `workflow_dispatch` only, runs only on `main`, builds `apps/web` and `apps/api`, no GitHub environment |
-| Access | **Public, no sign-in.** `apps/web/public/staticwebapp.config.json` has no route rules or roles |
-| Interpreter | `CLAIM_INTERPRETER_PROVIDER=local`. No Foundry settings are set |
+| PR base | `main` |
+| Candidate branch | `feature/explore-more-matches` |
+| Application candidate | `4d845e3` |
+| Current documented branch head | `01f1ee9` |
+| Workflow | `.github/workflows/shared-preview.yml` |
+| Trigger | `workflow_dispatch` only; job runs only when dispatched from `main` |
+| Source pin | `actions/checkout` checks out `${{ github.sha }}` so the workflow deploys the exact commit selected at dispatch |
+| Build/deploy | Azure Static Web Apps action builds `apps/web` and `apps/api` |
+| Frontend API URL | Same-origin `/api`; no deployed `localhost` URL or `API_PROXY_TARGET` |
+| API runtime | Node 22, declared in `apps/web/public/staticwebapp.config.json` |
+| Access | Public, no sign-in; API functions use anonymous authorization |
 
-## Azure resource settings
+The workflow has no automatic push or PR deployment, no GitHub environment approval gate, and no integration tests in its deployment job. Build verification must pass before merge and hosted acceptance is a separate release gate.
 
-| Setting | Value |
-| --- | --- |
-| Resource type | Static Web App (one) |
-| Plan | **Free** |
-| Region | any supported; choose one near judges |
-| Deployment source | **Other** (do not connect GitHub in the wizard, so Azure does not add a push-triggered workflow) |
-| API | managed Functions, Node 22 (from `platform.apiRuntime`) |
-| Application setting | `CLAIM_INTERPRETER_PROVIDER` = `local` |
-| Do NOT add | `FOUNDRY_API_KEY`, `FOUNDRY_OPENAI_BASE_URL`, `FOUNDRY_MODEL_DEPLOYMENT` |
-| Custom roles / Entra | none required; do not invite users |
-| Not created | no Function App, API Management, database, storage, Application Insights or Foundry resource |
+## Required configuration
 
-## Secret names
+Configure backend values in the Static Web App's **Settings → Environment variables → Production**. These settings are available to the backend API and are not frontend build-time variables.
 
-| Where | Name | Purpose |
+| Name | Required value/format | Purpose |
 | --- | --- | --- |
-| GitHub repository Actions secret | `AZURE_STATIC_WEB_APPS_API_TOKEN` | Deployment token for this Static Web App. The only secret the workflow reads |
-| Static Web App application settings | `CLAIM_INTERPRETER_PROVIDER` (not secret) | Selects local rules |
+| `CLAIM_INTERPRETER_PROVIDER` | Literal `local` | Explicitly selects the rule-based interpreter. Keep this value for the public release. |
+| `NODE_ENV` | Literal `production` | Activates the production signing-key guard. Do not rely on an implicit platform default. |
+| `PLAYER_RESOLUTION_SIGNING_KEY` | 32 cryptographically random bytes, encoded as canonical unpadded base64url (43 characters) | HMAC-SHA256 signing key for player-clarification continuation tokens. Keep it server-only in the Static Web App API environment variables. Never put it in source, a GitHub build variable, frontend configuration, logs, screenshots or a PR. |
 
-Never put the token or any credential in a file, log or PR comment.
+The application fails explicitly for player clarification when `NODE_ENV=production` and the signing key is absent, and rejects a malformed key. The process-local development key is used only when the production guard is not active; therefore `NODE_ENV=production` is a release prerequisite, not an optional optimization. Before opening the public URL, verify both production settings are present without displaying or copying the key value.
 
-## Deployment steps (after approval)
+All API instances must receive the **same** signing key. A process-local development key is intentionally not shared across instances or restarts and must never be used for production. Changing the production key requires applying the same replacement to the environment and restarting/redeploying the API instances; otherwise a continuation issued by one instance can fail on another. Continuation tokens currently have no explicit expiry. Rotating the key invalidates every still-held token signed with the old key, so users must submit the original opinion again to obtain a new clarification.
 
-1. Review and merge the consolidated PR to `main` (owner decision; this runbook does not merge).
-2. Restrict repository write access and protect `main`. The workflow has no approval gate: anyone with write access can dispatch it.
-3. In Azure, create the Static Web App as above. Copy its deployment token into the repository secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
-4. In the Static Web App, set application setting `CLAIM_INTERPRETER_PROVIDER=local`.
-5. GitHub → Actions → **Deploy shared preview** → Run workflow on `main`. Note the run's commit SHA.
+### GitHub Actions secret
 
-## Verification steps
+| Name | Location | Purpose |
+| --- | --- | --- |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Repository Actions secret | Opaque deployment token consumed by the Static Web Apps deploy action. Do not expose its value. |
 
-1. Open the HTTPS URL in a private window: the page loads with no sign-in prompt.
-2. Run the walkthrough in [TEAM_DEMO.md](../TEAM_DEMO.md): 57′ shots-on-target answer (2–2, contradicted), Check again at 58′ (3–2, supported), direct comparison, Share what changed card (copy and PNG).
-3. Confirm each answer is labelled "Local rules · no model connection" and no answer says Foundry. Check the API response: `provider` is `local`.
-4. `POST /api/analyze` with `{"opinion":"How many shots did Eastport have?","selectedClock":{"period":2,"minute":90,"stoppageMinutes":4},"period":"match-so-far"}` returns 200 with 8 shots; an over-2,000-character opinion returns 400.
-5. Confirm the Static Web App has no Foundry application settings.
+### Do not configure for this release
+
+- Do not set `CLAIM_INTERPRETER_PROVIDER=foundry`.
+- Do not configure `FOUNDRY_OPENAI_BASE_URL`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL_DEPLOYMENT`, or `FOUNDRY_CAPTURE_RAW_OUTPUT`.
+- `API_PROXY_TARGET` is a local Vite development/preview setting only. The deployed frontend calls same-origin `/api`.
+- `FUNCTIONS_WORKER_RUNTIME` appears in local Functions settings; the deployed managed API runtime is selected by `apiRuntime: node:22` in the Static Web Apps configuration.
+
+Microsoft documents that Static Web Apps API application settings are configured per environment in the Azure portal and made available to the backend API as environment variables: [Configure application settings for Azure Static Web Apps](https://learn.microsoft.com/azure/static-web-apps/application-settings).
+
+## Exact release sequence
+
+1. Review the complete PR diff into `main`, confirm the final PR head and all required checks, and resolve or explicitly accept the public unauthenticated API exposure described below. Do not merge until the release owner approves.
+2. Before production traffic, create/configure the approved Static Web App resource, verify Node 22 and public access expectations, and set the three backend values above in its **Production** environment. Add `AZURE_STATIC_WEB_APPS_API_TOKEN` to repository Actions secrets. Do not set any Foundry configuration.
+3. Have the authorized owner merge the PR. Record the resulting `main` merge commit SHA (`M`); this will not be known before merge.
+4. On GitHub Actions, manually dispatch **Deploy shared preview** with the `main` ref at `M`. The workflow rejects non-main dispatches and checks out `${{ github.sha }}`, so it deploys the exact selected `main` commit. Verify the run's event SHA and checkout SHA both equal `M`; stop and investigate if they differ. This document does not dispatch the workflow.
+5. Once the workflow succeeds, open the deployed HTTPS URL in a fresh private browser context and perform the hosted acceptance below. Verify the configured provider and signing behavior using app responses/UI without printing or exporting secrets. Do not infer success from the workflow status alone.
+
+## Hosted acceptance checklist
+
+Record each result with the deployment URL, workflow run URL, deployed SHA, browser/device, language and timestamp. Keep local verification separate from hosted results.
+
+1. **Fresh entry:** with clean browser storage, visit Home → Try it Out → each of the four fixture routes. Confirm the selected fixture/version, 1′, 0–0 and no events; later goals/results must not appear ahead of the selected clock. Confirm replay requests succeed and no analysis occurs on entry.
+2. **Replay and comparison:** move through earlier/later times and test a backward seek. On the baseline fixture, choose the explicit guided walkthrough: preparing 57′ makes no analysis request; explicit submit returns the 2–2 shots-on-target answer; moving to 58′ makes no request; recheck produces Eastport 3–Northbridge 2 and a correctly scoped comparison.
+3. **Player clarification and retry:** submit an ambiguous player request and choose each presented candidate in separate trials. Confirm the selected player's evidence and the original fixture/time/period are retained. Exercise a failed choice request, explicit retry, and successful resolution; verify no extra interpreter call is made for selection.
+4. **Languages:** change among English, Español, Français, Deutsch and العربية while preserving the match, selected clock, period, draft and conversation. Verify a fresh route in each language and inspect Arabic RTL text, mixed-script identities, score and minutes.
+5. **Receipts:** inspect copied reply and copied card text; download and inspect a generated PNG for original opinion, chosen player where relevant, figures, selected-time scope, fixture/version and accurate provider disclosure. Verify a failed copy/download is reported. Hosted browser verification does not establish native share-sheet behavior.
+6. **Real iPhone:** on an actual iPhone, open the HTTPS URL in Safari, repeat the guided comparison and use the native share sheet with the generated PNG. Confirm readability and actual share-sheet behavior. Record this separately from desktop/mobile emulation.
+7. **Provider and secrets:** confirm analysis responses and disclosures say `local`/local rules; no Foundry provider or model label appears. Confirm a player clarification completes, which exercises signing without logging the key. Inspect the Azure environment-variable names/presence only; never reveal values in test logs or evidence.
+
+## Verified versus outstanding
+
+- Local verification for the candidate includes 151/151 web tests, 363/363 API tests, web build/typecheck/lint and `git diff --check`; browser acceptance used local rules and local services.
+- Built-frontend smoke testing used Vite preview with a local API proxy; it did **not** exercise Azure, a hosted URL, hosted app settings or a real device.
+- Hosted acceptance and real-iPhone sharing are **not yet verified**. Do not label local checks as hosted verification.
+- Current deployment workflow uses the GitHub Actions token and Azure Static Web Apps configuration; no deployment or Azure resource changes were performed for this candidate.
+
+## Release blockers and exposure
+
+- **Durable request allowance:** not implemented. Before relying on the public endpoint, decide the allowed volume/window and exhaustion behavior, add durable shared state and atomic enforcement across API instances, define any reset/expiry and abuse identity model, expose a clear limit response, and test concurrency, restart and multi-instance behavior. Agree on monitoring and an operator response. Until then, the API is anonymous and has no enforced total-request allowance.
+- **Judge-accessible Foundry route:** not implemented or enabled. Separately approve who can access it and how they authenticate; isolate it from the public local-rules route; define a bounded request/token budget and exhaustion UX; configure server-side credentials; and add provider-specific acceptance and failure tests before any route is made available.
+- **Outstanding live verification:** no live model call was made for this release candidate. Obtain fresh explicit authorization, pin the exact application commit and provider configuration, agree the bounded acceptance inputs/expected results and stop conditions, and record a sanitized ledger before a future run. Historical live ledgers apply to earlier application commits and do not verify this candidate.
+- **Public API exposure:** both API routes are anonymous; the durable allowance is absent. Removing Foundry avoids model spend, but does not eliminate availability/traffic risk. Decide whether this is acceptable, protect repository write access and `main`, set an Azure budget alert, and confirm plan quotas/costs in the target subscription before public release.
+- **Other outstanding checks:** hosted verification, native share on a real iPhone, independent native-speaker/screen-reader review and load testing.
 
 ## Rollback
 
-- **Bad build:** re-run the workflow from `main` after reverting the offending commit; the previous production build is replaced.
-- **Take offline immediately:** delete the Static Web App in the Azure portal (stops the site, API and billing for that resource) and remove `AZURE_STATIC_WEB_APPS_API_TOKEN` from repository secrets. To pause without deleting, rotate the deployment token in Azure so the workflow can no longer deploy.
-- Nothing else needs unwinding: no database, no Foundry deployment and no other Azure resources are created.
-
-## Exposure and cost (inspected, not load-tested)
-
-What the code does: two POST routes (`/api/analyze`, `/api/replay`) with `authLevel: anonymous`; no secrets, no outbound calls and no persistence with the local provider. Opinions are capped at 2,000 characters and at most 8 claims; the clock is validated against the fixture. Measured locally: ~10 ms per request, ~60 KB response; oversized or pathological opinions are rejected in ≤ 10 ms. `request.json()` parses the body before validation, but the platform's documented request-size limit is 30 MB.
-
-Material exposure, stated plainly:
-
-- **Anyone can call the API without limit.** Static Web Apps has no per-client rate limiting and, on the Free plan, no IP restrictions or private endpoints. An anonymous client can generate sustained traffic. Removing Foundry removes model-token spend and credential risk; it does **not** make hosting unlimited or free of cost.
-- **Free-plan quota.** Documented: 100 GB included bandwidth per month per subscription, with overage "unavailable" on Free (so bandwidth abuse risks the quota or throttling rather than a bill, but exact behaviour was not tested). At ~60 KB per analysis response that is roughly 1.6 million analyses before the quota, ignoring page assets.
-- **Compute.** Managed Functions run on the platform's consumption model; the Free plan lists no separate charge, but this was not verified in a subscription. Billing terms and quotas must be checked in the target subscription before approval.
-- **No monitoring.** No Application Insights is configured, so abuse would not be visible except through the portal's metrics.
-- **Essential protection:** keep Foundry out of this deployment (enforced by tests and the runbook), restrict repo write/`main` and the deployment token, set an Azure budget alert on the subscription, and be ready to delete the app or rotate the token. If the event expects hostile traffic, a Standard plan (IP restrictions) or a fronting service with rate limiting would be required; that is not part of this candidate.
-- GitHub Actions minutes for the manual deployment are separate from Azure and depend on the organisation plan.
-
-## Approval checklist
-
-- [ ] Consolidated PR reviewed and merged to `main` by the owner
-- [ ] Azure subscription, region and budget alert agreed; Free plan quotas confirmed
-- [ ] `main` protected; deployment secret added
-- [ ] Decision on whether unauthenticated, unlimited public access is acceptable for the event
-- [ ] Repository visibility decision (this runbook does not change it; history was scanned, see the PR description)
+- For a bad build, dispatch the approved rollback commit from `main` through the same workflow and verify its checked-out SHA.
+- For a compromised signing key, replace it consistently for all API instances, restart/redeploy, and expect outstanding clarification continuations to become invalid.
+- To take the site offline, the authorized owner can disable/delete the Static Web App and revoke the deployment token. No destructive or Azure action is performed by this runbook.

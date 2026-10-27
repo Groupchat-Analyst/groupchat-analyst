@@ -1,11 +1,13 @@
 import { useId, useState } from 'react'
 import type { AnalysisResponse } from '../../shared/src/apiContracts'
-import { TEAMS, type MatchTeam } from '../../shared/src/matchClock'
+import type { MatchTeam } from '../../shared/src/matchClock'
+import { LocalizedMarkup } from './localization'
 
 type Foundation = AnalysisResponse['evidenceFoundation']
 
 export function PassMap({ foundation }: { foundation: Foundation }) {
-  const [team, setTeam] = useState<MatchTeam>('Northbridge')
+  const teams = Object.keys(foundation.teams) as MatchTeam[]
+  const [team, setTeam] = useState<MatchTeam>(teams[0])
   const [selectedId, setSelectedId] = useState('')
   const titleId = useId()
   const descriptionId = useId()
@@ -19,6 +21,7 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
   const y = (value: number) => 8 + value * 0.64
 
   return (
+    <LocalizedMarkup>
     <details className="pass-map-panel">
       <summary>Explore the pass map</summary>
       <div className="pass-map-content">
@@ -28,7 +31,7 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
             <h3 id={titleId}>Follow the ball.</h3>
           </div>
           <div className="segmented-control" role="group" aria-label="Pass map team">
-            {TEAMS.map((name) => (
+            {teams.map((name) => (
               <button
                 key={name}
                 type="button"
@@ -92,5 +95,6 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
         <p className="map-caption">This shows recorded pass locations. It does not show player movement, defensive shape or why a pass succeeded.</p>
       </div>
     </details>
+    </LocalizedMarkup>
   )
 }

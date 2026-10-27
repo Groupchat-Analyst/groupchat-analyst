@@ -13,6 +13,7 @@ export type EvidenceKind =
   | 'physical-measurements'
   | 'build-up-phase'
   | 'lineups'
+  | 'shot-location'
 
 /** Describes the claim's meaning, independently of its requested operation or time scope. */
 export type ClaimMeaningCategory =
@@ -88,9 +89,33 @@ export type AnalysisRequest = {
   opinion: string
   selectedClock: MatchClock
   period: AnalysisPeriod
+  datasetId?: string
+  inputLanguage?: 'en' | 'es' | 'fr' | 'de' | 'ar'
+}
+
+export type PlayerResolutionRequest = {
+  action: 'resolve-player'
+  continuation: string
+  claimId: string
+  playerId: string
+}
+
+export type ResolvedPlayerRecheckRequest = {
+  action: 'recheck-resolved-player'
+  continuation: string
+  selectedClock: MatchClock
+  period: AnalysisPeriod
+}
+
+export type PlayerResolutionOption = {
+  id: string
+  name: string
+  team: MatchTeam
 }
 
 export type MatchReplayResponse = {
+  datasetId?: string
+  datasetVersion?: string
   selectedTime: string
   score: Record<MatchTeam, number>
   events: Array<{
@@ -259,6 +284,7 @@ export type PlayerCalculationTrace = {
     | 'shots'
     | 'shots-on-target'
     | 'goals'
+    | 'minutes-played'
     | 'recoveries'
     | 'pressure-observations'
   numerator: number
@@ -267,6 +293,14 @@ export type PlayerCalculationTrace = {
   numeratorRecordIds: string[]
   denominatorRecordIds: string[]
   denominatorDescription: string
+  durationWindow?: {
+    recordedCoverageStart: string
+    recordedCoverageEnd: string
+    selectedWindowStart: string
+    selectedWindowEnd: string
+    participationStart: string
+    participationEnd: string
+  }
 }
 
 export type ClaimEvidence = {
@@ -276,6 +310,11 @@ export type ClaimEvidence = {
 
 export type ClaimResult = {
   claim: InterpretedClaim
+  reply?: string
+  playerResolution?: {
+    continuation: string
+    candidates: PlayerResolutionOption[]
+  }
   assessment:
     | 'supported'
     | 'contradicted'
@@ -310,4 +349,6 @@ export type AnalysisResponse = {
   periodEvents: EvidenceReference[]
   evidenceFoundation: EvidenceFoundation
   claims: ClaimResult[]
+  playerResolutionContinuation?: string
+  selectedPlayers?: PlayerResolutionOption[]
 }

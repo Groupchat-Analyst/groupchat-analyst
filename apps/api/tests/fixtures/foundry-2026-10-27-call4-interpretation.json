@@ -1,0 +1,28 @@
+{
+  "claims": [
+    {
+      "id": "claim-1",
+      "subject": null,
+      "playerSubject": null,
+      "playerMetric": "pass-completions",
+      "text": "Count of completed passes by Bruno in the match so far.",
+      "intent": "statistical-request",
+      "meaning": {
+        "category": "other",
+        "description": "Request the number of completed passes by the named player during the selected period (match so far).",
+        "comparison": null
+      },
+      "requiredEvidence": [
+        "passing"
+      ],
+      "timePeriod": {
+        "kind": "selected",
+        "eventId": null
+      },
+      "historicalEventAnchor": null,
+      "clarificationNeeds": [
+        "Which Bruno do you mean: Bruno Fernandes (Eastport) or Bruno Guimarães (Northbridge)?"
+      ]
+    }
+  ]
+}

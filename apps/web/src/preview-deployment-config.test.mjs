@@ -51,7 +51,7 @@ test('deployment is manual, uses the repository secret, and has no environment g
 
   assert.match(workflow, /^on:\r?\n  workflow_dispatch:\r?$/m)
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/)
-  assert.match(workflow, /ref: main/)
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/)
   assert.match(workflow, /secrets\.AZURE_STATIC_WEB_APPS_API_TOKEN/)
   assert.doesNotMatch(workflow, /^\s+environment:/m)
   assert.doesNotMatch(workflow, /^\s+(push|pull_request):/m)
