@@ -1,0 +1,199 @@
+{
+  "title": "Bounded live Foundry verification",
+  "run_date": "2026-10-27",
+  "branch": "feature/explore-more-matches",
+  "application_commit": "2343167",
+  "documentation_head_before_run": "3e8ebca04ba2a0f543c0a985f73815148b518d5f",
+  "preflight": {
+    "worktree": "clean",
+    "application_and_fixtures_match_commit": true,
+    "api_port": 7416,
+    "web_port": 5416,
+    "local_functions_host_note": "Core Tools reported AzureWebJobsStorage health as unhealthy, but the worker started and all three analyze requests succeeded.",
+    "stored_configuration": "Existing ignored Foundry configuration; no values recorded",
+    "process_overrides": [
+      "CLAIM_INTERPRETER_PROVIDER=foundry",
+      "FOUNDRY_CAPTURE_RAW_OUTPUT=true"
+    ],
+    "model_calls_before_run": 0
+  },
+  "controls": {
+    "maximum_outbound_foundry_requests": 6,
+    "actual_outbound_foundry_requests": 3,
+    "successful_raw_captures": 3,
+    "completion_token_limit": 8192,
+    "provider_timeout_seconds": 30,
+    "browser_deadline_seconds": 45,
+    "retries": 0,
+    "model_or_prompt_changes": false,
+    "stop_rule": "Stop on the first transport, authentication, HTTP, schema, semantic, truncation, timeout, provider, interpretation, result, or request-count failure."
+  },
+  "calls": [
+    {
+      "number": 1,
+      "status": "attempted; HTTP 200",
+      "input": "Eastport had more shots on target.",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "57′",
+      "period": "Match so far",
+      "provider": "foundry",
+      "provider_label": "Microsoft Foundry structured-output model; UI: Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "comparison": "Eastport greater than Northbridge"
+      },
+      "assessment": "contradicted",
+      "figures": {
+        "Eastport_shots_on_target": 2,
+        "Northbridge_shots_on_target": 2
+      },
+      "evidence_event_ids": [
+        "event-01",
+        "event-04",
+        "event-07",
+        "event-08"
+      ],
+      "request_started_at_utc": "2026-10-27T12:33:10.232Z",
+      "browser_request_duration_ms": 7550,
+      "usage_tokens": {
+        "prompt": 3864,
+        "completion": 720,
+        "total": 4584
+      },
+      "finish_reason": "unknown; not captured"
+    },
+    {
+      "number": 2,
+      "status": "attempted; HTTP 200",
+      "input": "Eastport had more shots on target.",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "58′",
+      "period": "Match so far",
+      "submitted_via": "Check again on call 1's saved opinion",
+      "provider": "foundry",
+      "provider_label": "Microsoft Foundry structured-output model; UI: Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "comparison": "Eastport greater than Northbridge"
+      },
+      "assessment": "supported",
+      "figures": {
+        "Eastport_shots_on_target": 3,
+        "Northbridge_shots_on_target": 2
+      },
+      "comparison_with_call_1": "The conversation displayed the 57′ → 58′ change: contradicted to supported; shots on target changed from Northbridge 2, Eastport 2 to Northbridge 2, Eastport 3. The new recorded moment was at 58′.",
+      "receipt_checks": {
+        "share_preview": "Displayed the original opinion, 58′ scope, supported assessment, figures, selected moments, evidence against, fixture identity/version, and Foundry provider label.",
+        "copied_card_text": "Clipboard text matched the preview and named Northbridge v Eastport, Original match v3.0.0, and Foundry.",
+        "png_button": "UI reported 'Card image downloaded.' The browser harness did not expose a download event, so the resulting PNG bytes were not independently opened or inspected.",
+        "additional_analyze_requests_during_comparison_and_receipt_checks": 0
+      },
+      "request_started_at_utc": "2026-10-27T12:34:02.620Z",
+      "browser_request_duration_ms": 8704,
+      "usage_tokens": {
+        "prompt": 3916,
+        "completion": 848,
+        "total": 4764
+      },
+      "finish_reason": "unknown; not captured"
+    },
+    {
+      "number": 3,
+      "status": "attempted; HTTP 200; run stopped on result mismatch",
+      "input": "Saka has had a horrible game",
+      "fixture": "Return",
+      "dataset_id": "northbridge-eastport-return-demo",
+      "dataset_version": "1.0.0",
+      "selected_time": "60′",
+      "period": "Match so far",
+      "provider": "foundry",
+      "provider_label": "Microsoft Foundry structured-output model; UI: Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Bukayo Saka has had a horrible game so far.",
+        "intent": "subjective-judgement",
+        "assessment": "insufficient evidence for a firm conclusion"
+      },
+      "reported_contributions": {
+        "shots_on_target": 2,
+        "completed_passes": 5,
+        "pass_attempts": 5,
+        "minutes_played_in_selected_period": 62,
+        "overall_rating": "not inferred"
+      },
+      "evidence_record_ids": [
+        "pass-009",
+        "pass-018",
+        "pass-026",
+        "pass-027",
+        "pass-028",
+        "pass-029",
+        "pass-038",
+        "pass-043",
+        "pass-046",
+        "pass-047",
+        "pass-048",
+        "pass-049",
+        "pass-059",
+        "return-event-06",
+        "return-event-07"
+      ],
+      "mismatch": "The answer reported 62 minutes played in a period selected through 60′. This exceeds the selected match time and violates the required time scope.",
+      "stop_reason": "First materially incorrect result; no later inputs were submitted.",
+      "request_started_at_utc": "2026-10-27T12:37:52.672Z",
+      "browser_request_duration_ms": 7173,
+      "usage_tokens": {
+        "prompt": 3837,
+        "completion": 733,
+        "total": 4570
+      },
+      "finish_reason": "unknown; not captured"
+    },
+    {
+      "number": 4,
+      "status": "not run; stopped after call 3",
+      "input": "How many passes did Bruno complete?",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "58′",
+      "period": "Match so far"
+    },
+    {
+      "number": 5,
+      "status": "not run; stopped after call 3",
+      "input": "Kingswell City had no shots on target.",
+      "fixture": "Westhaven/Kingswell",
+      "dataset_id": "westhaven-kingswell-demo",
+      "selected_time": "90+4′",
+      "period": "Match so far"
+    },
+    {
+      "number": 6,
+      "status": "not run; stopped after call 3",
+      "input": "Abraham has scored",
+      "fixture": "Redmere/Alderwick",
+      "dataset_id": "redmere-alderwick-demo",
+      "selected_time": "88′",
+      "period": "Match so far"
+    }
+  ],
+  "run_outcome": {
+    "completed": false,
+    "stopped_after_call": 3,
+    "stopping_mismatch": "Call 3's 62-minute figure exceeded its selected 60′ time.",
+    "unexpected_or_additional_analysis_requests": 0,
+    "api_and_ui_stopped": true,
+    "public_deployment_or_azure_changes": false,
+    "stored_configuration_changes": false,
+    "broad_reliability_claim": false
+  },
+  "capture_handling": "Raw Foundry captures and request-counter helper output are local and git-ignored. This ledger contains no credentials, endpoint, headers, raw provider output, or stored configuration values."
+}

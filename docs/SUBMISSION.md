@@ -18,7 +18,7 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 - The public candidate is configured to use a **local rule-based interpreter**. No model is called and no credentials are present.
 - An optional Microsoft Foundry structured-output adapter exists, disabled by default. If enabled, the model only interprets wording into a validated structure; all statistics, evidence selection and assessments are computed in application code. Invalid or failed model output is an explicit error, never a guessed answer.
-- Foundry has only had small live runs on earlier application versions (ledgers in `docs/`). Captured outputs are replayed offline through the real validation path; that is not live verification.
+- A bounded live run against application `2343167` made three of six authorised requests and stopped after a time-scope mismatch: at 60′, the Return-match response reported 62 minutes played. Calls 4–6 were not run. See the [sanitized ledger](./foundry-2343167-bounded-live-ledger.json). Earlier captured outputs replayed offline through the real validation path; offline replay is not live verification.
 
 ## Verification summary
 
@@ -30,11 +30,11 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 | Browser (desktop + 390 px/320 px emulation, local stack) | Prior Stage 1/2 checks plus current direct demo route: 0 analyze calls on entry, 1 on explicit submit, 0 on replay movement, 1 on explicit recheck. Both new fixture identities and team names verified in replies and exports; see `docs/NEXT_SESSION.md`. |
 | Language matrix | 42 inputs: 42 pass, 0 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
-| Live Foundry for the current work | **None** |
+| Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 reported 62 minutes at 60′. Calls 4–6 not run; no broad reliability claim. |
 
-Final Stage 2 follow-up (27 October 2026; application commit `2343167`): catalog foreign-team opponents are preserved distinctly and rejected without team attribution, statistics or evidence, and are not sent to a supplied model provider. Uncatalogued comparison opponents now prompt for clarification rather than inheriting the fixture's second team. Valid fixture aliases and descriptive opinions remain covered. Homepage limitations and the compound demonstration route were corrected; the direct guided route was rehearsed with explicit submit/recheck. API 308/308 and web 121/121 pass; baseline hash remains unchanged. This work was offline/local only.
+Final Stage 2 follow-up (27 October 2026; application commit `2343167`): catalog foreign-team opponents are preserved distinctly and rejected without team attribution, statistics or evidence, and are not sent to a supplied model provider. Uncatalogued comparison opponents now prompt for clarification rather than inheriting the fixture's second team. Valid fixture aliases and descriptive opinions remain covered. Homepage limitations and the compound demonstration route were corrected; the direct guided route was rehearsed with explicit submit/recheck. API 308/308 and web 121/121 pass; baseline hash remains unchanged.
 
-Independent review note: the additional composition repairs have nine regression tests and the complete 42-case local corpus passes. The captured baseline responses also pass through the actual web comparison/share functions offline. Browser rendering could not be independently repeated in the review runtime; the following interaction results are the supplied candidate's reported checks. Native phone sharing and live Foundry remain unverified.
+Independent review note: the additional composition repairs have nine regression tests and the complete 42-case local corpus passes. The captured baseline responses also pass through the actual web comparison/share functions offline. Browser rendering could not be independently repeated in the review runtime; the following interaction results are the supplied candidate's reported checks. Native phone sharing remains unverified. The bounded live Foundry run is recorded below and in the linked ledger; it stopped after call 3 and did not verify the remaining inputs.
 
 Browser interaction note: ordinary Playwright pointer clicks (with actionability checks) worked on desktop and 390 px emulation for home, match selection, example, submit, replay controls, Move to 58′, Check again and evidence expansion. The earlier interception was not reproduced; no DOM `click()` was used. Not verified: screen readers, real devices, a full keyboard audit.
 
@@ -71,7 +71,7 @@ Smallest credible route:
 
 Dependencies: a new storage resource and a code change in the API; both need explicit approval. Not implemented.
 
-### Stage 2 audit findings (repository-only; no model calls, no Azure changes)
+### Stage 2 audit findings (repository-only, before the authorised 27 October run; no model calls or Azure changes)
 
 - **What Foundry supports today:** the structured-interpretation schema and prompt cover the original two matches’ vocabulary (team enums `Northbridge`/`Eastport`, Bruno example). Count assertions (negation, “every”, zero), shot location and the repaired composition forms are implemented in local rules only.
 - **Captured outputs:** the genuine `cf10c74` captures still replay through the current validator, service, web comparison and share functions with provider `foundry` (offline replay, not new verification). Constructed transport stubs for the Return fixture and for Westhaven FC v Kingswell City check that the selected fixture supplies events, evidence, calculations and metadata. They are not captures and not live results.
@@ -86,15 +86,6 @@ Dependencies: a new storage resource and a code change in the API; both need exp
 4. Fixture-aware team names in the Foundry context/schema for the two new fixtures.
 5. Approvals needed: a storage resource, server settings for credentials/caps, enabling the flag on a hosted instance. None has been requested or performed.
 
-### Proposed fixed live acceptance set (execution NOT authorised)
+### Bounded live acceptance result (application `2343167`)
 
-Candidate commit: `2343167` (latest application commit, including the foreign-opponent and unknown-comparison repairs). Exact inputs: the six opinions listed above, on the fixtures and times stated there. Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Not executed; do not run it from this document.
-
-1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
-2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).
-3. “Northbridge did not score in the first half” — Original, 57′ (negation). Note: the Foundry schema is unchanged, so this tests how the model expresses it, not the local count-assertion path.
-4. “Every Eastport shot was on target” — Original, 57′ (quantifier; same note).
-5. “Eastport had more possession than Northbridge but Northbridge had more shots” — Return, 90+4′ (multiple claims, differing metrics).
-6. “How many passes did Bruno complete?” — Original, 58′ (clarification regression).
-
-Record the interpretation, provider, assessment, timing and any token usage in a new sanitised ledger.
+The authorised six-input run attempted the first three exact inputs and stopped after call 3. The 60′ Return-match answer reported 62 minutes played, violating the selected-time cutoff. Inputs 4–6 were not run; no retries or replacement calls were made. Calls 1 and 2 returned the expected 57′ contradiction and 58′ support, and the 57′→58′ comparison and copied receipt showed the correct figures, fixture version and Foundry label. The PNG control reported a download, but the harness did not expose the file for byte-level inspection. Full sanitized details, including exact inputs, request timings, token counts, provider and dataset IDs, are in [the live ledger](./foundry-2343167-bounded-live-ledger.json). This small, stopped run does not establish broad Foundry reliability.

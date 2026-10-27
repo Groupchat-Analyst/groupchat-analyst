@@ -1,5 +1,14 @@
 # Next-session handoff
 
+## Bounded live Foundry run (application `2343167`; stopped after call 3)
+
+- Preflight confirmed a clean worktree and application/fixture blobs identical to `2343167`; the only descendant was the docs commit `3e8ebca`. Isolated API/UI services used ports 7416/5416 and process-only provider/capture overrides. Stored configuration and application code were not changed.
+- Exactly three outbound Foundry requests were made, one per attempted browser submission. Calls 1 and 2 met their stated expectations, including the 57′→58′ comparison. Receipt preview and copied text preserved the opinion, figures, fixture/version and Foundry label; those actions added 0 analyze requests.
+- Call 3, Return fixture at 60′, received HTTP 200 from Foundry and returned a qualified subjective judgement for Bukayo Saka. Its response nevertheless said he had “played 62 minutes in the selected period”, exceeding the selected 60′ scope. The run stopped immediately; calls 4–6 were not run.
+- Three successful captures record token usage; browser resource timing was 7,550 ms, 8,704 ms and 7,173 ms. Finish reason was not captured. The PNG button reported a download, but this browser harness did not expose a download event, so the PNG bytes were not independently inspected.
+- The isolated services were stopped. No live call was made to the public deployment; no retries, replacement calls, Azure changes, stored-setting changes or application repairs occurred. This three-call run does not establish broad reliability.
+- Sanitized call-by-call record: [foundry-2343167-bounded-live-ledger.json](./foundry-2343167-bounded-live-ledger.json). Raw captures remain local and git-ignored.
+
 ## Final repair patch from the independent Stage 2 review (application `2343167`)
 
 - Patch base `f4eae5c` applied cleanly to the same branch/HEAD, with a clean worktree before application. No newer local edits were present.
@@ -7,7 +16,7 @@
 - Unknown explicit comparison opponents now prompt for clarification rather than silently using the current fixture’s other team. Regression coverage checks both team orders, aliases/case, negation, possession and shot comparisons, unsupported teams/players, plus ordinary descriptive and completed-pass comparisons to guard against false positives.
 - Homepage limits copy now refers to every fictional match; the 20-second walkthrough has explicit submission for the Return-match compound example, and the direct `/demo` route is documented as part of the guided flow.
 - Rehearsed the direct route in browser emulation with the local provider: prepared opinion and 57′ scope with 0 analyze calls; explicit submit=1; replay move=0 additional; explicit 58′ recheck=1 additional. Both expected replies and comparison appeared.
-- API build and **308/308 API tests** pass; web typecheck, lint, build and **121/121 web tests** pass. Baseline remains `fb5335ff…1044` (70 passes, 17 turnovers); asserted language matrix remains 42/42 PASS; `git diff --check` clean. No live model call, deployment or Azure change.
+- API build and **308/308 API tests** pass; web typecheck, lint, build and **121/121 web tests** pass. Baseline remains `fb5335ff…1044` (70 passes, 17 turnovers); asserted language matrix remains 42/42 PASS; `git diff --check` clean. Those patch checks were offline/local; no deployment or Azure change was made.
 
 ## Final Stage 2 review follow-up (application `36ce40c`)
 
@@ -67,7 +76,7 @@ Branch from `main` (after PR #7). Commits: `68f98bd` Saka/player-language repair
 - **Browser checks on the new fixtures (emulation, ordinary pointer clicks; no real device, no screen reader):** Westhaven→Redmere, Westhaven→Redmere→Westhaven, Redmere→Westhaven and Redmere→Westhaven→Redmere with a fresh draft typed before releasing the held `/api/analyze` request, released both as a real success (`continue`) and as a 503: each made exactly one request, left the fresh draft untouched, added no turn and showed no error. A failed recheck at 58′ (503) kept the 57′ answer and the edited draft and showed “Try again”; retry sent one request using the saved opinion, produced one 58′ turn and the what-changed comparison, and left the edited draft. The replay control, navigation and examples made no analyze call. Exports for both new fixtures (copied reply, copied card text, share preview, and the real PNG blob the Download button generates, 543 KB and 457 KB `image/png`) carry display names, original wording, dataset/version (“Late winner v1.0.0”, “Goalless match v1.0.0”), 57′ and “read by local rules”, with no Northbridge/Eastport text. Harness notes: native element clicks missed after a viewport resize, so coordinates were scaled by width/innerWidth and `page.mouse.click` used; the download event is not emitted by this browser tool, so the anchor download was intercepted in-page and the blob rendered as an image (the saved screenshots show it); the PNG itself was not saved as a file. Native sharing on a real phone remains unverified.
 - **Language:** [LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md): 42 inputs, 42 pass, 0 partial, 0 fail under local rules, asserted in `language-matrix.test.mjs` and `topic-context.test.mjs`. Foundry interpretation of the repaired forms is unverified.
 - **Not verified:** native share on a real phone; any live Foundry call for the current work (prompt and schema unchanged; earlier live ledgers belong to the earlier version); screen-reader use and real devices. Keyboard Tab order was exercised only through the ordinary browser journey, not a full audit.
-- **Foundry access recommendation and proposed (unauthorised) live set:** [SUBMISSION.md](./SUBMISSION.md).
+- **Foundry access recommendation and current verification status:** [SUBMISSION.md](./SUBMISSION.md). The earlier proposal was superseded by the bounded run recorded at the top of this handoff.
 - **Known gaps:** the Return fixture has constructed offline transport-stub coverage, not genuine Foundry captures from that fixture; no automated component tests for `MatchView`/`Shell`; the home page and match list were not given a separate accessibility audit.
 
 The sections below are the earlier handoff, kept for history.
@@ -158,31 +167,16 @@ Current walkthrough is **local-provider verified** (local interpreter), not Foun
 - "Share the receipts" (single card and what-changed card) is shown only where `navigator.canShare({files})` is true. It reuses the download PNG, prepared ahead of the tap and keyed by card content; cancellation is silent; copy/download remain. No delivery is claimed. Sharing makes no analysis requests.
 - Verified: unit tests, local-provider browser journey (desktop and 390 px emulation), forced-500 failure path, and request counting with a stubbed `navigator.share`. **Native share is unverified on a real device** until tested on an iPhone against the hosted candidate.
 
-## 3. Proposed Foundry plan (NOT AUTHORISED FOR EXECUTION)
+## 3. Foundry verification status and remaining blocker
 
-Do not run without explicit approval after review. Use the existing server-side Foundry host with the stored configuration; do not print credentials. All four use **Match so far**.
+The previously proposed acceptance set was superseded by the explicitly authorised six-input run recorded above. That run stopped after call 3 because a 60′ response reported 62 minutes played. Do not rerun or continue the remaining inputs without a new explicit authorisation and a fix reviewed outside the live run.
 
-Provider settings (from source and the git-ignored local settings; values only, no secrets): deployment `gpt-5-mini`; strict JSON-schema Chat Completions; **`max_completion_tokens: 8192`** (added after `41edbc8`; previously no ceiling); provider timeout **30 s** (fixed in code); **no retries** (a single `fetch`, no SDK, no retry loop); no reasoning setting sent. Browser deadline 45 s. Truncation (`finish_reason: length`) is rejected as `incomplete-output` even if the partial content parses (offline-tested).
+The current host still has an 8192 completion-token ceiling, 30 s provider timeout, no retry loop, and 45 s browser deadline. These bound a single request; they are not a durable total allowance. The judge-accessible allowance, per-client limit, exhaustion/fallback semantics, and fixture-aware Foundry team context/schema remain proposed—not implemented. No live verification was performed for Westhaven/Kingswell or Redmere/Alderwick in this run.
 
-| # | Exact take | Clock | Expected |
-| --- | --- | --- | --- |
-| 1 | "Eastport had more shots on target." | 57′ | Eastport vs Northbridge shots on target, match so far through 57′; 2–2; "more" contradicted. If Foundry instead asks for clarification, record it as a **demo limitation**; do not convert it into another claim. |
-| 2 | "Eastport had more shots on target." (identical text) | 58′ | Same interpretation; Eastport 3, Northbridge 2; supported; direct comparison with #1. Same clarification rule. |
-| 3 | "Northbridge parked the bus." | 57′ | No definitive verdict; not silently mapped to low possession; qualified, evidence-limited response saying the data can't establish defensive shape. |
-| 4 | "How many passes did Bruno complete?" | 58′ | Clarification asking Bruno Fernandes or Bruno Guimarães; no pass count until resolved. |
-
-Controls:
-
-- **Output limit:** 8192 completion tokens, set in code. Record `completion_tokens` per call from the usage the server already logs.
-- **Capture:** `FOUNDRY_CAPTURE_RAW_OUTPUT=true` via the server environment for the bounded run only (stored settings unchanged). It writes timestamp, the model's structured output string and token usage to `apps/api/.local-captures/foundry-raw-output.jsonl` (git-ignored). It does not record credentials, headers, endpoint, deployment or the request. It does **not** record timing, finish reason or the provider label, so capture those by hand. Captured output can echo the take text. It is written only after an HTTP 2xx, so transport, auth and timeout failures leave no capture. Delete or move the file after review; do not commit it.
-- **Stop conditions:** stop at the first transport/auth failure, schema failure, truncation (`incomplete-output`), wrong provider label, 30 s timeout, or a materially incorrect interpretation. Also stop after call 4.
-- **No retries**, no manual re-submits (including the UI "Try again"), no automatic extra calls. Mark a failed call as failed rather than rerunning it.
-- Confirm the UI/provider label reads Foundry for these calls only.
-
-Four calls cannot establish production reliability: consistency across repeat runs, broad phrasing coverage, failure rate, latency distribution, cost at scale, or parity of Foundry wording with local wording.
+Three calls cannot establish production reliability: repeatability, broad language coverage, failure rate, latency distribution, cost at scale, or parity with local wording remain unknown.
 
 ## 4. Next actions (priority order)
 
-1. Review this plan before spending any model credits.
-2. Resolve any demonstrated release-blocking issues.
+1. Investigate and repair the reported future-minutes scope mismatch without making live model calls.
+2. Re-run local regression checks for player minutes and the selected match-time cutoff.
 3. Obtain Rob's feedback and prepare deployment/submission materials.
