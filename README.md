@@ -73,7 +73,7 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (local rules): home, four-match selection and conversation at 1280 px and 390 px; 320 px has no horizontal overflow. Keyboard navigation visibly focuses the language selector. The 57′ submit and 58′ explicit recheck made exactly two analyze requests; replay movement, language changes, navigation, copy and PNG generation made none. Switching through all five locales retained the exact draft, clock and two-turn comparison. An actual downloaded Arabic receipt PNG (2160×2420) was decoded and visually inspected; its copied text and image retain the submitted opinion, 58′ scope, fixture/version, figures, event times and local-provider label. Other-language receipt strings and SVGs have automated regressions. Native sharing on a real phone is **unverified**.
 
-Automated checks: **352/352 API tests** and **137/137 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. The baseline fixture source is unchanged (70 passes, 17 turnovers; existing baseline hash `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`). Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated checks: **358/358 API tests** and **137/137 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
 Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 
@@ -86,7 +86,7 @@ Foundry (not used by the hosted candidate): earlier small, bounded live runs are
 - Snapshots are in browser memory and are lost on refresh. Analysis requests have a 45 s client deadline; an abort does not guarantee server work stopped.
 - No real-device, screen-reader or load testing. Real-phone native sharing is unverified. There is no durable total-request allowance or judge-accessible hosted AI route; the public candidate remains on local rules.
 - No messaging, accounts, publishing or chat ingestion exist. A messaging companion is a future idea only.
-- Production player-clarification continuation requires a stable `PLAYER_RESOLUTION_SIGNING_KEY` shared across API instances and restarts; development uses an ephemeral process-local key.
+- Production player-clarification continuation requires `PLAYER_RESOLUTION_SIGNING_KEY`: exactly 32 cryptographically random bytes encoded as unpadded base64url (43 characters), shared across API instances and restarts. Configure it only in the API server's environment settings; never in browser/Vite settings or source control. With `NODE_ENV=production`, a missing or malformed key fails the request explicitly (HTTP 502), with no ephemeral fallback. Development without the variable uses a process-local random key. Tokens have no expiry: rotating the key immediately invalidates outstanding clarification/recheck continuations; there is no previous-key verification ring.
 
 ## Deployment and further reading
 

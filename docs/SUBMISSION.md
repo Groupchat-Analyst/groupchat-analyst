@@ -26,14 +26,14 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 | Check | Result |
 | --- | --- |
-| API tests | 352 pass, including captured-call replay, fixture, duration, player-resolution and language regressions |
+| API tests | 358 pass, including captured-call replay, fixture, duration, player-resolution and language regressions |
 | Web tests | 137 pass |
 | API/web typecheck, web lint and production build | Pass |
 | `git diff --check` | Pass |
-| Baseline fixture verification | Six fixture/canonical-source Git blobs match the starting commit; 70 passes and 17 turnovers. The previously recorded baseline digest is `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`. |
+| Baseline fixture verification | Fixture source blobs remain unchanged; 70 passes and 17 turnovers. The historical semantic digest is `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` and was not recomputed in this release. |
 | Language matrices | English corpus: 42/42 PASS. Five languages: 30/30 PASS (six asserted behavior classes per language). Broader non-English rule coverage and all live Foundry interpretation are unverified. |
 | Browser (local rules) | Existing walkthrough checks remain; all five player-selection flows passed with pointer and keyboard choice, preserving original opinion, language, draft, scope and one conversation turn. Five analysis and five explicit selection API requests; no interpreter call during selection. Explicit retry after an injected failure made no automatic retry or duplicate turn. A→B late success and A→B→A late failure did not alter the new draft, conversation or error state. |
-| Arabic receipt | Earlier actual downloaded PNG inspection remains recorded above. For player selection, the UI reported a successful download; the harness did not expose a download event. The same application rasterizer generated a 2160×1340 PNG from the rendered Arabic receipt blocks and that image was visually inspected. Original opinion, selected player, 57′ scope, Original match v3.0.0, local-provider disclosure and selection provenance are present; downloaded file bytes could not be independently retrieved. |
+| Arabic receipt | For player selection, clicked the UI download action and captured the exact PNG blob passed to its download anchor. Valid 2160×1584 PNG, 340,825 bytes; visually inspected. It contains the original Arabic opinion, selected Bruno Fernandes, 1 completed pass, 58′ scope, Northbridge v Eastport, Original v3.0.0, local-rules and user-selection disclosures. Mixed Arabic/Latin layout is legible; some event/detail labels remain English. Playwright did not expose a native download event, so the exact anchor payload—not a second rasterization—was captured. |
 | Native share on a real phone | **Unverified** |
 | Live multilingual Foundry | **Not run**. Language acceptance used local rules only; no prompt/schema/credential changes. |
 | Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
@@ -55,7 +55,17 @@ Offline regressions cover both Bruno choices and attributed records, unrelated/f
 
 Browser verification used the local provider only. Each of the five language flows preserved its original input and selected identity; language changes before and during resolution did not submit another request. A simulated 503 required one explicit retry. Delayed late success/failure were tested across A→B and A→B→A navigation. No live Foundry, external translation, Azure or credential changes occurred. A stable `PLAYER_RESOLUTION_SIGNING_KEY` must be configured for production and shared across API instances/restarts; no key is included here.
 
-The actual download event was unavailable to the browser automation harness, so retrieved download bytes remain unverified. The same `svgToPngBlob` export function produced a 2160×1340 Arabic player-selection receipt that was inspected; native sharing on a real device remains unverified. Broader non-English wording, independent native-speaker review, screen readers and real-device testing remain open.
+At that earlier check, the browser automation harness did not expose a download event, so the downloaded bytes were then unverified. The same `svgToPngBlob` export function produced a 2160×1340 Arabic player-selection receipt that was inspected; native sharing on a real device remains unverified. The subsequent release verification below captured the actual download-anchor payload.
+
+## Release verification addendum (application commit `5034094`)
+
+Selection-to-answer and explicit recheck were exercised for both Bruno choices, both “Martin” and “Martín” aliases resolving to Martín Zubimendi/Martin Ødegaard, and “Pedro” resolving to Joao Pedro/Pedro Neto. Player statistics were attributed only to the selected ID, with original time, period and dataset retained; rechecks retained the selected player. Full names for these players bypass selection. In the local browser, the Arabic Bruno flow selected Fernandes at 58′ and rechecked at 83′; the Westhaven flow selected Joao Pedro at 62′ and rechecked at 80′. This uncovered and repaired missing Pedro candidate generation and surname-overlap ambiguity for explicit names.
+
+The latest captured Foundry Bruno interpretation was replayed offline through the real adapter, validation, service and both continuation outcomes with stubbed transport. Exactly one mocked outbound response occurred; resolution added none. Both outcomes retained the original provider and Foundry answer label, with the selected player exposed as user-selected provenance. This is not live Foundry verification.
+
+`PLAYER_RESOLUTION_SIGNING_KEY` format is canonical unpadded base64url for 32 cryptographically random bytes (43 characters). Configure it only in the API server environment and use the same value across instances and restarts. In production (`NODE_ENV=production`), a missing or malformed key fails explicitly with HTTP 502; development without it uses a process-local random key, which can invalidate continuations after worker restart. Signed continuations do not expire. Rotating the key invalidates outstanding continuations; there is no previous-key ring. Automated checks verified missing/malformed configuration, cross-process continuation with a shared test key, altered context/signature rejection and rejection with another key. No production key was generated, printed, committed or configured.
+
+The isolated Azure Functions host restarted its worker because local Azure Storage health was unavailable. A recheck with the intentionally ephemeral development key then correctly failed signature validation; a fresh browser journey with a stable process-only test key passed the 58′→83′ resolved-player recheck. This documents the development limitation and is not a production-secret verification. No Azure resource or configuration was changed.
 
 ### Separate deployment gates (not implemented)
 
