@@ -15,10 +15,24 @@ export type PlayerResolutionGrant = {
 }
 
 const developmentSecret = randomBytes(32).toString('base64url')
+const signingKeyBytes = 32
+
+function validateSigningKey(secret: string): string {
+  const decoded = Buffer.from(secret, 'base64url')
+  if (
+    decoded.length !== signingKeyBytes ||
+    decoded.toString('base64url') !== secret
+  ) {
+    throw new Error(
+      'PLAYER_RESOLUTION_SIGNING_KEY must be 32 random bytes encoded as unpadded base64url.',
+    )
+  }
+  return secret
+}
 
 export function playerResolutionSecret(): string {
   const configured = process.env.PLAYER_RESOLUTION_SIGNING_KEY
-  if (configured) return configured
+  if (configured !== undefined) return validateSigningKey(configured)
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
       'Player clarification is unavailable until PLAYER_RESOLUTION_SIGNING_KEY is configured.',
@@ -31,6 +45,7 @@ export function signPlayerResolution(
   grant: PlayerResolutionGrant,
   secret = playerResolutionSecret(),
 ): string {
+  validateSigningKey(secret)
   const body = Buffer.from(JSON.stringify(grant)).toString('base64url')
   const signature = createHmac('sha256', secret).update(body).digest('base64url')
   return `${body}.${signature}`
@@ -40,6 +55,7 @@ export function verifyPlayerResolution(
   token: unknown,
   secret = playerResolutionSecret(),
 ): PlayerResolutionGrant {
+  validateSigningKey(secret)
   if (typeof token !== 'string' || token.length > 100_000) {
     throw new InputValidationError('Player clarification token is invalid.')
   }

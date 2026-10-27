@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { analyzeOpinion } from '../dist/api/src/service.js'
 import { FoundryInterpretationProvider } from '../dist/api/src/providers/foundry.js'
+import { verifyPlayerResolution } from '../dist/api/src/playerResolution.js'
 
 // Captured-output replay: structured outputs recorded in the cf10c74 live run,
 // replayed through a stubbed transport. This is not live Foundry verification.
@@ -116,6 +117,65 @@ test('latest captured Bruno interpretation replays unchanged through Foundry val
   assert.deepEqual(claim.evidence, [])
   assert.match(result.fanReply, /Which Bruno do you mean: Bruno Fernandes \(Eastport\) or Bruno Guimarães \(Northbridge\)\?/)
   assert.doesNotMatch(result.fanReply, /\d+ (?:completed )?passes?/i)
+})
+
+test('latest captured Bruno output resolves either candidate offline with Foundry provenance', async () => {
+  const latest = JSON.parse(
+    await readFile(
+      new URL('./fixtures/foundry-2026-10-27-call4-interpretation.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  let outboundRequests = 0
+  const provider = new FoundryInterpretationProvider(
+    { baseUrl: 'https://example.invalid/openai/v1', apiKey: 'mock-key', deployment: 'mock' },
+    async () => {
+      outboundRequests += 1
+      return new Response(
+        JSON.stringify({
+          choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(latest) } }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    },
+  )
+  const initial = await analyzeOpinion(
+    request('How many passes did Bruno complete?', 58),
+    provider,
+  )
+  const candidates = initial.claims[0].playerResolution.candidates
+
+  assert.equal(outboundRequests, 1)
+  assert.equal(initial.provider, 'foundry')
+  assert.equal(initial.providerLabel, 'Microsoft Foundry structured-output model')
+  assert.equal(candidates.length, 2)
+
+  for (const candidate of candidates) {
+    const resolved = await analyzeOpinion({
+      action: 'resolve-player',
+      continuation: initial.playerResolutionContinuation,
+      claimId: initial.claims[0].claim.id,
+      playerId: candidate.id,
+    })
+    const claim = resolved.claims[0]
+    const grant = verifyPlayerResolution(resolved.playerResolutionContinuation)
+
+    assert.equal(outboundRequests, 1)
+    assert.equal(resolved.provider, 'foundry')
+    assert.equal(resolved.providerLabel, 'Microsoft Foundry structured-output model')
+    assert.equal(grant.provider, 'foundry')
+    assert.equal(grant.request.opinion, 'How many passes did Bruno complete?')
+    assert.equal(resolved.selectedTime, '58′')
+    assert.equal(
+      resolved.selectedPeriodLabel,
+      'Match so far through 58′',
+    )
+    assert.equal(claim.claim.playerSubject.id, candidate.id)
+    assert.equal(claim.claim.playerSubject.name, candidate.name)
+    assert.deepEqual(resolved.selectedPlayers.map(({ id }) => id), [candidate.id])
+    assert.ok(claim.playerStatistics.length > 0)
+    assert.ok(claim.playerStatistics.every(({ playerId }) => playerId === candidate.id))
+  }
 })
 
 test('unresolved statistical entity without clarification is still rejected', async () => {

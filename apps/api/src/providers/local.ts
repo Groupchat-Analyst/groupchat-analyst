@@ -131,21 +131,53 @@ function mentionedPlayers(
   players: InterpretationContext['players'],
 ): PlayerEntityReference[] {
   const normalizedText = ` ${normalizeName(text).replace(/[’']/g, ' ')} `
+  const spansOf = (name: string) => {
+    const normalizedName = normalizeName(name)
+    const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const expression = new RegExp(
+      `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+      'gu',
+    )
+    return [...normalizedText.matchAll(expression)].map(({ index }) => ({
+      start: index!,
+      end: index! + normalizedName.length,
+    }))
+  }
+  const fullNameSpans = players.flatMap((player) =>
+    normalizeName(player.name).split(/\s+/).length > 1
+      ? spansOf(player.name).map((span) => ({ playerId: player.id, ...span }))
+      : [],
+  )
+  const coveredByAnotherFullName = (
+    span: { start: number; end: number },
+    playerId: string,
+  ) =>
+    fullNameSpans.some(
+      (fullName) =>
+        fullName.playerId !== playerId &&
+        span.start >= fullName.start &&
+        span.end <= fullName.end,
+    )
   const strongMatches = players.filter((player) => {
     const parts = normalizeName(player.name).split(/\s+/)
-    const fullName = normalizeName(player.name)
-    return normalizedText.includes(` ${fullName} `) ||
-      (parts.length > 1 && normalizedText.includes(` ${parts[parts.length - 1]} `)) ||
-      (parts.length === 1 && normalizedText.includes(` ${parts[0]} `))
+    const fullNameMatches = spansOf(player.name)
+    if (fullNameMatches.length > 0) return true
+    const shortNameMatches = spansOf(parts[parts.length - 1])
+    return shortNameMatches.some(
+      (span) => !coveredByAnotherFullName(span, player.id),
+    )
   })
   const stronglyResolvedFirstNames = new Set(
     strongMatches.map(({ name }) => normalizeName(name).split(/\s+/)[0]),
   )
   const firstNameMatches = players.filter((player) => {
     const firstName = normalizeName(player.name).split(/\s+/)[0]
+    const firstNameMatches = spansOf(firstName)
     return (
       !stronglyResolvedFirstNames.has(firstName) &&
-      normalizedText.includes(` ${firstName} `) &&
+      firstNameMatches.some(
+        (span) => !coveredByAnotherFullName(span, player.id),
+      ) &&
       normalizeName(player.name).split(/\s+/).length > 1
     )
   })

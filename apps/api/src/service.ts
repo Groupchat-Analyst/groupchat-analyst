@@ -2810,10 +2810,16 @@ function playerCandidatesForClaim(
   const canonicalOpinion = canonicalizeSupportedFootballOpinion(opinion)
   const groups = new Map<string, PlayerResolutionOption[]>()
   for (const player of players) {
-    const firstName = player.name.trim().split(/\s+/u)[0]
-    if (firstName.length < 3) continue
-    const key = normalizePlayerName(firstName)
-    groups.set(key, [...(groups.get(key) ?? []), player])
+    const aliases = new Set(
+      player.name
+        .trim()
+        .split(/\s+/u)
+        .filter((name) => name.length >= 3)
+        .map(normalizePlayerName),
+    )
+    for (const alias of aliases) {
+      groups.set(alias, [...(groups.get(alias) ?? []), player])
+    }
   }
   const matching = [...groups.entries()].filter(
     ([alias, candidates]) =>

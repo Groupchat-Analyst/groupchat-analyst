@@ -156,6 +156,133 @@ test('full player names and explicit team context do not expose an ambiguous cho
   }
 })
 
+test('Martin and Pedro name aliases complete selection and recheck with attributed evidence', async () => {
+  const scenarios = [
+    {
+      opinion: 'How many passes did Martin complete?',
+      datasetId: 'northbridge-eastport-return-demo',
+      selectedClock: { period: 2, minute: 60 },
+      version: '1.0.0',
+      candidates: ['Martín Zubimendi', 'Martin Ødegaard'],
+      recheckClock: { period: 2, minute: 90, stoppageMinutes: 4 },
+    },
+    {
+      opinion: 'How many passes did Martín complete?',
+      datasetId: 'northbridge-eastport-return-demo',
+      selectedClock: { period: 2, minute: 60 },
+      version: '1.0.0',
+      candidates: ['Martín Zubimendi', 'Martin Ødegaard'],
+      recheckClock: { period: 2, minute: 90, stoppageMinutes: 4 },
+    },
+    {
+      opinion: 'How many passes did Pedro complete?',
+      datasetId: 'westhaven-kingswell-demo',
+      selectedClock: { period: 2, minute: 62 },
+      version: '1.0.0',
+      candidates: ['Joao Pedro', 'Pedro Neto'],
+      recheckClock: { period: 2, minute: 70 },
+    },
+  ]
+
+  for (const scenario of scenarios) {
+    const requestScope = {
+      opinion: scenario.opinion,
+      datasetId: scenario.datasetId,
+      selectedClock: scenario.selectedClock,
+      period: 'match-so-far',
+      inputLanguage: 'en',
+    }
+    const initial = await analyzeOpinion(requestScope)
+    assert.ok(initial.claims[0].playerResolution)
+    assert.deepEqual(
+      initial.claims[0].playerResolution.candidates
+        .map(({ name }) => name)
+        .sort(),
+      [...scenario.candidates].sort(),
+    )
+    assert.equal(initial.claims[0].assessment, 'clarification needed')
+    assert.deepEqual(initial.claims[0].evidence, [])
+
+    for (const candidate of initial.claims[0].playerResolution.candidates) {
+      const selected = await analyzeOpinion({
+        action: 'resolve-player',
+        continuation: initial.playerResolutionContinuation,
+        claimId: initial.claims[0].claim.id,
+        playerId: candidate.id,
+      })
+      const claim = selected.claims[0]
+      assert.equal(selected.provider, 'local')
+      assert.equal(selected.selectedTime, initial.selectedTime)
+      assert.equal(selected.selectedPeriodLabel, initial.selectedPeriodLabel)
+      assert.equal(selected.evidenceFoundation.dataset.id, scenario.datasetId)
+      assert.equal(selected.evidenceFoundation.dataset.version, scenario.version)
+      assert.equal(claim.claim.playerSubject.id, candidate.id)
+      assert.equal(claim.claim.playerSubject.name, candidate.name)
+      assert.equal(claim.assessment, 'statistics provided')
+      assert.ok(claim.playerStatistics.length > 0)
+      assert.ok(claim.playerStatistics.every(({ playerId }) => playerId === candidate.id))
+      assert.equal(
+        verifyPlayerResolution(selected.playerResolutionContinuation).request.opinion,
+        scenario.opinion,
+      )
+      assert.deepEqual(selected.selectedPlayers.map(({ id }) => id), [candidate.id])
+
+      const rechecked = await analyzeOpinion({
+        action: 'recheck-resolved-player',
+        continuation: selected.playerResolutionContinuation,
+        selectedClock: scenario.recheckClock,
+        period: 'last-10-minutes',
+      })
+      assert.equal(rechecked.evidenceFoundation.dataset.id, scenario.datasetId)
+      assert.equal(rechecked.claims[0].claim.playerSubject.id, candidate.id)
+      assert.equal(rechecked.selectedTime, scenario.recheckClock.stoppageMinutes
+        ? '90+4′'
+        : `${scenario.recheckClock.minute}′`)
+      assert.ok(
+        rechecked.claims[0].playerStatistics.every(
+          ({ playerId }) => playerId === candidate.id,
+        ),
+      )
+    }
+  }
+})
+
+test('unambiguous Martin and Pedro full names bypass player selection', async () => {
+  for (const [datasetId, opinion, expectedName] of [
+    [
+      'northbridge-eastport-return-demo',
+      'How many passes did Martín Zubimendi complete?',
+      'Martín Zubimendi',
+    ],
+    [
+      'northbridge-eastport-return-demo',
+      'How many passes did Martin Ødegaard complete?',
+      'Martin Ødegaard',
+    ],
+    [
+      'westhaven-kingswell-demo',
+      'How many passes did Joao Pedro complete?',
+      'Joao Pedro',
+    ],
+    [
+      'westhaven-kingswell-demo',
+      'How many passes did Pedro Neto complete?',
+      'Pedro Neto',
+    ],
+  ]) {
+    const result = await analyzeOpinion({
+      opinion,
+      datasetId,
+      selectedClock: { period: 2, minute: 62 },
+      period: 'match-so-far',
+      inputLanguage: 'en',
+    })
+    assert.equal(result.claims[0].playerResolution, undefined, opinion)
+    assert.equal(result.claims[0].claim.playerSubject.name, expectedName, opinion)
+    assert.equal(result.claims[0].assessment, 'statistics provided', opinion)
+  }
+})
+
 test('Arabic Bruno clarification uses localized opinion meaning to offer canonical player choices', async () => {
   const opinion = 'كم تمريرة أكمل برونو؟'
   const stub = providerFor([ambiguousBruno])
