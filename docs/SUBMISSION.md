@@ -14,6 +14,17 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 - “Check again” at a later minute produces a deterministic comparison; the card, copied text and PNG are built from the same content and name the fixture, version and how the opinion was read.
 - Dataset selection is allowlisted server-side. Omitting `datasetId` selects the original match; unknown or malformed IDs are rejected.
 - An accessible language selector provides English, Spanish, French, German and Arabic throughout the interface and receipts. Language changes do not submit or rerun analysis and preserve the active draft and conversation.
+- Arabic presentation transliterates every canonical team and player name across all four fixtures without changing identity. Arabic aliases are recognized as input while shared-name ambiguity remains explicit; the original submitted wording stays intact.
+
+## Arabic identity completion (application commit `d61bd5d`)
+
+Arabic generated text now uses correct player interpolation, translated metric and period metadata, count-appropriate forms, localized status and accessibility labels, and fully translated receipt text. The omitted-event count in share cards is localized. Regressions cover fixture-scoped name mappings and aliases, ambiguous Bruno/Martin/Pedro names, direct full-name resolution, metric agreement, metadata and the absence of undefined output.
+
+Offline browser verification used local rules only. In Return (`northbridge-eastport-return-demo` v1.0.0), “كم تمريرة أكمل برونو؟” resolved to Bruno Fernandes at 57′ Match so far with 18 attributed completed passes. The evidence list contains only his records through 53′; no post-cutoff evidence was shown. Expanded details keep the original English records available in a collapsed section labeled as English source wording. Switching Arabic↔French preserved the answer, original wording, unsent draft and selected scope, with zero analysis requests.
+
+The actual Arabic UI download after player selection is a valid 2160×1932 PNG, 409,242 bytes, SHA-256 `600BB8C7ACFCA150F8B1D2A0A8D515CC2E67C8DD8FEFD4D87FE0F87CC8CBF06D`; it was visually inspected for the transliterated player/team identities, original opinion, 18-pass figure, 57′ scope, Return/version, local-provider and user-selection disclosures, event times and RTL mixed-script layout. Desktop and 390×844 mobile emulation were checked; the mobile document width was 375 px with no horizontal overflow.
+
+The inspected Arabic journey had no remaining generated English beyond canonical `Groupchat Analyst` branding, the native language name “English” in the selector, technical IDs/version strings and the explicitly labeled original English source section. This is offline localization verification only, not live multilingual Foundry verification. Independent native-speaker, screen-reader and real-device review remain outstanding. Fixture source blobs match the parent commit; the historical semantic digest was not recomputed.
 
 ## Accurate AI architecture
 
@@ -26,16 +37,17 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 | Check | Result |
 | --- | --- |
-| API tests | 358 pass, including captured-call replay, fixture, duration, player-resolution and language regressions |
-| Web tests | 140 pass |
+| API tests | 363 pass, including captured-call replay, fixture, duration, player-resolution, Arabic identity and language regressions |
+| Web tests | 144 pass |
 | API/web typecheck, web lint and production build | Pass |
 | `git diff --check` | Pass |
 | Baseline fixture verification | Fixture source blobs remain unchanged; 70 passes and 17 turnovers. The historical semantic digest is `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` and was not recomputed in this release. |
 | Event-detail localization | Structured match events plus representative completed/incomplete passes, linked passes, turnovers and selected pressure records from all four fixtures are covered in Spanish, French, German and Arabic. Comparison details, copied text, receipt SVGs, expanded evidence and labeled English source records are covered. |
 | Language matrices | English corpus: 42/42 PASS. Five languages: 30/30 PASS (six asserted behavior classes per language). Broader non-English rule coverage and all live Foundry interpretation are unverified. |
 | Browser (local rules) | Existing walkthrough checks remain; all five player-selection flows passed with pointer and keyboard choice, preserving original opinion, language, draft, scope and one conversation turn. Five analysis and five explicit selection API requests; no interpreter call during selection. Explicit retry after an injected failure made no automatic retry or duplicate turn. A→B late success and A→B→A late failure did not alter the new draft, conversation or error state. |
-| Arabic receipt | After selecting Bruno Fernandes, clicked the UI download action and captured its exact anchor payload. Valid 2160×1512 PNG, 347,159 bytes; SHA-256 `28F388DA5383223E749CBFA9FE731682973053757B7DCB97F09B9F0EF513367C`; visually inspected. It contains the preserved English opinion, selected player, 1 completed pass, 58′ scope, Northbridge v Eastport, Original v3.0.0, local-provider disclosure and Arabic event detail. Playwright did not expose a native download event; the anchor payload—not a second rasterization—was inspected. |
+| Arabic receipt | Earlier receipt captures are retained in the historical notes below. For application `d61bd5d`, the UI download anchor produced a 2160×1932 PNG, 409,242 bytes; SHA-256 `600BB8C7ACFCA150F8B1D2A0A8D515CC2E67C8DD8FEFD4D87FE0F87CC8CBF06D`. Visually inspected after selecting Bruno Fernandes in Return v1.0.0: Arabic opinion, 18 completed passes, 57′ Match so far, selected-player identity, team/player evidence, local-provider and no-extra-call disclosures, Arabic event detail and RTL mixed-script layout. |
 | Native share on a real phone | **Unverified** |
+| Remaining Arabic English | Canonical product branding, the native “English” language name, technical IDs/version strings, and original English records in the explicitly labeled collapsed source section. No other generated English was observed in the inspected journeys. |
 | Live multilingual Foundry | **Not run**. Language acceptance used local rules only; no prompt/schema/credential changes. |
 | Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
 | Offline call-3 duration repair | Captured interpretation replayed through the real validation/service path with stubbed transport; Fan/Analyst/copy/card-label regressions pass. The repaired call-3 presentation later matched in one bounded live run. The PNG from that Foundry run remains uninspected; the separate local Arabic PNG inspection above does not change that result. |

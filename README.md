@@ -30,6 +30,8 @@ Each match offers key-moment chips and five example opinions. Examples only fill
 
 The local interpreter has its broadest bounded phrase coverage in English. All five selector languages have asserted coverage for six opinion classes: the guided shots-on-target comparison, ambiguous Bruno clarification, negated comparison, zero-count claim, qualified Saka judgement, and unavailable running-distance metric. Wider English-only rule coverage includes multiple claims, player statistics, possession and pass comparisons, chronology, quantifiers, and evidence-limited tactical judgements. Uncovered wording is not guessed. See [docs/LANGUAGE_ACCEPTANCE.md](./docs/LANGUAGE_ACCEPTANCE.md) for the 42-case English corpus and the five-language matrix (42/42 and 30/30 PASS under local rules; no live Foundry testing for multilingual wording).
 
+Arabic presentation uses fixture-scoped transliterations for every canonical team and player identity without changing fixture data. Those names are recognized as input aliases, while shared names such as Bruno, Martin/Martín and Pedro remain ambiguous until clarified.
+
 ## Quick start (Windows or any OS with Node.js ≥ 22.12)
 
 Requirements: Node.js ≥ 22.12, [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local).
@@ -73,7 +75,7 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (local rules): home, four-match selection and conversation at 1280 px and 390 px; 320 px has no horizontal overflow. Keyboard navigation visibly focuses the language selector. The 57′ submit and 58′ explicit recheck made exactly two analyze requests; replay movement, language changes, navigation, copy and PNG generation made none. Switching through all five locales retained the exact draft, clock and two-turn comparison. An actual downloaded Arabic receipt PNG (2160×2420) was decoded and visually inspected; its copied text and image retain the submitted opinion, 58′ scope, fixture/version, figures, event times and local-provider label. Other-language receipt strings and SVGs have automated regressions. Native sharing on a real phone is **unverified**.
 
-Automated checks: **358/358 API tests** and **137/137 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated checks: **363/363 API tests** and **144/144 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
 Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 
