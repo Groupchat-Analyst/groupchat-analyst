@@ -301,7 +301,10 @@ export function sourceFooter(analysis: AnalysisResponse): string {
     ? `${entry.teams[0]} v ${entry.teams[1]} · ${entry.name} v${dataset.version}`
     : null
   const reader = analysis.provider === 'local' ? 'read by local rules' : 'read by Foundry (server-side)'
-  return [SYNTHETIC_LABEL, match, reader].filter(Boolean).join(' · ')
+  const selection = analysis.selectedPlayers?.length
+    ? 'Player selected by you; no additional model call was made.'
+    : null
+  return [SYNTHETIC_LABEL, match, reader, selection].filter(Boolean).join(' · ')
 }
 
 /** Single source of truth for the card: the on-screen card, copied text and exported image all use these blocks. */

@@ -13,7 +13,9 @@ import type {
   ClaimOperator,
   EvidenceKind,
   InterpretedClaim,
+  PlayerResolutionRequest,
   PlayerEntityReference,
+  ResolvedPlayerRecheckRequest,
 } from '../../shared/src/apiContracts.js'
 
 const evidenceKinds: EvidenceKind[] = [
@@ -150,19 +152,24 @@ function isClock(value: unknown): value is MatchClock {
 
 export function parseAnalysisRequest(value: unknown): AnalysisRequest {
   const baseKeys = ['opinion', 'selectedClock', 'period']
+  const optionalKeys = ['datasetId', 'inputLanguage']
   if (
     !isRecord(value) ||
-    !(
-      hasExactKeys(value, baseKeys) ||
-      hasExactKeys(value, [...baseKeys, 'datasetId'])
-    )
+    !baseKeys.every((key) => Object.hasOwn(value, key)) ||
+    Object.keys(value).some((key) => ![...baseKeys, ...optionalKeys].includes(key))
   ) {
     throw new InputValidationError(
-      'Request must contain only opinion, selectedClock, period, and optionally datasetId.',
+      'Request must contain only opinion, selectedClock, period, and optionally datasetId or inputLanguage.',
     )
   }
   if ('datasetId' in value && !findCatalogEntry(value.datasetId)) {
     throw new InputValidationError('datasetId is not a supported match.')
+  }
+  if (
+    'inputLanguage' in value &&
+    !['en', 'es', 'fr', 'de', 'ar'].includes(String(value.inputLanguage))
+  ) {
+    throw new InputValidationError('Input language is not supported.')
   }
   if (typeof value.opinion !== 'string' || value.opinion.length > 2000) {
     throw new InputValidationError('Opinion must be text no longer than 2,000 characters.')
@@ -182,6 +189,51 @@ export function parseAnalysisRequest(value: unknown): AnalysisRequest {
     selectedClock: value.selectedClock,
     period: value.period as AnalysisPeriod,
     ...('datasetId' in value ? { datasetId: value.datasetId as string } : {}),
+    ...('inputLanguage' in value
+      ? { inputLanguage: value.inputLanguage as AnalysisRequest['inputLanguage'] }
+      : {}),
+  }
+}
+
+export function parsePlayerResolutionRequest(
+  value: unknown,
+): PlayerResolutionRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['action', 'continuation', 'claimId', 'playerId']) ||
+    value.action !== 'resolve-player' ||
+    typeof value.continuation !== 'string' ||
+    typeof value.claimId !== 'string' ||
+    typeof value.playerId !== 'string'
+  ) {
+    throw new InputValidationError('Player selection request is invalid.')
+  }
+  return {
+    action: 'resolve-player',
+    continuation: value.continuation,
+    claimId: value.claimId,
+    playerId: value.playerId,
+  }
+}
+
+export function parseResolvedPlayerRecheckRequest(
+  value: unknown,
+): ResolvedPlayerRecheckRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['action', 'continuation', 'selectedClock', 'period']) ||
+    value.action !== 'recheck-resolved-player' ||
+    typeof value.continuation !== 'string' ||
+    !isClock(value.selectedClock) ||
+    (value.period !== 'match-so-far' && value.period !== 'last-10-minutes')
+  ) {
+    throw new InputValidationError('Resolved-player recheck request is invalid.')
+  }
+  return {
+    action: 'recheck-resolved-player',
+    continuation: value.continuation,
+    selectedClock: value.selectedClock,
+    period: value.period,
   }
 }
 

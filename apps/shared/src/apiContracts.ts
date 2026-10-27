@@ -90,6 +90,27 @@ export type AnalysisRequest = {
   selectedClock: MatchClock
   period: AnalysisPeriod
   datasetId?: string
+  inputLanguage?: 'en' | 'es' | 'fr' | 'de' | 'ar'
+}
+
+export type PlayerResolutionRequest = {
+  action: 'resolve-player'
+  continuation: string
+  claimId: string
+  playerId: string
+}
+
+export type ResolvedPlayerRecheckRequest = {
+  action: 'recheck-resolved-player'
+  continuation: string
+  selectedClock: MatchClock
+  period: AnalysisPeriod
+}
+
+export type PlayerResolutionOption = {
+  id: string
+  name: string
+  team: MatchTeam
 }
 
 export type MatchReplayResponse = {
@@ -289,6 +310,11 @@ export type ClaimEvidence = {
 
 export type ClaimResult = {
   claim: InterpretedClaim
+  reply?: string
+  playerResolution?: {
+    continuation: string
+    candidates: PlayerResolutionOption[]
+  }
   assessment:
     | 'supported'
     | 'contradicted'
@@ -323,4 +349,6 @@ export type AnalysisResponse = {
   periodEvents: EvidenceReference[]
   evidenceFoundation: EvidenceFoundation
   claims: ClaimResult[]
+  playerResolutionContinuation?: string
+  selectedPlayers?: PlayerResolutionOption[]
 }

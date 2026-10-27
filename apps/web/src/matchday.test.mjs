@@ -19,6 +19,7 @@ test('submission scope is copied and remains tied to the submitted match time', 
     opinion: 'Eastport will equalise.',
     selectedClock: { period: 2, minute: 57 },
     period: 'match-so-far',
+    inputLanguage: 'en',
   })
   assert.equal(
     isSubmissionScopeCurrent(submitted, { period: 2, minute: 57 }, 'match-so-far'),

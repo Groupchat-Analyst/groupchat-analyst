@@ -295,6 +295,63 @@ test('fixture identity and provider disclosures translate without changing names
   }
 })
 
+test('resolved Bruno answer and pass-coverage limitation stay localized in receipts', () => {
+  const opinion = 'كم تمريرة أكمل برونو؟'
+  const answer = 'Bruno Guimarães: 0 pass completions.'
+  const limitation = 'Limitation: Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions.'
+  const localized = {
+    en: {
+      answer,
+      limitation,
+    },
+    es: {
+      answer: 'Bruno Guimarães: 0 pases completados.',
+      limitation: 'Limitación: Se ofrecen estadísticas descriptivas a partir de los pases sintéticos registrados. El porcentaje de pases completados no está disponible si no se registraron intentos; cero intentos es distinto de intentos registrados sin pases completados.',
+    },
+    fr: {
+      answer: 'Bruno Guimarães: 0 passes réussies.',
+      limitation: 'Limite : Les statistiques descriptives proviennent des passes synthétiques enregistrées. Le pourcentage de passes réussies n’est pas disponible si aucune tentative n’est enregistrée ; zéro tentative est différent de tentatives enregistrées sans passe réussie.',
+    },
+    de: {
+      answer: 'Bruno Guimarães: 0 vollständige Pässe.',
+      limitation: 'Einschränkung: Beschreibende Statistiken beruhen auf erfassten synthetischen Pässen. Ein Passerfolgsprozentsatz ist nicht verfügbar, wenn keine Versuche erfasst wurden; null Versuche unterscheiden sich von erfassten Versuchen ohne erfolgreichen Pass.',
+    },
+    ar: {
+      answer: 'Bruno Guimarães: 0 تمريرات مكتملة.',
+      limitation: 'القيد: تُعرض إحصاءات وصفية استناداً إلى تمريرات اصطناعية مسجلة. لا تتوفر نسبة التمريرات المكتملة عند عدم تسجيل أي محاولات؛ فعدم وجود محاولات يختلف عن تسجيل محاولات لم تسفر عن تمريرات مكتملة.',
+    },
+  }
+  for (const { code } of APP_LANGUAGES) {
+    const translatedAnswer = translateNarrative(answer, code)
+    const translatedLimitation = translateNarrative(limitation, code)
+    assert.equal(translatedAnswer, localized[code].answer)
+    assert.equal(translatedLimitation, localized[code].limitation)
+    const image = createBlocksImage([
+      { kind: 'take', text: `“${opinion}”` },
+      { kind: 'scope', text: 'حتى 57′ من المباراة' },
+      { kind: 'answer', text: translatedAnswer },
+      { kind: 'note', text: translatedLimitation },
+    ], code)
+    const imageText = image.svg
+      .replace(/<\/text>/gu, ' ')
+      .replace(/<[^>]*>/gu, '')
+      .replace(/&amp;/gu, '&')
+      .replace(/&lt;/gu, '<')
+      .replace(/&gt;/gu, '>')
+      .replace(/\s+/gu, ' ')
+      .replace(/\s+([:;,.])/gu, '$1')
+    assert.ok(imageText.includes(opinion))
+    assert.ok(
+      imageText.includes(translatedAnswer.replace(/\s+([:;,.])/gu, '$1')),
+      `${code}: ${imageText}`,
+    )
+    assert.ok(
+      imageText.includes(translatedLimitation.replace(/\s+([:;,.])/gu, '$1')),
+      `${code}: ${imageText}`,
+    )
+  }
+})
+
 test('Arabic receipt SVG sets RTL and isolates Latin names, times and figures', () => {
   const original = 'Eastport tuvo más tiros a puerta que Northbridge.'
   const image = createBlocksImage([

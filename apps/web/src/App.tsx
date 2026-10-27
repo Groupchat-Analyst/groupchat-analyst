@@ -11,6 +11,7 @@ import type {
   AnalysisResponse,
   ClaimResult,
   EvidenceReference,
+  PlayerResolutionOption,
 } from '../../shared/src/apiContracts'
 import {
   formatMatchClock,
@@ -73,6 +74,37 @@ const INITIAL_MATCH_TIME: MatchClock = {
   minute: 57,
 }
 
+type RequestOperation =
+  | { kind: 'analysis' }
+  | {
+      kind: 'resolve-player'
+      continuation: string
+      claimId: string
+      playerId: string
+      snapshotId: number
+    }
+  | { kind: 'recheck-resolved-player'; continuation: string }
+
+type SubmittedRequest = {
+  id: number
+  context: SubmissionContext
+  baseline: AnswerSnapshot | null
+  operation: RequestOperation
+}
+
+function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOption {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    'team' in value &&
+    typeof value.team === 'string'
+  )
+}
+
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (typeof value !== 'object' || value === null) return false
   const foundation =
@@ -86,6 +118,11 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
     (value.provider === 'local' || value.provider === 'foundry') &&
     'claims' in value &&
     Array.isArray(value.claims) &&
+    (!('playerResolutionContinuation' in value) ||
+      typeof value.playerResolutionContinuation === 'string') &&
+    (!('selectedPlayers' in value) ||
+      (Array.isArray(value.selectedPlayers) &&
+        value.selectedPlayers.every(isPlayerResolutionOption))) &&
     (!('fanReply' in value) || value.fanReply === undefined || typeof value.fanReply === 'string') &&
     'periodEvents' in value &&
     Array.isArray(value.periodEvents) &&
@@ -110,7 +147,17 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
         'playerStatistics' in claim &&
         Array.isArray(claim.playerStatistics) &&
         'playerCalculations' in claim &&
-        Array.isArray(claim.playerCalculations),
+        Array.isArray(claim.playerCalculations) &&
+        (!('reply' in claim) || typeof claim.reply === 'string') &&
+        (!('playerResolution' in claim) ||
+          (typeof claim.playerResolution === 'object' &&
+            claim.playerResolution !== null &&
+            'continuation' in claim.playerResolution &&
+            typeof claim.playerResolution.continuation === 'string' &&
+            'candidates' in claim.playerResolution &&
+            Array.isArray(claim.playerResolution.candidates) &&
+            claim.playerResolution.candidates.length > 1 &&
+            claim.playerResolution.candidates.every(isPlayerResolutionOption))),
     )
   )
 }
@@ -375,6 +422,63 @@ function ClaimCard({
       )}
       </details>
     </article>
+    </LocalizedMarkup>
+  )
+}
+
+function PlayerResolutionPicker({
+  result,
+  busy,
+  requestError,
+  onChoose,
+  onRetry,
+}: {
+  result: ClaimResult
+  busy: boolean
+  requestError: string
+  onChoose: (claimId: string, continuation: string, playerId: string) => void
+  onRetry: () => void
+}) {
+  const { language } = useLocalization()
+  const resolution = result.playerResolution
+  if (!resolution) return null
+  return (
+    <LocalizedMarkup>
+      <section className="player-resolution-picker" aria-label="Player clarification">
+        <p>{translateText('Choose a player', language)}</p>
+        <div className="player-choice-buttons">
+          {resolution.candidates.map((candidate) => (
+            <button
+              className="secondary-button"
+              type="button"
+              key={candidate.id}
+              disabled={busy}
+              onClick={() =>
+                onChoose(result.claim.id, resolution.continuation, candidate.id)
+              }
+            >
+              <bdi dir="auto">{candidate.name}</bdi>
+              <span aria-hidden="true"> · </span>
+              <bdi dir="auto">{candidate.team}</bdi>
+            </button>
+          ))}
+        </div>
+        {busy && (
+          <p role="status">{translateText('Resolving your selection…', language)}</p>
+        )}
+        {requestError && !busy && (
+          <div role="alert">
+            <p>{translateText('Player selection failed.', language)}</p>
+            <details className="msg-evidence">
+              <summary>{translateText('Details', language)}</summary>
+              <p>{translateNarrative(requestError, language)}</p>
+            </details>
+            <button className="secondary-button" type="button" onClick={onRetry}>
+              {translateText('Try again', language)}
+            </button>
+          </div>
+        )}
+      </section>
     </LocalizedMarkup>
   )
 }
@@ -698,18 +802,38 @@ function TurnMessages({
   turn,
   view,
   messageRef,
+  onResolvePlayer,
+  onRetryPlayerSelection,
+  isResolving,
+  requestError,
 }: {
   turn: AnswerSnapshot
   view: 'fan' | 'analyst'
   messageRef?: RefObject<HTMLDivElement | null>
+  onResolvePlayer: (claimId: string, continuation: string, playerId: string) => void
+  onRetryPlayerSelection: () => void
+  isResolving: boolean
+  requestError: string
 }) {
   const { language } = useLocalization()
   const { analysis, context } = turn
   const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
   const checked = checkedAgainst(analysis)
+  const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
+  const evidenceClaims = analysis.claims
+    .map((result, index) => ({ result, index }))
+    .filter(({ result }) => !result.playerResolution)
+  const answeredReplies = analysis.claims
+    .filter(({ playerResolution }) => !playerResolution)
+    .map(({ reply }) => reply)
+    .filter((reply): reply is string => Boolean(reply))
   const notes = analysis.claims.flatMap((result) => [
-    ...result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' })),
-    ...(isRoutineLimitation(result) ? [] : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
+    ...(!result.playerResolution
+      ? result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' }))
+      : []),
+    ...(!result.playerResolution && !isRoutineLimitation(result)
+      ? [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]
+      : []),
   ])
   return (
     <LocalizedMarkup>
@@ -720,10 +844,17 @@ function TurnMessages({
       </div>
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
         <p className="msg-label">Groupchat Analyst · {scope}</p>
-        <p className="msg-text">{canonicalReply(analysis)}</p>
-        {analysis.claims.length > 1 && (
+        {(playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis)) && (
+          <p className="msg-text">
+            {translateNarrative(
+              playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis),
+              language,
+            )}
+          </p>
+        )}
+        {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
           <ul className="msg-claims" aria-label="Claims in this opinion">
-            {analysis.claims.map((result, index) => (
+            {evidenceClaims.map(({ result, index }) => (
               <li key={result.claim.id}>
                 <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}>{result.assessment}</span>
                 <span>Claim {index + 1}: {result.claim.text}</span>
@@ -734,11 +865,21 @@ function TurnMessages({
         {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join('; ')}</p>}
         {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
         {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
-        {analysis.claims.length > 0 && (
+        {playerChoices.map((result) => (
+          <PlayerResolutionPicker
+            key={result.claim.id}
+            result={result}
+            busy={isResolving}
+            requestError={requestError}
+            onChoose={onResolvePlayer}
+            onRetry={onRetryPlayerSelection}
+          />
+        ))}
+        {evidenceClaims.length > 0 && (
           <details className="msg-evidence" key={view} open={view === 'analyst'}>
             <summary>How this was checked</summary>
             <div className="claim-result-list">
-              {analysis.claims.map((result, index) => (
+              {evidenceClaims.map(({ result, index }) => (
                 <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} />
               ))}
             </div>
@@ -752,6 +893,11 @@ function TurnMessages({
             language,
           )}
         </p>
+        {analysis.selectedPlayers && analysis.selectedPlayers.length > 0 && (
+          <p className="msg-attribution">
+            {translateText('Player selected by you; no additional model call was made.', language)}
+          </p>
+        )}
       </div>
     </>
     </LocalizedMarkup>
@@ -781,11 +927,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const selectedClock = replaySnapshot.requested
   const [period, setPeriod] = useState<AnalysisPeriod>('match-so-far')
   const [opinion, setOpinion] = useState('')
-  const [submittedRequest, setSubmittedRequest] = useState<{
-    id: number
-    context: SubmissionContext
-    baseline: AnswerSnapshot | null
-  } | null>(null)
+  const [submittedRequest, setSubmittedRequest] = useState<SubmittedRequest | null>(null)
   // Successful turns are immutable snapshots in order; failed requests never replace or reorder them.
   const [transcript, setTranscript] = useState<AnswerSnapshot[]>([])
   const shown = transcript.length > 0 ? transcript[transcript.length - 1] : null
@@ -802,6 +944,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
   const [view, setView] = useState<'fan' | 'analyst'>('fan')
   const analysisRequestId = useRef(0)
+  const resolutionRequestId = useRef<number | null>(null)
   const answerRef = useRef<HTMLDivElement>(null)
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
@@ -813,7 +956,12 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const displayedClock = replaySnapshot.displayedClock
   const canCheckAgain = Boolean(
     shown && displayedClock && !isLoadingSubmit &&
+      (!analysis?.claims.some(({ playerResolution }) => playerResolution) ||
+        analysis.playerResolutionContinuation) &&
       isLaterClock(displayedClock, shown.context.selectedClock),
+  )
+  const hasPlayerChoices = Boolean(
+    analysis?.claims.some(({ playerResolution }) => playerResolution),
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(
@@ -837,10 +985,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
   const examples = dataset.examples
   const shareModel = useMemo<ShareCardModel | null>(
-    () => (analysis && submittedContext
+    () => (analysis && submittedContext && !hasPlayerChoices
       ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language)
       : null),
-    [analysis, submittedContext, language],
+    [analysis, submittedContext, language, hasPlayerChoices],
   )
   const [canNativeShare] = useState(() => supportsFileShare(navigator, new File([''], 'probe.png', { type: 'image/png' })))
   const [demoActive, setDemoActive] = useState(false)
@@ -887,7 +1035,22 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     const active = submittedRequest
     const controller = new AbortController()
     const requestId = active.id
-    const request = createAnalysisRequest(active.context)
+    const request =
+      active.operation.kind === 'resolve-player'
+        ? {
+            action: 'resolve-player',
+            continuation: active.operation.continuation,
+            claimId: active.operation.claimId,
+            playerId: active.operation.playerId,
+          }
+        : active.operation.kind === 'recheck-resolved-player'
+          ? {
+              action: 'recheck-resolved-player',
+              continuation: active.operation.continuation,
+              selectedClock: active.context.selectedClock,
+              period: active.context.period,
+            }
+          : createAnalysisRequest(active.context)
     async function loadAnalysis() {
       setIsLoading(true)
       setRequestError('')
@@ -896,14 +1059,37 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       try {
         const payload = await requestAnalysis(request, { signal: controller.signal })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
-        if (payload.evidenceFoundation.dataset?.id !== datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
+        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
-          const snapshot = createSnapshot(requestId, active.context, payload)
-          const baseline = active.baseline
-          setTranscript((turns) => [...turns, snapshot])
-          setComparisonState(
-            baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
-          )
+          if (active.operation.kind === 'resolve-player' && active.baseline) {
+            const snapshot = createSnapshot(
+              active.operation.snapshotId,
+              active.baseline.context,
+              payload,
+            )
+            setTranscript((turns) =>
+              turns.map((turn) => (turn.id === snapshot.id ? snapshot : turn)),
+            )
+            setComparisonState((current) => {
+              if (!current) return current
+              const earlier =
+                current.earlier.id === snapshot.id ? snapshot : current.earlier
+              const later =
+                current.later.id === snapshot.id ? snapshot : current.later
+              return {
+                earlier,
+                later,
+                result: compareSnapshots(earlier, later),
+              }
+            })
+          } else {
+            const snapshot = createSnapshot(requestId, active.context, payload)
+            const baseline = active.baseline
+            setTranscript((turns) => [...turns, snapshot])
+            setComparisonState(
+              baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
+            )
+          }
         }
       } catch (error) {
         if (
@@ -913,6 +1099,12 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           setRequestError(error instanceof Error ? error.message : 'The analysis service could not be reached.')
         }
       } finally {
+        if (
+          active.operation.kind === 'resolve-player' &&
+          resolutionRequestId.current === requestId
+        ) {
+          resolutionRequestId.current = null
+        }
         if (
           !controller.signal.aborted &&
           isLatestRequest(requestId, analysisRequestId.current)
@@ -1008,8 +1200,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId),
+      context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId, language),
       baseline: null,
+      operation: { kind: 'analysis' },
     })
   }
 
@@ -1020,14 +1213,54 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     setRequestError('')
     setSubmittedRequest({
       id,
-      context: createSubmissionContext(shown.context.opinion, displayedClock, shown.context.period, datasetId),
+      context: createSubmissionContext(
+        shown.context.opinion,
+        displayedClock,
+        shown.context.period,
+        datasetId,
+        shown.context.inputLanguage,
+      ),
       baseline: shown,
+      operation: shown.analysis.playerResolutionContinuation
+        ? {
+            kind: 'recheck-resolved-player',
+            continuation: shown.analysis.playerResolutionContinuation,
+          }
+        : { kind: 'analysis' },
+    })
+  }
+
+  function resolvePlayer(
+    claimId: string,
+    continuation: string,
+    playerId: string,
+  ) {
+    if (!shown || resolutionRequestId.current !== null || isLoading) return
+    const id = ++analysisRequestId.current
+    resolutionRequestId.current = id
+    setRequestError('')
+    setSubmittedRequest({
+      id,
+      context: shown.context,
+      baseline: shown,
+      operation: {
+        kind: 'resolve-player',
+        continuation,
+        claimId,
+        playerId,
+        snapshotId: shown.id,
+      },
     })
   }
 
   function retryAnalysis() {
     if (!submittedRequest || isLoading) return
     const id = ++analysisRequestId.current
+    if (submittedRequest.operation.kind === 'resolve-player') {
+      if (resolutionRequestId.current !== null) return
+      resolutionRequestId.current = id
+    }
+    setRequestError('')
     setSubmittedRequest({ ...submittedRequest, id })
   }
 
@@ -1103,7 +1336,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       )}
       {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
       {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
-      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
+      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
       {opinion.trim() !== submittedOpinion && (
         <p className="draft-notice">
           {translateNarrative(
@@ -1135,13 +1368,15 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           </span>
         </div>
       )}
-      <div className="share-row">
-        {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
-        <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
-        <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
-        <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
-        <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
-      </div>
+      {!hasPlayerChoices && (
+        <div className="share-row">
+          {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
+          <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
+          <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
+          <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
+          <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
+        </div>
+      )}
       {shareModel && (
         <details className="share-preview">
           <summary>Preview share card</summary>
@@ -1155,7 +1390,21 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     </div>
   ) : null
 
-  const pending = submittedRequest && (isLoading || requestError !== '') ? submittedRequest : null
+  const resolutionOperation =
+    submittedRequest?.operation.kind === 'resolve-player'
+      ? submittedRequest.operation
+      : null
+  const isResolvingShown = Boolean(
+    resolutionOperation &&
+      submittedRequest?.baseline?.id === shown?.id &&
+      isLoading,
+  )
+  const pending =
+    submittedRequest &&
+    submittedRequest.operation.kind !== 'resolve-player' &&
+    (isLoading || requestError !== '')
+      ? submittedRequest
+      : null
   const pendingScope = pending ? `${formatMatchClock(pending.context.selectedClock)} · ${scopePeriod(pending.context.period)}` : ''
 
   return (
@@ -1216,7 +1465,20 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                 )}
                 {transcript.map((turn, index) => (
                   <div className="chat-turn" key={turn.id}>
-                    <TurnMessages turn={turn} view={view} messageRef={index === transcript.length - 1 ? answerRef : undefined} />
+                    <TurnMessages
+                      turn={turn}
+                      view={view}
+                      messageRef={index === transcript.length - 1 ? answerRef : undefined}
+                      onResolvePlayer={resolvePlayer}
+                      onRetryPlayerSelection={retryAnalysis}
+                      isResolving={isResolvingShown && turn.id === shown?.id}
+                      requestError={
+                        resolutionOperation?.snapshotId === turn.id &&
+                        !isLoading
+                          ? requestError
+                          : ''
+                      }
+                    />
                     {index === transcript.length - 1 && latestActions}
                   </div>
                 ))}

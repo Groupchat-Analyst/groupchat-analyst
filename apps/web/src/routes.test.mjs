@@ -29,6 +29,8 @@ test('submission context carries the dataset into the request, and omits it when
   const clock = { period: 2, minute: 57 }
   const withId = createAnalysisRequest(createSubmissionContext('x', clock, 'match-so-far', RET))
   assert.equal(withId.datasetId, RET)
+  assert.equal(withId.inputLanguage, 'en')
   const without = createAnalysisRequest(createSubmissionContext('x', clock, 'match-so-far'))
   assert.equal('datasetId' in without, false)
+  assert.equal(without.inputLanguage, 'en')
 })

@@ -10,6 +10,7 @@ export type InterpretationContext = {
   period: AnalysisPeriod
   capabilities: EvidenceCapability[]
   players: SyntheticMatchEvidence['players']
+  inputLanguage?: 'en' | 'es' | 'fr' | 'de' | 'ar'
 }
 
 export type ProviderFailureCategory =

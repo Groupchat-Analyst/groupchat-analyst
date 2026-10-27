@@ -12,6 +12,7 @@ export type SubmissionContext = {
   selectedClock: MatchClock
   period: AnalysisPeriod
   datasetId?: string
+  inputLanguage: 'en' | 'es' | 'fr' | 'de' | 'ar'
 }
 
 export function createSubmissionContext(
@@ -19,12 +20,14 @@ export function createSubmissionContext(
   selectedClock: MatchClock,
   period: AnalysisPeriod,
   datasetId?: string,
+  inputLanguage: SubmissionContext['inputLanguage'] = 'en',
 ): SubmissionContext {
   return {
     opinion,
     selectedClock: { ...selectedClock },
     period,
     ...(datasetId ? { datasetId } : {}),
+    inputLanguage,
   }
 }
 
@@ -34,6 +37,7 @@ export function createAnalysisRequest(context: SubmissionContext): AnalysisReque
     selectedClock: { ...context.selectedClock },
     period: context.period,
     ...(context.datasetId ? { datasetId: context.datasetId } : {}),
+    inputLanguage: context.inputLanguage,
   }
 }
 

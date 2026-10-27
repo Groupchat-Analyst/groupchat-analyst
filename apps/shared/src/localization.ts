@@ -94,6 +94,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'pass completion': 'precisión de pase',
     'pass attempts': 'intentos de pase',
     'pass completions': 'pases completados',
+    'Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions.': 'Se ofrecen estadísticas descriptivas a partir de los pases sintéticos registrados. El porcentaje de pases completados no está disponible si no se registraron intentos; cero intentos es distinto de intentos registrados sin pases completados.',
     'elapsed participation minutes (recorded window; added time included)': 'minutos transcurridos de participación (ventana registrada; incluye el tiempo añadido)',
     'recorded recoveries': 'recuperaciones registradas',
     'selected pressure observations': 'observaciones de presión seleccionadas',
@@ -177,6 +178,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Not understood': 'No se ha entendido',
     'Clarification:': 'Aclaración:',
     Limitation: 'Limitación',
+    'Limitation:': 'Limitación:',
     Limitations: 'Limitaciones',
     'View evidence': 'Ver pruebas',
     Subject: 'Sujeto',
@@ -216,6 +218,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Ask about a player': 'Preguntar por un jugador',
     'Fictional matchday squad': 'Plantilla ficticia del partido',
     'Choose a player': 'Elige un jugador',
+    'Player clarification': 'Aclaración sobre el jugador',
+    'Resolving your selection…': 'Resolviendo tu selección…',
+    'Player selection failed.': 'No se pudo completar la selección del jugador.',
+    'Player selected by you; no additional model call was made.': 'Has elegido al jugador; no se realizó otra llamada al modelo.',
     'Use this player': 'Usar este jugador',
     'About this demo & its data': 'Acerca de esta demo y sus datos',
     'Copy reply': 'Copiar respuesta',
@@ -377,6 +383,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'pass completion': 'réussite des passes',
     'pass attempts': 'tentatives de passe',
     'pass completions': 'passes réussies',
+    'Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions.': 'Les statistiques descriptives proviennent des passes synthétiques enregistrées. Le pourcentage de passes réussies n’est pas disponible si aucune tentative n’est enregistrée ; zéro tentative est différent de tentatives enregistrées sans passe réussie.',
     'elapsed participation minutes (recorded window; added time included)': 'minutes écoulées de participation (fenêtre enregistrée ; temps additionnel inclus)',
     'recorded recoveries': 'récupérations enregistrées',
     'selected pressure observations': 'observations de pressing sélectionnées',
@@ -460,6 +467,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Not understood': 'Non compris',
     'Clarification:': 'Précision :',
     Limitation: 'Limite',
+    'Limitation:': 'Limite :',
     Limitations: 'Limites',
     'View evidence': 'Voir les preuves',
     Subject: 'Sujet',
@@ -498,6 +506,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Ask about a player': 'Interroger sur un joueur',
     'Fictional matchday squad': 'Effectif fictif du match',
     'Choose a player': 'Choisir un joueur',
+    'Player clarification': 'Précision sur le joueur',
+    'Resolving your selection…': 'Résolution de votre choix…',
+    'Player selection failed.': 'La sélection du joueur a échoué.',
+    'Player selected by you; no additional model call was made.': 'Vous avez choisi le joueur ; aucun nouvel appel au modèle n’a été effectué.',
     'Use this player': 'Utiliser ce joueur',
     'About this demo & its data': 'À propos de la démo et des données',
     'Copy reply': 'Copier la réponse',
@@ -656,6 +668,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'pass completion': 'Passgenauigkeit',
     'pass attempts': 'Passversuche',
     'pass completions': 'vollständige Pässe',
+    'Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions.': 'Beschreibende Statistiken beruhen auf erfassten synthetischen Pässen. Ein Passerfolgsprozentsatz ist nicht verfügbar, wenn keine Versuche erfasst wurden; null Versuche unterscheiden sich von erfassten Versuchen ohne erfolgreichen Pass.',
     'elapsed participation minutes (recorded window; added time included)': 'verstrichene Teilnahmeminuten (erfasster Zeitraum; Nachspielzeit eingeschlossen)',
     'recorded recoveries': 'erfasste Rückeroberungen',
     'selected pressure observations': 'ausgewählte Pressing-Beobachtungen',
@@ -739,6 +752,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Not understood': 'Nicht verstanden',
     'Clarification:': 'Rückfrage:',
     Limitation: 'Einschränkung',
+    'Limitation:': 'Einschränkung:',
     Limitations: 'Einschränkungen',
     'View evidence': 'Belege anzeigen',
     Subject: 'Subjekt',
@@ -777,6 +791,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Ask about a player': 'Zu einem Spieler fragen',
     'Fictional matchday squad': 'Fiktiver Spieltagskader',
     'Choose a player': 'Spieler auswählen',
+    'Player clarification': 'Rückfrage zum Spieler',
+    'Resolving your selection…': 'Auswahl wird aufgelöst…',
+    'Player selection failed.': 'Die Spielerauswahl ist fehlgeschlagen.',
+    'Player selected by you; no additional model call was made.': 'Du hast den Spieler ausgewählt; es gab keinen weiteren Modellaufruf.',
     'Use this player': 'Diesen Spieler verwenden',
     'About this demo & its data': 'Über diese Demo und ihre Daten',
     'Copy reply': 'Antwort kopieren',
@@ -935,6 +953,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'pass completion': 'دقة التمرير',
     'pass attempts': 'محاولات تمرير',
     'pass completions': 'تمريرات مكتملة',
+    'Descriptive statistics are provided from recorded synthetic passes. Pass-completion percentage is not available when no attempts are recorded; zero attempts is distinct from attempted passes with no completions.': 'تُعرض إحصاءات وصفية استناداً إلى تمريرات اصطناعية مسجلة. لا تتوفر نسبة التمريرات المكتملة عند عدم تسجيل أي محاولات؛ فعدم وجود محاولات يختلف عن تسجيل محاولات لم تسفر عن تمريرات مكتملة.',
     'elapsed participation minutes (recorded window; added time included)': 'دقائق مشاركة منقضية (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)',
     'recorded recoveries': 'استعادات مسجلة',
     'selected pressure observations': 'ملاحظات الضغط المحددة',
@@ -1018,6 +1037,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Not understood': 'لم يُفهم',
     'Clarification:': 'التوضيح:',
     Limitation: 'القيد',
+    'Limitation:': 'القيد:',
     Limitations: 'القيود',
     'View evidence': 'عرض الأدلة',
     Subject: 'الموضوع',
@@ -1056,6 +1076,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Ask about a player': 'اسأل عن لاعب',
     'Fictional matchday squad': 'تشكيلة مباراة خيالية',
     'Choose a player': 'اختر لاعباً',
+    'Player clarification': 'توضيح اللاعب',
+    'Resolving your selection…': 'جارٍ تطبيق اختيارك…',
+    'Player selection failed.': 'تعذّر إكمال اختيار اللاعب.',
+    'Player selected by you; no additional model call was made.': 'اخترت اللاعب بنفسك؛ لم يُجرَ أي استدعاء إضافي للنموذج.',
     'Use this player': 'استخدم هذا اللاعب',
     'About this demo & its data': 'عن هذا العرض وبياناته',
     'Copy reply': 'انسخ الرد',
@@ -1863,13 +1887,22 @@ export function translateNarrative(text: string, language: AppLanguage): string 
     }[language]
   }
 
-  const countedMetric = text.match(/^([\d,.]+)(%)?\s+(shots on target|shots|goals|passes completed|pass completion|passes attempted|recoveries|pressure observations|possession|elapsed participation minutes(?: \(recorded window; added time included\))?|elapsed minutes|minutes|turnovers|recorded actions)(.*)$/u)
+  const playerPassCompletions = text.match(/^(.+?): ([\d,.]+) pass completions\.$/u)
+  if (playerPassCompletions) {
+    return `${playerPassCompletions[1]}: ${translateNarrative(
+      `${playerPassCompletions[2]} pass completions`,
+      language,
+    )}.`
+  }
+
+  const countedMetric = text.match(/^([\d,.]+)(%)?\s+(shots on target|shots|goals|passes completed|pass completions|pass completion|passes attempted|recoveries|pressure observations|possession|elapsed participation minutes(?: \(recorded window; added time included\))?|elapsed minutes|minutes|turnovers|recorded actions)(.*)$/u)
   if (countedMetric) {
     const metrics: Record<string, Record<Exclude<AppLanguage, 'en'>, string>> = {
       'shots on target': { es: 'tiros a puerta', fr: 'tirs cadrés', de: 'Schüsse aufs Tor', ar: 'تسديدات على المرمى' },
       shots: { es: 'tiros', fr: 'tirs', de: 'Schüsse', ar: 'تسديدات' },
       goals: { es: 'goles', fr: 'buts', de: 'Tore', ar: 'أهداف' },
       'passes completed': { es: 'pases completados', fr: 'passes réussies', de: 'vollständige Pässe', ar: 'تمريرات مكتملة' },
+      'pass completions': { es: 'pases completados', fr: 'passes réussies', de: 'vollständige Pässe', ar: 'تمريرات مكتملة' },
       'pass completion': { es: 'pases completados', fr: 'passes réussies', de: 'Passerfolge', ar: 'تمريرات مكتملة' },
       'passes attempted': { es: 'pases intentados', fr: 'passes tentées', de: 'Passversuche', ar: 'محاولات تمرير' },
       recoveries: { es: 'recuperaciones', fr: 'récupérations', de: 'Rückeroberungen', ar: 'استعادات' },
@@ -1901,6 +1934,11 @@ export function translateNarrative(text: string, language: AppLanguage): string 
     }
     return `${evidenceCount[1]} ${labels[language]}`
   }
+
+  const limitation = text.match(/^Limitation: (.+)$/u)
+  if (limitation) return `${translateText('Limitation:', language)} ${translateNarrative(limitation[1], language)}`
+  const limitations = text.match(/^Limitations: (.+)$/u)
+  if (limitations) return `${translateText('Limitations:', language)} ${translateNarrative(limitations[1], language)}`
 
   const teamEvent = text.match(/^(.+?): (.+)$/u)
   if (teamEvent) {
@@ -1978,10 +2016,6 @@ export function translateNarrative(text: string, language: AppLanguage): string 
 
   const verdictHeading = text.match(/^Verdict: (.+)$/u)
   if (verdictHeading) return `${translateText('Verdict:', language)} ${translateNarrative(verdictHeading[1], language)}`
-  const limitation = text.match(/^Limitation: (.+)$/u)
-  if (limitation) return `${translateText('Limitation:', language)} ${translateNarrative(limitation[1], language)}`
-  const limitations = text.match(/^Limitations: (.+)$/u)
-  if (limitations) return `${translateText('Limitations:', language)} ${translateNarrative(limitations[1], language)}`
   const numberedClaim = text.match(/^Claim (\d+): (.+)$/u)
   if (numberedClaim) {
     const labels = { es: 'Afirmación', fr: 'Affirmation', de: 'Behauptung', ar: 'الادعاء' }

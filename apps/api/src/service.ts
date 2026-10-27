@@ -1,4 +1,5 @@
 import type {
+  AnalysisRequest,
   AnalysisResponse,
   ClaimEvidence,
   ClaimMetric,
@@ -11,6 +12,7 @@ import type {
   PlayerCalculationTrace,
   PlayerEntityReference,
   PlayerStatistic,
+  PlayerResolutionOption,
   TeamStatistic,
 } from '../../shared/src/apiContracts.js'
 import {
@@ -31,7 +33,11 @@ import {
   type MatchTeam,
 } from '../../shared/src/match.js'
 import { resolveDataset } from './datasets.js'
-import { toDisplay, toSlotOpinion } from '../../shared/src/teamNaming.js'
+import {
+  toDisplay,
+  toSlotOpinion,
+  type TeamNaming,
+} from '../../shared/src/teamNaming.js'
 import {
   BEFORE_GOAL_PHRASE,
   parseCountAssertion,
@@ -52,8 +58,17 @@ import {
   hasExplicitBuildUpPassingScope,
   normalizeKnownInterpretation,
   parseAnalysisRequest,
+  parsePlayerResolutionRequest,
+  parseResolvedPlayerRecheckRequest,
+  InputValidationError,
   validateInterpretation,
 } from './validation.js'
+import { canonicalizeSupportedFootballOpinion } from '../../shared/src/localization.js'
+import {
+  signPlayerResolution,
+  verifyPlayerResolution,
+  type PlayerResolutionGrant,
+} from './playerResolution.js'
 
 function isUnsupportedBuildUpPassingScope(claim: InterpretedClaim): boolean {
   const passMetrics = new Set<ClaimMetric>([
@@ -1461,7 +1476,9 @@ function assessOneClaim(
 
   let assessment: ClaimResult['assessment'] =
     claim.clarificationNeeds.length > 0 ||
-    (claim.subject === null && claim.meaning.category !== 'coaching-question')
+    (claim.subject === null &&
+      claim.playerSubject === null &&
+      claim.meaning.category !== 'coaching-question')
       ? 'clarification needed'
       : 'insufficient evidence for a firm conclusion'
   if (
@@ -2480,11 +2497,27 @@ function createFanReply(
       : original.toLowerCase().includes(result.claim.text.trim().toLowerCase())
         ? result.claim.text
         : undefined
-  return claims
-    .map((result) =>
+  return claimReplies(
+    claims,
+    fixture,
+    advanced,
+    events,
+    selectedClock,
+    wordingFor,
+  ).join(' ')
+}
+
+function claimReplies(
+  claims: ClaimResult[],
+  fixture: SyntheticMatchEvidence,
+  advanced: EvidenceCalculation,
+  events: MatchEvent[],
+  selectedClock: MatchClock,
+  wordingFor: (result: ClaimResult) => string | undefined,
+): string[] {
+  return claims.map((result) =>
       fanAnswerForClaim(result, fixture, events, advanced, selectedClock, wordingFor(result)),
-    )
-    .join(' ')
+  )
 }
 
 function evidenceReference(
@@ -2657,6 +2690,22 @@ export async function analyzeOpinion(
   provider: InterpretationProvider = new LocalInterpretationProvider(),
   fixtureOverride?: SyntheticMatchEvidence,
 ): Promise<AnalysisResponse> {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'action' in input &&
+    input.action === 'resolve-player'
+  ) {
+    return resolvePlayerSelection(input)
+  }
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'action' in input &&
+    input.action === 'recheck-resolved-player'
+  ) {
+    return recheckResolvedPlayer(input)
+  }
   const parsed = parseAnalysisRequest(input)
   const dataset = resolveDataset(parsed.datasetId)
   const slotted = toSlotOpinion(parsed.opinion, dataset.naming)
@@ -2704,7 +2753,342 @@ export async function analyzeOpinion(
     }
     return toDisplay(unsupported, dataset.naming, slotted.foreign)
   }
-  return toDisplay(response, dataset.naming)
+  return toDisplay(
+    addPlayerResolutionContinuation(
+      response,
+      parsed,
+      response.claims.map(({ claim }) => claim),
+      response.evidenceFoundation.players.map(({ id, name, team }) => ({
+        id,
+        name,
+        team,
+      })),
+      dataset.naming,
+      response.provider,
+      [],
+    ),
+    dataset.naming,
+  )
+}
+
+function normalizePlayerName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+}
+
+function mentionsAlias(text: string, alias: string): boolean {
+  const normalizedText = normalizePlayerName(text)
+  const normalizedAlias = normalizePlayerName(alias)
+  const escaped = normalizedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(
+    normalizedText,
+  )
+}
+
+function playerCandidatesForClaim(
+  claim: InterpretedClaim,
+  opinion: string,
+  players: PlayerResolutionOption[],
+  naming: TeamNaming,
+): PlayerResolutionOption[] {
+  if (
+    claim.intent !== 'statistical-request' ||
+    claim.subject !== null ||
+    claim.playerSubject !== null ||
+    claim.meaning.category !== 'other' ||
+    claim.meaning.comparison !== null ||
+    claim.clarificationNeeds.length === 0 ||
+    claim.playerMetric === null ||
+    !claim.requiredEvidence.some((kind) =>
+      ['passing', 'player-events', 'lineups'].includes(kind),
+    )
+  ) {
+    return []
+  }
+  const canonicalOpinion = canonicalizeSupportedFootballOpinion(opinion)
+  const groups = new Map<string, PlayerResolutionOption[]>()
+  for (const player of players) {
+    const firstName = player.name.trim().split(/\s+/u)[0]
+    if (firstName.length < 3) continue
+    const key = normalizePlayerName(firstName)
+    groups.set(key, [...(groups.get(key) ?? []), player])
+  }
+  const matching = [...groups.entries()].filter(
+    ([alias, candidates]) =>
+      candidates.length > 1 &&
+      mentionsAlias(canonicalOpinion, alias) &&
+      mentionsAlias(claim.text, alias),
+  )
+  if (matching.length !== 1) return []
+  const candidates = matching[0][1]
+  if (
+    candidates.some(
+      (candidate) =>
+        mentionsAlias(canonicalOpinion, candidate.name),
+    )
+  ) {
+    return []
+  }
+  const teamSlots = [
+    { canonical: 'Northbridge', aliases: [naming.teams[0], ...naming.aliases[0]] },
+    { canonical: 'Eastport', aliases: [naming.teams[1], ...naming.aliases[1]] },
+  ]
+  const mentionedInOpinion = teamSlots.filter(({ canonical, aliases }) => {
+    const names = [canonical, ...aliases]
+    return names.some((name) => mentionsAlias(canonicalOpinion, name))
+  })
+  const explicitTeams = teamSlots.filter(({ canonical, aliases }) => {
+    const names = [canonical, ...aliases]
+    return (
+      names.some((name) => mentionsAlias(claim.text, name))
+    )
+  })
+  if (
+    mentionedInOpinion.length === 1 &&
+    (explicitTeams.length !== 1 ||
+      explicitTeams[0].canonical !== mentionedInOpinion[0].canonical)
+  ) {
+    return []
+  }
+  if (explicitTeams.length === 1) {
+    return candidates.filter(({ team }) => team === explicitTeams[0].canonical)
+  }
+  return candidates
+}
+
+function candidateSetsForClaims(
+  claims: InterpretedClaim[],
+  opinion: string,
+  players: PlayerResolutionOption[],
+  naming: TeamNaming,
+): PlayerResolutionGrant['candidates'] {
+  return claims.flatMap((claim) => {
+    const candidates = playerCandidatesForClaim(claim, opinion, players, naming)
+    return candidates.length > 1 ? [{ claimId: claim.id, players: candidates }] : []
+  })
+}
+
+function addPlayerResolutionContinuation(
+  response: AnalysisResponse,
+  request: AnalysisRequest,
+  claims: InterpretedClaim[],
+  players: PlayerResolutionOption[],
+  naming: TeamNaming,
+  provider: 'local' | 'foundry',
+  selectedPlayers: PlayerResolutionOption[],
+): AnalysisResponse {
+  const candidates = candidateSetsForClaims(claims, request.opinion, players, naming)
+  if (candidates.length === 0 && selectedPlayers.length === 0) return response
+  const continuation = signPlayerResolution({
+    request,
+    provider,
+    claims,
+    candidates,
+    selectedPlayers,
+  })
+  return {
+    ...response,
+    claims: response.claims.map((result) => {
+      const options = candidates.find(({ claimId }) => claimId === result.claim.id)
+      return options ? { ...result, playerResolution: { continuation, candidates: options.players } } : result
+    }),
+    playerResolutionContinuation: continuation,
+    ...(selectedPlayers.length > 0 ? { selectedPlayers } : {}),
+  }
+}
+
+function validateGrant(
+  grant: PlayerResolutionGrant,
+  selectedClock = grant.request.selectedClock,
+  period = grant.request.period,
+) {
+  const request = parseAnalysisRequest({
+    ...grant.request,
+    selectedClock,
+    period,
+  })
+  const dataset = resolveDataset(request.datasetId)
+  const slotted = toSlotOpinion(request.opinion, dataset.naming)
+  if (Object.keys(slotted.foreign).length > 0) {
+    throw new Error('Player clarification cannot resolve an opinion containing a foreign fixture team.')
+  }
+  const fixture = dataset.evidence
+  const end = elapsedMatchMinute(request.selectedClock)
+  const availableEvents = dataset.events.filter(
+    (event) => elapsedMatchMinute(event.clock) <= end,
+  )
+  let claims: InterpretedClaim[]
+  try {
+    claims = validateInterpretation(
+      { claims: grant.claims },
+      availableEvents,
+      fixture.players,
+      { requireClaims: request.opinion.length > 0 },
+    )
+  } catch (error) {
+    throw new InputValidationError(
+      error instanceof Error ? error.message : 'Saved player clarification is invalid.',
+    )
+  }
+  const players = fixture.players.map(({ id, name, team }) => ({ id, name, team }))
+  const actualCandidates = candidateSetsForClaims(
+    claims,
+    request.opinion,
+    players,
+    dataset.naming,
+  )
+  if (JSON.stringify(actualCandidates) !== JSON.stringify(grant.candidates)) {
+    throw new InputValidationError('Player clarification candidates do not match this fixture and opinion.')
+  }
+  for (const selected of grant.selectedPlayers) {
+    const known = players.find(({ id }) => id === selected.id)
+    if (
+      !known ||
+      known.name !== selected.name ||
+      known.team !== selected.team
+    ) {
+      throw new InputValidationError('Previously selected player does not match this fixture.')
+    }
+  }
+  return { request, dataset, fixture, slotted, availableEvents, claims, players }
+}
+
+function continuationProvider(name: 'local' | 'foundry'): InterpretationProvider {
+  return {
+    name,
+    async interpret() {
+      throw new Error('A player-resolution continuation must not invoke an interpreter.')
+    },
+  }
+}
+
+async function analyzeContinuation(
+  grant: PlayerResolutionGrant,
+  claims: InterpretedClaim[],
+  request: AnalysisRequest,
+  selectedPlayers: PlayerResolutionOption[],
+): Promise<AnalysisResponse> {
+  const dataset = resolveDataset(request.datasetId)
+  const players = dataset.evidence.players.map(({ id, name, team }) => ({
+    id,
+    name,
+    team,
+  }))
+  const validated = validateGrant(
+    {
+      ...grant,
+      request,
+      claims,
+      candidates: candidateSetsForClaims(
+        claims,
+        request.opinion,
+        players,
+        dataset.naming,
+      ),
+      selectedPlayers,
+    },
+    request.selectedClock,
+    request.period,
+  )
+  const response = await analyzeSlottedOpinion(
+    { ...validated.request, opinion: validated.slotted.text },
+    validated.dataset,
+    continuationProvider(grant.provider),
+    undefined,
+    validated.claims,
+  )
+  return toDisplay(
+    addPlayerResolutionContinuation(
+      response,
+      validated.request,
+      validated.claims,
+      validated.players,
+      validated.dataset.naming,
+      grant.provider,
+      selectedPlayers,
+    ),
+    validated.dataset.naming,
+  )
+}
+
+export async function resolvePlayerSelection(
+  input: unknown,
+  secret?: string,
+): Promise<AnalysisResponse> {
+  const request = parsePlayerResolutionRequest(input)
+  const grant = verifyPlayerResolution(request.continuation, secret)
+  const validated = validateGrant(grant)
+  const candidateSet = grant.candidates.find(
+    ({ claimId }) => claimId === request.claimId,
+  )
+  const claimIndex = validated.claims.findIndex(
+    ({ id }) => id === request.claimId,
+  )
+  if (
+    !candidateSet ||
+    claimIndex < 0 ||
+    !candidateSet.players.some(({ id }) => id === request.playerId)
+  ) {
+    throw new InputValidationError('Selected player is not a candidate for this clarification.')
+  }
+  const player = validated.players.find(({ id }) => id === request.playerId)
+  if (!player) throw new InputValidationError('Selected player is not in this fixture.')
+  const resolvedClaims = validated.claims.map((claim, index) =>
+    index === claimIndex
+      ? {
+          ...claim,
+          subject: player.team,
+          playerSubject: player,
+          clarificationNeeds: [],
+        }
+      : claim,
+  )
+  let checkedClaims: InterpretedClaim[]
+  try {
+    checkedClaims = validateInterpretation(
+      { claims: resolvedClaims },
+      validated.availableEvents,
+      validated.fixture.players,
+      { requireClaims: true },
+    )
+  } catch (error) {
+    throw new InputValidationError(
+      error instanceof Error ? error.message : 'Selected player claim is invalid.',
+    )
+  }
+  const selectedPlayers = [
+    ...grant.selectedPlayers.filter(
+      ({ id }) => id !== player.id,
+    ),
+    player,
+  ]
+  return analyzeContinuation(
+    grant,
+    checkedClaims,
+    validated.request,
+    selectedPlayers,
+  )
+}
+
+export async function recheckResolvedPlayer(
+  input: unknown,
+  secret?: string,
+): Promise<AnalysisResponse> {
+  const request = parseResolvedPlayerRecheckRequest(input)
+  const grant = verifyPlayerResolution(request.continuation, secret)
+  const validated = validateGrant(
+    grant,
+    request.selectedClock,
+    request.period,
+  )
+  return analyzeContinuation(
+    grant,
+    validated.claims,
+    validated.request,
+    grant.selectedPlayers,
+  )
 }
 
 async function analyzeSlottedOpinion(
@@ -2712,6 +3096,7 @@ async function analyzeSlottedOpinion(
   dataset: ReturnType<typeof resolveDataset>,
   provider: InterpretationProvider,
   fixtureOverride?: SyntheticMatchEvidence,
+  validatedClaims?: InterpretedClaim[],
 ): Promise<AnalysisResponse> {
   const fixture = fixtureOverride ?? dataset.evidence
   const matchEvents = dataset.events
@@ -2739,7 +3124,9 @@ async function analyzeSlottedOpinion(
     request.period === 'match-so-far'
       ? `Match so far through ${selectedTime}`
       : `Last 10 minutes ending ${selectedTime}`
-  const interpreted = request.opinion
+  const interpreted = validatedClaims
+    ? undefined
+    : request.opinion
     ? await provider.interpret(request.opinion, {
         events: eventsThroughSelectedTime,
         selectedClock: request.selectedClock,
@@ -2747,12 +3134,13 @@ async function analyzeSlottedOpinion(
         period: request.period,
         capabilities: EVIDENCE_CAPABILITIES,
         players: fixture.players,
+        inputLanguage: request.inputLanguage,
       })
     : { claims: [] }
   let claims: InterpretedClaim[]
   try {
     claims = validateInterpretation(
-      normalizeKnownInterpretation(interpreted),
+      validatedClaims ? { claims: validatedClaims } : normalizeKnownInterpretation(interpreted),
       eventsThroughSelectedTime,
       fixture.players,
       { requireClaims: request.opinion.length > 0 },
@@ -2821,6 +3209,22 @@ async function analyzeSlottedOpinion(
       ).length,
     },
   }
+  const originalOpinion = request.opinion.trim()
+  const replies = claimReplies(
+    results,
+    fixture,
+    advanced,
+    eventsThroughSelectedTime,
+    request.selectedClock,
+    (result) =>
+      claims.length === 1 && originalOpinion !== ''
+        ? originalOpinion
+        : originalOpinion
+            .toLowerCase()
+            .includes(result.claim.text.trim().toLowerCase())
+          ? result.claim.text
+          : undefined,
+  )
   const response: AnalysisResponse = {
     provider: provider.name,
     providerLabel:
@@ -2856,7 +3260,7 @@ async function analyzeSlottedOpinion(
       fixture,
       matchAnalysis.periodEvents,
     ),
-    claims: results,
+    claims: results.map((result, index) => ({ ...result, reply: replies[index] })),
   }
 
   return response
