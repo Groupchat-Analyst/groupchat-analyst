@@ -110,15 +110,15 @@ export function HomePage() {
       <section className="lp-future" aria-labelledby="lp-future-title">
         <h2 id="lp-future-title">Built for your group chat.</h2>
         <p>
-          The web demo works today. A WhatsApp companion is planned, with no launch date. Nothing here connects to messaging,
-          reads a chat or monitors one.
+          Check an opinion here, then share the evidence with your mates. A WhatsApp companion is planned;
+          this demo doesn’t connect to your chats.
         </p>
       </section>
 
       <details className="lp-limits">
         <summary>What this demo is, and is not</summary>
         <ul>
-          <li>Both matches are fictional. Players carry real names as invented identities; no performance, result or statistic is real.</li>
+          <li>Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.</li>
           <li>Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.</li>
           <li>Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.</li>
           <li>Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.</li>

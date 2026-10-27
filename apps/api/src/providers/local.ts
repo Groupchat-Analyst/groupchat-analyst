@@ -845,6 +845,18 @@ function claimFromText(
   const clarificationNeeds: string[] = []
   const comparisonPrompt =
     /\b(?:compare|comparison|than|versus|vs\.?)\b/i.test(text)
+  const namedTeams = TEAMS.filter((team) => new RegExp(`\\b${team}\\b`, 'i').test(text))
+  if (
+    !comparison &&
+    /\b(?:than|versus|vs\.?|compared\s+(?:with|to))\b/i.test(text) &&
+    /\b(?:shots?|goals?|possession|passes|passing|completion|accuracy|recoveries|distance|minutes)\b/i.test(text) &&
+    namedTeams.length < 2 &&
+    playerMentions.length < 2
+  ) {
+    clarificationNeeds.push(
+      'I cannot resolve both sides of this comparison. Which two teams or players from this fixture do you mean?',
+    )
+  }
   if (
     playerMentions.length > 1 &&
     !playerComparison &&
