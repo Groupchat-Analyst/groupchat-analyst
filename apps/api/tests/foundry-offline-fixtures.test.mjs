@@ -114,3 +114,27 @@ test('constructed stub: a baseline-only event reference is rejected for the seco
     /unavailable event|anchor/i,
   )
 })
+
+// CONSTRUCTED STUB (Stage 2 fixture): not a capture and not a live result. The Foundry context for a
+// fixture with other team names carries internal slot names (Northbridge/Eastport) and the response is
+// translated back to display names afterwards. A real Foundry call has not been made for these fixtures.
+test('constructed stub: a Stage 2 fixture supplies its own events and the response uses display names', async () => {
+  const seen = []
+  const result = await analyzeOpinion(
+    {
+      opinion: 'Westhaven FC had more shots than Kingswell City.',
+      selectedClock: { period: 2, minute: 90, stoppageMinutes: 4 },
+      period: 'match-so-far',
+      datasetId: 'westhaven-kingswell-demo',
+    },
+    stub(constructed, seen),
+  )
+  const userMessage = JSON.parse(seen[0].messages.at(-1).content)
+  assert.ok(userMessage.availableEvents.every(({ id }) => id.startsWith('westhaven-event-')))
+  assert.equal(result.provider, 'foundry')
+  assert.equal(result.evidenceFoundation.dataset.id, 'westhaven-kingswell-demo')
+  assert.equal(result.claims[0].assessment, 'supported')
+  assert.deepEqual(result.claims[0].statistics.map(({ team, value }) => [team, value]), [['Westhaven FC', 9], ['Kingswell City', 3]])
+  assert.deepEqual(result.score, { 'Westhaven FC': 0, 'Kingswell City': 0 })
+  assert.ok(!/Northbridge|Eastport/.test(JSON.stringify(result)))
+})

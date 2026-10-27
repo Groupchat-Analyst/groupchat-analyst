@@ -10,6 +10,7 @@ import {
   type MatchClock,
 } from '../../../shared/src/match.js'
 import { findCatalogEntry } from '../../../shared/src/datasetCatalog.js'
+import { toDisplay } from '../../../shared/src/teamNaming.js'
 import { resolveDataset } from '../datasets.js'
 import type { MatchReplayResponse } from '../../../shared/src/apiContracts.js'
 
@@ -51,7 +52,7 @@ export function getReplayFrame(
 
   const analysis = analyzeMatch(dataset.events, clock, 'match-so-far')
 
-  return {
+  return toDisplay({
     datasetId: dataset.id,
     datasetVersion: dataset.version,
     selectedTime: formatMatchClock(clock),
@@ -64,7 +65,7 @@ export function getReplayFrame(
       type: event.type,
       ...(event.type === 'shot' ? { outcome: event.outcome } : {}),
     })),
-  }
+  }, dataset.naming)
 }
 
 export function createReplayHandler() {

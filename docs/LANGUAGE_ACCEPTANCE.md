@@ -82,6 +82,15 @@ These are covered by `apps/api/tests/dataset-selection.test.mjs`, `return-fixtur
 - Saka at 60′: 2 shots on target and 5 of 5 passes. A player with no attempts shows a null completion rate, not 0%.
 - Substitutions apply before events at the same timestamp, and the first-half stoppage events (45+1′) are included in order.
 
+## Stage 2 fixtures (local-rule execution)
+
+Covered by `apps/api/tests/new-fixtures.test.mjs` and the catalog examples in `dataset-examples.test.mjs`; these are checks of fixture behaviour on the same bounded rules, not additions to the 42-row matrix (which is unchanged and still runs on the local provider).
+
+- Westhaven FC v Kingswell City (goalless): “Kingswell City had no shots on target” → supported (0 of 3 shots); last-10-minutes possession 40%/60% contradicts “Westhaven FC had more possession” while the whole match favours Westhaven; “Haaland’s passing has been poor” → no recorded pass attempts, no completion rate; “before the goal” → no goal recorded, asks for clarification; “Pedro” → asks which Pedro.
+- Redmere FC v Alderwick United: “Abraham has scored” is supported from 88′ and not before; “Every Alderwick United shot was on target” → contradicted (3 of 5); “before the goal” → asks which of three goals; “Jackson has been poor” → recorded contributions, no rating.
+- A team or player belonging to another match is not reinterpreted (“Eastport…” in Westhaven gives clarification/limitation, never a verdict).
+- Known coverage limit: “completed more passes than …” is unrecognised on every fixture under local rules.
+
 ## Coverage statement
 
 The local interpreter reads a bounded set of patterns by *meaning class* (a shared opinion-topic classifier, a comparison parser and a player-metric parser). It is not an open language model and will decline wording outside those classes. Foundry interpretation for these classes has not been verified on the current prompt and schema.

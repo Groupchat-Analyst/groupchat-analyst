@@ -1,5 +1,13 @@
 # Next-session handoff
 
+## Corrected submission brief: Stage 2 (two more fictional fixtures)
+
+- New fixtures: **Westhaven FC v Kingswell City** (`westhaven-kingswell-demo`, goalless: 9 shots/5 on target v 3/0, Kingswell hold the ball late) and **Redmere FC v Alderwick United** (`redmere-alderwick-demo`, goals 33′, 61′ and a 78′ substitute’s 88′ winner; three goals make “before the goal” ambiguous). Rosters are synthetic fixtures using roster-snapshot names (sources/date in `apps/shared/DATA_DICTIONARY.md`). Both pass `validateFixtureIntegrity`; the original two and the baseline hash are untouched.
+- Team handling: a slot adapter (`teamNaming.ts`). New fixtures keep internal slots `Northbridge`/`Eastport`; the API translates the opinion in and the response out (display names and aliases such as “Westhaven”). A foreign team name (“Eastport” in Westhaven) becomes a placeholder and is not reinterpreted. Web reads team names from the catalog and the response (header, replay validation, pass map, squads, player picker).
+- Checks: API 246/246 (`new-fixtures.test.mjs` is new; labelled constructed-stub Foundry test added), web 121/121, tsc/lint/build/`git diff --check` clean, baseline hash `fb5335ff…1044 70 17`, 42-case matrix still runs on the local provider.
+- Verified in the browser (emulation, scaled ordinary mouse events): both new fixtures at 1280/390/320 px load with correct names, monograms and score, no horizontal overflow, 0 analyze calls on load; an example only prefills; submit makes one request; the Analyst view, squads and pass map show the fixture’s team names. Screenshots: `s2-home-*`, `s2-matches-*`, `s2-convo-*` (d = 1280 px, m = 390 px).
+- Not verified: live Foundry for any fixture (the Foundry path for the new fixtures is offline-stub only and would carry slot-named context), real device, screen reader, native share on a phone. Local rules do not read “completed more passes than” (reported as unrecognised, same as the original match).
+
 ## Corrected submission brief: Stage 1 (entry flow and conversation)
 
 - Home: headline “Your mate’s football opinion. Checked.”, one primary action **Try it Out** to `#/matches` (the secondary button and demo shortcut were removed; the `/demo` route still exists). Match tiles show monograms, `Team v Team`, a scenario line and example count.

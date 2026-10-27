@@ -4,11 +4,11 @@
 
 Groupchat Analyst checks football opinions against recorded match evidence. You type an opinion, choose a moment in a fictional replay, and get an answer that shows how the opinion was understood, the evidence for and against, the limits of that evidence, and a shareable receipt. Move the clock, check again, and see what changed.
 
-Both Northbridge v Eastport matches, their events and player performances are fictional. Player names are used in invented scenarios; the figures are not real player-performance data.
+Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell City, Redmere FC v Alderwick United), their events and player performances are synthetic. Real-player names are fictionalised identities in invented scenarios; the figures are not real player-performance data. The two new squads are roster snapshots (sources and retrieval date 27 October 2026 in [DATA_DICTIONARY.md](../apps/shared/DATA_DICTIONARY.md)), used only as names.
 
 ## What works today
 
-- Home page, match selection (Original match, Return match) and a match view with replay controls, key moments and verified example opinions that only prefill.
+- Home page, match selection (four fictional matches) and a match view with replay controls, key moments and verified example opinions that only prefill.
 - Opinion → structured meaning → server-side evidence and calculation → Fan or Analyst explanation. Multiple claims are separated; ambiguity gets a clarification; unavailable physical data, injuries and predictions get explicit limits.
 - Broad opinions (for example “Saka has had a horrible game”) get the player’s recorded contributions with no rating.
 - “Check again” at a later minute produces a deterministic comparison; the card, copied text and PNG are built from the same content and name the fixture, version and how the opinion was read.
@@ -24,10 +24,10 @@ Both Northbridge v Eastport matches, their events and player performances are fi
 
 | Check | Result |
 | --- | --- |
-| API tests | 230 pass after the independent offline review (Node 22.23.3) |
-| Web tests | 113 pass after the independent offline review (Node 22.23.3) |
-| Baseline fixture hash | Unchanged (`fb5335ff…`) |
-| Browser (desktop + 390 px emulation, local stack) | Guided 57′→58′ journey, match switching, failure path, pending-request switch, stubbed native share |
+| API tests | 246 pass (Node 22.23.3), local provider |
+| Web tests | 121 pass |
+| Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
+| Browser (desktop + 390 px/320 px emulation, local stack) | Stage 1 journey and race checks (see NEXT_SESSION.md); Stage 2: both new fixtures load with correct names/score, no overflow at 1280/390/320, 0 analyze calls on load, example prefills without a request, one request on submit, Analyst view and pass map use the fixture’s team names |
 | Language matrix | 42 inputs: 42 pass under local rules ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
 | Live Foundry for the current work | **None** |
@@ -69,9 +69,24 @@ Smallest credible route:
 
 Dependencies: a new storage resource and a code change in the API; both need explicit approval. Not implemented.
 
+### Stage 2 audit findings (repository-only; no model calls, no Azure changes)
+
+- **What Foundry supports today:** the structured-interpretation schema and prompt cover the original two matches’ vocabulary (team enums `Northbridge`/`Eastport`, Bruno example). Count assertions (negation, “every”, zero), shot location and the repaired composition forms are implemented in local rules only.
+- **Captured outputs:** the genuine `cf10c74` captures still replay through the current validator, service, web comparison and share functions with provider `foundry` (offline replay, not new verification). Constructed transport stubs for the Return fixture and for Westhaven FC v Kingswell City check that the selected fixture supplies events, evidence, calculations and metadata. They are not captures and not live results.
+- **Team-name assumptions (Stage 2):** the two new fixtures use internal slot names (`Northbridge` = home, `Eastport` = away) so the schema, prompt, validators and local rules stay unchanged. The API translates the opinion to slot names before interpretation and translates the whole response back to display names. Consequence: a live Foundry call for a new fixture would see slot-named context. That is unverified, and the context/schema would need fixture-specific team names before a live run on those fixtures.
+- **Total request allowance:** none enforced. Token ceiling and timeout are per request only.
+
+### Minimum work for a judge-accessible Foundry experience (PROPOSED, not implemented)
+
+1. A durable counter (for example Azure Table Storage) with conditional writes, checked and incremented *before* each call: total cap and per-client cap, shared across instances and restarts.
+2. Failure behaviour: a failed provider call consumes allowance; storage unavailable ⇒ refuse Foundry and fall back to local rules, labelled.
+3. An off switch (the existing provider flag, default local) and exhausted/fallback labels (“live-AI allowance used up — answered by local rules”).
+4. Fixture-aware team names in the Foundry context/schema for the two new fixtures.
+5. Approvals needed: a storage resource, server settings for credentials/caps, enabling the flag on a hosted instance. None has been requested or performed.
+
 ### Proposed fixed live acceptance set (execution NOT authorised)
 
-Six calls, one run, no retries, stopping at the first failure, on the current prompt/schema:
+Candidate commit: the Stage 2 commit recorded in [NEXT_SESSION.md](./NEXT_SESSION.md) (the `git log` SHA of the pushed branch tip that contains this section). Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Do not run it from this document.
 
 1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
 2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).

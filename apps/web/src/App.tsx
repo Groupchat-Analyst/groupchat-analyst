@@ -15,9 +15,9 @@ import type {
 import {
   formatMatchClock,
   getMatchTimeOptions,
-  TEAMS,
   type AnalysisPeriod,
   type MatchClock,
+  type MatchTeam,
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
@@ -384,7 +384,7 @@ function EvidenceFoundationPanel({
         contested play and time out of play are excluded.
       </p>
       <div className="advanced-team-grid">
-        {TEAMS.map((team) => {
+        {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => {
           const metrics = foundation.teams[team]
           const lossValues = Object.values(metrics.possessionLosses)
           const lossCount = lossValues.some((value) => value === null)
@@ -512,7 +512,7 @@ function EvidenceFoundationPanel({
       </details>
       <details className="all-references">
         <summary>View fictional matchday squads and participation</summary>
-        {TEAMS.map((team) => (
+        {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => (
           <section key={team}>
             <h3>{team} · starting XI</h3>
             <ol className="interval-list">
@@ -708,10 +708,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       new ReplayController(
         MATCH_TIME_OPTIONS,
         INITIAL_MATCH_TIME,
-        (clock, signal) => fetchReplayFrame(clock, signal, datasetId),
+        (clock, signal) => fetchReplayFrame(clock, signal, datasetId, dataset.teams),
         { dwellMs: REPLAY_DWELL_MS },
       ),
-    [datasetId],
+    [datasetId, dataset.teams],
   )
   const replaySnapshot = useSyncExternalStore(
     replay.subscribe,
@@ -1084,6 +1084,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <div className="workspace-grid">
           <div className="match-column">
             <MatchHeader
+              teams={dataset.teams}
               timeline={MATCH_TIME_OPTIONS}
               snapshot={replaySnapshot}
               keyMoments={KEY_MOMENTS}
@@ -1199,7 +1200,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                 <label htmlFor="player-select">Fictional matchday squad</label>
                 <select id="player-select" value={selectedPlayerId} onChange={(event) => setSelectedPlayerId(event.currentTarget.value)}>
                   <option value="">Choose a player</option>
-                  {TEAMS.map((team) => <optgroup key={team} label={team}>{analysis.evidenceFoundation.players.filter((player) => player.team === team).map((player) => <option key={player.id} value={player.id}>{player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}</option>)}</optgroup>)}
+                  {(Object.keys(analysis.evidenceFoundation.teams) as MatchTeam[]).map((team) => <optgroup key={team} label={team}>{analysis.evidenceFoundation.players.filter((player) => player.team === team).map((player) => <option key={player.id} value={player.id}>{player.name} · {player.status === 'starter' ? 'starter' : 'substitute'}</option>)}</optgroup>)}
                 </select>
                 <button className="secondary-button" type="button" disabled={!selectedPlayerId} onClick={() => {
                   const player = analysis.evidenceFoundation.players.find(({ id }) => id === selectedPlayerId)

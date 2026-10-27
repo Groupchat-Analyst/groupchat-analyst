@@ -142,7 +142,5 @@ export function validateFixtureIntegrity(
     if (!owned(annotation.pressureIds, fixture.pressures)) report(`Annotation ${annotation.id} has a pressure outside its possession.`)
   }
 
-  const goalsByPlayer = events.filter((e) => e.type === 'shot' && e.outcome === 'goal').length
-  if (goalsByPlayer === 0) report('The fixture records no goals.')
   return problems
 }

@@ -11,7 +11,7 @@ This guide describes the public, read-only local-provider candidate. Deployment 
 3. **Check at 57′ (20 s).** Press **Check this moment**; your opinion appears on the right and the answer on the left, with **How this was checked** expandable: “Eastport had more shots on target than Northbridge.” → no, level at 2 each. Point at **Checked against** and the “Local rules · no model connection” label.
 4. **Replay and recheck (20 s).** **Move to 58′**, then **Check again at 58′**. Now Eastport 3, Northbridge 2, with the new shot at 58′. No cause is inferred.
 5. **Share (15 s).** Open **Share what changed**; the card footer names the fixture, version and local-rules reading. Copy, download or (on a supported phone) **Share the receipts**.
-6. **A different match (25 s).** **All matches → Return match**. Choose the example “Eastport had more possession than Northbridge but Northbridge had more shots” at 90+4′: two claims, both supported, because possession and shots can differ. Then “Saka has had a horrible game” at 60′: his records, no rating.
+6. **A different match (25 s).** **All matches → Return match**. Choose the example “Eastport had more possession than Northbridge but Northbridge had more shots” at 90+4′: two claims, both supported, because possession and shots can differ. Then “Saka has had a horrible game” at 60′: his records, no rating. Optional: **Late winner** → “Abraham has scored” at 88′ (a substitute’s goal), or **Goalless match** → “Kingswell City had no shots on target.” at 90+4′ (a zero count).
 7. **Vision (10 s).** A WhatsApp companion is planned; this demo reads no chat.
 
 ## Other checks (Original match unless stated)

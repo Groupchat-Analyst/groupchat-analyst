@@ -1,11 +1,12 @@
 import { useId, useState } from 'react'
 import type { AnalysisResponse } from '../../shared/src/apiContracts'
-import { TEAMS, type MatchTeam } from '../../shared/src/matchClock'
+import type { MatchTeam } from '../../shared/src/matchClock'
 
 type Foundation = AnalysisResponse['evidenceFoundation']
 
 export function PassMap({ foundation }: { foundation: Foundation }) {
-  const [team, setTeam] = useState<MatchTeam>('Northbridge')
+  const teams = Object.keys(foundation.teams) as MatchTeam[]
+  const [team, setTeam] = useState<MatchTeam>(teams[0])
   const [selectedId, setSelectedId] = useState('')
   const titleId = useId()
   const descriptionId = useId()
@@ -28,7 +29,7 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
             <h3 id={titleId}>Follow the ball.</h3>
           </div>
           <div className="segmented-control" role="group" aria-label="Pass map team">
-            {TEAMS.map((name) => (
+            {teams.map((name) => (
               <button
                 key={name}
                 type="button"

@@ -27,6 +27,12 @@ The shared match clock represents normal time and stoppage as `45+N′` or `90+N
 
 For an event exactly at an interval boundary, the event is linked to the interval whose possession produced it. Adjacent intervals share the boundary instant only; the instant contributes no duration twice.
 
+## Additional fixtures, team slots and roster sources
+
+`westhaven-kingswell-demo` and `redmere-alderwick-demo` (both 1.0.0, provenance `synthetic`) are authored deterministic fixtures with 11 starters plus 9 substitutes per side, validated by `validateFixtureIntegrity`. Internally the home side is the `Northbridge` slot (`north-player-NN`) and the away side the `Eastport` slot (`east-player-NN`), so IDs stay stable and the shared calculations, validators and interpreter are unchanged. `teamNaming.ts` translates display names and aliases (for example “Westhaven”) to slots before interpretation and back afterwards; a slot name belonging to another match becomes a placeholder and is not reinterpreted. For a live Foundry call the context would carry slot names, which is unverified.
+
+Player names are dated reference snapshots used only as fictional identities (retrieved 27 October 2026): Westhaven FC ← Chelsea men’s profiles (https://www.chelseafc.com/en/teams/mens-profiles); Kingswell City ← Manchester City players (https://www.mancity.com/players); Redmere FC ← Liverpool men’s team (https://www.liverpoolfc.com/teams/mens-team?position=all); Alderwick United ← Aston Villa teams (https://www.avfc.co.uk/teams/). Squad membership may have changed since retrieval. All actions, shots, goals, substitutions and possession are invented. The goalless fixture records no goals; “before the goal” has no anchor there.
+
 ## Record schemas
 
 | Record | Key fields |

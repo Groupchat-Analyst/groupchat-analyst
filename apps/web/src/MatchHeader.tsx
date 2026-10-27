@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MatchReplayResponse } from '../../shared/src/apiContracts'
+import type { MatchTeam } from '../../shared/src/matchClock'
 import { formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
 import { clockKey, type ReplaySnapshot } from './replayController'
+import { teamMonogram } from './teamMonogram'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -9,6 +11,7 @@ type Replay = MatchReplayResponse
 type ReplayEvent = Replay['events'][number]
 
 type MatchHeaderProps = {
+  teams: readonly [string, string]
   timeline: MatchClock[]
   snapshot: ReplaySnapshot
   keyMoments: KeyMoment[]
@@ -52,7 +55,7 @@ function useNewEventIds(frame: Replay | null): Set<string> {
   return tracked.added
 }
 
-function EventLog({ frame }: { frame: Replay | null }) {
+function EventLog({ frame, homeTeam }: { frame: Replay | null; homeTeam: string }) {
   const listRef = useRef<HTMLOListElement>(null)
   const added = useNewEventIds(frame)
   const count = frame?.events.length ?? 0
@@ -68,7 +71,7 @@ function EventLog({ frame }: { frame: Replay | null }) {
         <li
           key={event.id}
           className={[
-            event.team === 'Northbridge' ? 'north-event' : 'east-event',
+            event.team === homeTeam ? 'north-event' : 'east-event',
             isGoal(event) ? 'is-goal' : '',
             added.has(event.id) ? 'is-new' : '',
           ].filter(Boolean).join(' ')}
@@ -87,6 +90,7 @@ function EventLog({ frame }: { frame: Replay | null }) {
 }
 
 export function MatchHeader({
+  teams,
   timeline,
   snapshot,
   keyMoments,
@@ -119,26 +123,26 @@ export function MatchHeader({
   const motion = playing ? `${dwellMs}ms linear` : '160ms ease-out'
 
   const scoreText = displayed
-    ? `${displayed.score.Northbridge} – ${displayed.score.Eastport}`
+    ? `${displayed.score[teams[0] as MatchTeam]} – ${displayed.score[teams[1] as MatchTeam]}`
     : '– –'
   const scoreChanged = useChangedFlag(scoreText)
 
   const announcement = displayed && !playing
-    ? `${displayed.selectedTime}. Northbridge ${displayed.score.Northbridge}, Eastport ${displayed.score.Eastport}.`
+    ? `${displayed.selectedTime}. ${teams[0]} ${displayed.score[teams[0] as MatchTeam]}, ${teams[1]} ${displayed.score[teams[1] as MatchTeam]}.`
     : ''
 
   return (
     <section className="match-header" aria-labelledby="match-header-title">
       <h2 id="match-header-title" className="visually-hidden">Fictional match replay</h2>
       <div className="scoreboard">
-        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">N</span>Northbridge</div>
+        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">{teamMonogram(teams[0])}</span>{teams[0]}</div>
         <div
           className={`score${scoreChanged ? ' is-changed' : ''}${displayed ? '' : ' is-empty'}`}
           aria-hidden="true"
         >
           {scoreText}
         </div>
-        <div className="team-name east">Eastport<span className="team-monogram east" aria-hidden="true">E</span></div>
+        <div className="team-name east">{teams[1]}<span className="team-monogram east" aria-hidden="true">{teamMonogram(teams[1])}</span></div>
         <div className="match-clock" aria-hidden="true">
           <span className="clock-value">{displayedLabel ?? requestedLabel}</span>
           <span className="clock-state">
@@ -222,7 +226,7 @@ export function MatchHeader({
         <summary>
           All recorded events <span>{displayed ? `${displayed.events.length} through ${displayed.selectedTime}` : '…'}</span>
         </summary>
-        <EventLog frame={displayed} />
+        <EventLog frame={displayed} homeTeam={teams[0]} />
       </details>
     </section>
   )

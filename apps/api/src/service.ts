@@ -30,6 +30,7 @@ import {
   type MatchTeam,
 } from '../../shared/src/match.js'
 import { resolveDataset } from './datasets.js'
+import { toDisplay, toSlotOpinion } from '../../shared/src/teamNaming.js'
 import {
   BEFORE_GOAL_PHRASE,
   parseCountAssertion,
@@ -2420,8 +2421,20 @@ export async function analyzeOpinion(
   provider: InterpretationProvider = new LocalInterpretationProvider(),
   fixtureOverride?: SyntheticMatchEvidence,
 ): Promise<AnalysisResponse> {
-  const request = parseAnalysisRequest(input)
-  const dataset = resolveDataset(request.datasetId)
+  const parsed = parseAnalysisRequest(input)
+  const dataset = resolveDataset(parsed.datasetId)
+  const slotted = toSlotOpinion(parsed.opinion, dataset.naming)
+  const request = { ...parsed, opinion: slotted.text }
+  const response = await analyzeSlottedOpinion(request, dataset, provider, fixtureOverride)
+  return toDisplay(response, dataset.naming, slotted.foreign)
+}
+
+async function analyzeSlottedOpinion(
+  request: ReturnType<typeof parseAnalysisRequest>,
+  dataset: ReturnType<typeof resolveDataset>,
+  provider: InterpretationProvider,
+  fixtureOverride?: SyntheticMatchEvidence,
+): Promise<AnalysisResponse> {
   const fixture = fixtureOverride ?? dataset.evidence
   const matchEvents = dataset.events
   const matchSoFar = analyzeMatch(

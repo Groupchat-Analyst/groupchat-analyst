@@ -24,7 +24,7 @@ const at = (minute, stoppageMinutes, periodNumber = minute > 45 ? 2 : 1) => ({
 const stat = (result, team) => result.claims[0].statistics.find((s) => s.team === team)
 
 test('catalog entries resolve to fixtures with matching ID and version', () => {
-  assert.deepEqual(DATASET_CATALOG.map((d) => d.id), [BASELINE_ID, RETURN_ID])
+  assert.deepEqual(DATASET_CATALOG.map((d) => d.id), [BASELINE_ID, RETURN_ID, 'westhaven-kingswell-demo', 'redmere-alderwick-demo'])
   for (const entry of DATASET_CATALOG) {
     const resolved = resolveDataset(entry.id)
     assert.equal(resolved.evidence.dataset.id, entry.id)
