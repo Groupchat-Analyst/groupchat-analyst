@@ -1,10 +1,18 @@
 # Next-session handoff
 
+## Offline call-3 duration repair (application `14bb52314a70370851900726fbf620f0fb42e309`)
+
+- Replayed the captured call-3 interpretation through `FoundryInterpretationProvider`, real validation, and `analyzeOpinion` with a stubbed transport. The result uses Return fixture `northbridge-eastport-return-demo` v1.0.0, the selected 60′ match clock, match-so-far scope, Saka (`north-player-09`), and excludes later events.
+- The 62 minutes are elapsed participation, not 62 nominal match-clock minutes: 60′ maps to elapsed minute 63; recorded coverage and Saka's on-pitch interval begin at 1′ (elapsed minute 1); `[1, 63)` is 62 minutes. First-half added time is included and half-time excluded. The response, Analyst trace, squad display, copied card and PNG card model now label this meaning and expose the relevant boundaries.
+- Added regressions for the captured interpretation, 45+3′, the 46′ second-half boundary, a rolling ten-minute window, outgoing/incoming substitutions, player attribution, and exclusion of future events. The web receipt regression checks the original opinion, duration label, fixture/version and Foundry provider.
+- Final offline checks: API build and **313/313 API tests**; web **122/122 tests**, typecheck/build and lint; `git diff --check` clean. No fixtures, Foundry prompts/settings, ignored raw captures or historical ledgers were changed. No live model calls were made during this repair.
+- This is a separate offline explanation and code repair; it does not change the original live-run result or establish live Foundry behaviour. A proposed follow-up is tied to this commit in [SUBMISSION.md](./SUBMISSION.md), and has not been authorized or run.
+
 ## Bounded live Foundry run (application `2343167`; stopped after call 3)
 
 - Preflight confirmed a clean worktree and application/fixture blobs identical to `2343167`; the only descendant was the docs commit `3e8ebca`. Isolated API/UI services used ports 7416/5416 and process-only provider/capture overrides. Stored configuration and application code were not changed.
 - Exactly three outbound Foundry requests were made, one per attempted browser submission. Calls 1 and 2 met their stated expectations, including the 57′→58′ comparison. Receipt preview and copied text preserved the opinion, figures, fixture/version and Foundry label; those actions added 0 analyze requests.
-- Call 3, Return fixture at 60′, received HTTP 200 from Foundry and returned a qualified subjective judgement for Bukayo Saka. Its response nevertheless said he had “played 62 minutes in the selected period”, exceeding the selected 60′ scope. The run stopped immediately; calls 4–6 were not run.
+- Call 3, Return fixture at 60′, received HTTP 200 from Foundry and returned a qualified subjective judgement for Bukayo Saka. Its response said he had “played 62 minutes in the selected period” without defining match-clock versus elapsed participation time, so the run stopped on the apparent scope mismatch; calls 4–6 were not run. The later offline investigation confirmed that 62 is elapsed participation within recorded coverage, not participation after the selected clock.
 - Three successful captures record token usage; browser resource timing was 7,550 ms, 8,704 ms and 7,173 ms. Finish reason was not captured. The PNG button reported a download, but this browser harness did not expose a download event, so the PNG bytes were not independently inspected.
 - The isolated services were stopped. No live call was made to the public deployment; no retries, replacement calls, Azure changes, stored-setting changes or application repairs occurred. This three-call run does not establish broad reliability.
 - Sanitized call-by-call record: [foundry-2343167-bounded-live-ledger.json](./foundry-2343167-bounded-live-ledger.json). Raw captures remain local and git-ignored.
@@ -169,7 +177,7 @@ Current walkthrough is **local-provider verified** (local interpreter), not Foun
 
 ## 3. Foundry verification status and remaining blocker
 
-The previously proposed acceptance set was superseded by the explicitly authorised six-input run recorded above. That run stopped after call 3 because a 60′ response reported 62 minutes played. Do not rerun or continue the remaining inputs without a new explicit authorisation and a fix reviewed outside the live run.
+The authorised six-input run recorded above stopped after call 3 because its 60′ response did not distinguish match-clock time from elapsed participation. The offline replay at application `14bb52314a70370851900726fbf620f0fb42e309` confirms the 62-minute figure is the half-open elapsed interval `[1, 63)` within recorded coverage, not future play; the application now explains that calculation. This is not a live correction or verification. Calls 4–6 remain unrun. The exact proposed six-call follow-up is in [SUBMISSION.md](./SUBMISSION.md); it is not authorized by this handoff and requires fresh explicit approval.
 
 The current host still has an 8192 completion-token ceiling, 30 s provider timeout, no retry loop, and 45 s browser deadline. These bound a single request; they are not a durable total allowance. The judge-accessible allowance, per-client limit, exhaustion/fallback semantics, and fixture-aware Foundry team context/schema remain proposed—not implemented. No live verification was performed for Westhaven/Kingswell or Redmere/Alderwick in this run.
 
@@ -177,6 +185,6 @@ Three calls cannot establish production reliability: repeatability, broad langua
 
 ## 4. Next actions (priority order)
 
-1. Investigate and repair the reported future-minutes scope mismatch without making live model calls.
-2. Re-run local regression checks for player minutes and the selected match-time cutoff.
+1. If desired, obtain fresh explicit approval before running the proposed six-call Foundry follow-up tied to `14bb52314a70370851900726fbf620f0fb42e309`.
+2. Keep public Foundry disabled until the separate durable allowance, per-client cap, failure handling and exhaustion labels are implemented and approved.
 3. Obtain Rob's feedback and prepare deployment/submission materials.

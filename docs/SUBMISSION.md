@@ -18,19 +18,22 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 - The public candidate is configured to use a **local rule-based interpreter**. No model is called and no credentials are present.
 - An optional Microsoft Foundry structured-output adapter exists, disabled by default. If enabled, the model only interprets wording into a validated structure; all statistics, evidence selection and assessments are computed in application code. Invalid or failed model output is an explicit error, never a guessed answer.
-- A bounded live run against application `2343167` made three of six authorised requests and stopped after a time-scope mismatch: at 60′, the Return-match response reported 62 minutes played. Calls 4–6 were not run. See the [sanitized ledger](./foundry-2343167-bounded-live-ledger.json). Earlier captured outputs replayed offline through the real validation path; offline replay is not live verification.
+- A bounded live run against application `2343167` made three of six authorised requests and stopped after a time-scope presentation mismatch: at 60′, the Return-match response called 62 elapsed participation minutes “minutes played” in the selected period. The offline repair at application `14bb52314a70370851900726fbf620f0fb42e309` names the figure as elapsed participation within recorded coverage and traces the match-clock and elapsed boundaries. Calls 4–6 were not run, and the repair has not been verified live. See the [sanitized ledger](./foundry-2343167-bounded-live-ledger.json) for the unchanged original result.
 
 ## Verification summary
 
 | Check | Result |
 | --- | --- |
-| API tests | 308 pass, local provider |
-| Web tests | 121 pass |
+| API tests | 313 pass, including stubbed captured-call replay and duration boundary regressions |
+| Web tests | 122 pass |
+| Web typecheck/build/lint | Pass |
+| `git diff --check` | Pass |
 | Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
 | Browser (desktop + 390 px/320 px emulation, local stack) | Prior Stage 1/2 checks plus current direct demo route: 0 analyze calls on entry, 1 on explicit submit, 0 on replay movement, 1 on explicit recheck. Both new fixture identities and team names verified in replies and exports; see `docs/NEXT_SESSION.md`. |
 | Language matrix | 42 inputs: 42 pass, 0 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
-| Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 reported 62 minutes at 60′. Calls 4–6 not run; no broad reliability claim. |
+| Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
+| Offline call-3 duration repair | Captured interpretation replayed through the real validation/service path with stubbed transport; Fan/Analyst/copy/card-label regressions pass. No follow-up live call or browser PNG-byte inspection. |
 
 Final Stage 2 follow-up (27 October 2026; application commit `2343167`): catalog foreign-team opponents are preserved distinctly and rejected without team attribution, statistics or evidence, and are not sent to a supplied model provider. Uncatalogued comparison opponents now prompt for clarification rather than inheriting the fixture's second team. Valid fixture aliases and descriptive opinions remain covered. Homepage limitations and the compound demonstration route were corrected; the direct guided route was rehearsed with explicit submit/recheck. API 308/308 and web 121/121 pass; baseline hash remains unchanged.
 
@@ -88,4 +91,21 @@ Dependencies: a new storage resource and a code change in the API; both need exp
 
 ### Bounded live acceptance result (application `2343167`)
 
-The authorised six-input run attempted the first three exact inputs and stopped after call 3. The 60′ Return-match answer reported 62 minutes played, violating the selected-time cutoff. Inputs 4–6 were not run; no retries or replacement calls were made. Calls 1 and 2 returned the expected 57′ contradiction and 58′ support, and the 57′→58′ comparison and copied receipt showed the correct figures, fixture version and Foundry label. The PNG control reported a download, but the harness did not expose the file for byte-level inspection. Full sanitized details, including exact inputs, request timings, token counts, provider and dataset IDs, are in [the live ledger](./foundry-2343167-bounded-live-ledger.json). This small, stopped run does not establish broad Foundry reliability.
+The authorised six-input run attempted the first three exact inputs and stopped after call 3. The 60′ Return-match answer described 62 minutes as time played in the selected period without distinguishing nominal match-clock minutes from elapsed participation within recorded coverage. Inputs 4–6 were not run; no retries or replacement calls were made. The later offline replay established that the figure is `[1, 63)` elapsed minutes, not post-60′ activity; the original run was stopped on the ambiguous presentation and its record remains unchanged. Calls 1 and 2 returned the expected 57′ contradiction and 58′ support, and the 57′→58′ comparison and copied receipt showed the correct figures, fixture version and Foundry label. The PNG control reported a download, but the harness did not expose the file for byte-level inspection. Full sanitized details, including exact inputs, request timings, token counts, provider and dataset IDs, are in [the live ledger](./foundry-2343167-bounded-live-ledger.json). This small, stopped run does not establish broad Foundry reliability.
+
+### Offline duration follow-up and proposed recheck
+
+Application commit `14bb52314a70370851900726fbf620f0fb42e309` replays the captured call-3 interpretation through the actual Foundry response parser/validation and service using only a stub transport. It confirms that selected match clock 60′ maps to elapsed minute 63; recorded coverage and Saka's participation start at 1′ (elapsed minute 1), giving the half-open elapsed interval `[1, 63)` = 62 minutes. The match-clock labels, recorded coverage and player interval are now separately identified; first-half added time is included and half-time excluded. This corrects the presentation and calculation trace offline; it does not alter or replace call 3 in the original live ledger, and no new live call was made.
+
+The following is a **proposal only**, tied to the exact application commit above. It is not authorized or executed. It is a standalone bounded verification plan, not implementation of a durable hosted request allowance.
+
+| Call | Fixture / dataset | Selected clock; period | Exact browser input | Expected result |
+| --- | --- | --- | --- | --- |
+| 1 | Original / `northbridge-eastport-analysis-demo` v3.0.0 | 57′; Match so far | `Eastport had more shots on target.` | Same interpreted comparison; contradicted, 2–2 shots on target. |
+| 2 | Original / `northbridge-eastport-analysis-demo` v3.0.0 | 58′; Match so far | **Check again** on call 1's saved opinion | Supported; Eastport 3–Northbridge 2; direct comparison with call 1. |
+| 3 | Return / `northbridge-eastport-return-demo` v1.0.0 | 60′; Match so far | `Saka has had a horrible game` | Resolve Saka; qualified subjective judgement, recorded contributions and no overall rating. State 62 elapsed participation minutes within the selected recorded window; show match-clock 1′–60′ and elapsed interval `[1, 63)`, added time included and half-time excluded. |
+| 4 | Original / `northbridge-eastport-analysis-demo` v3.0.0 | 58′; Match so far | `How many passes did Bruno complete?` | Ask Fernandes or Guimarães; no guessed player or pass count. |
+| 5 | Westhaven FC v Kingswell City / `westhaven-kingswell-demo` | 90+4′; Match so far | `Kingswell City had no shots on target.` | Resolve the away team and metric correctly; supported, zero recorded shots on target. |
+| 6 | Redmere FC v Alderwick United / `redmere-alderwick-demo` | 88′; Match so far | `Abraham has scored` | Resolve Tammy Abraham for Alderwick United; supported by his recorded 88′ goal. |
+
+Controls: six actual outbound Foundry requests maximum for the whole run, sequentially in this order; no warm-up, retry, replacement call or rerun. Call 2 must use **Check again** on call 1. Stop at the first transport/authentication/HTTP error, schema or semantic-validation failure, truncation, timeout, wrong provider or label, incorrect interpretation/result, or request-count breach; submit nothing further. Verify `foundry` in every response and answer label. After call 2, inspect comparison, copied text, share preview and exported receipt using those existing responses and confirm those actions make zero analyze requests. Confirm dataset/version, player/team identity, selected time, period and future-event cutoff. This proposal does not claim that a Foundry run, the remaining three earlier inputs, a durable allowance, public enablement or native phone sharing has been verified.
