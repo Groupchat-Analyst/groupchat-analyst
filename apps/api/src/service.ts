@@ -17,6 +17,7 @@ import {
   calculateEvidence,
   classifyPitchArea,
   EVIDENCE_CAPABILITIES,
+  matchClockAtElapsed,
   type EvidenceCalculation,
   type SyntheticMatchEvidence,
 } from '../../shared/src/evidence.js'
@@ -332,29 +333,77 @@ function selectedPlayerEntities(claim: InterpretedClaim): PlayerEntityReference[
   return [...new Map(entities.map((player) => [player.id, player])).values()]
 }
 
-function selectedWindowMinutes(
+function playerWindowDuration(
   player: PlayerEntityReference,
   fixture: SyntheticMatchEvidence,
   advanced: EvidenceCalculation,
-): number {
+): {
+  minutes: number
+  denominator: number
+  numeratorRecordIds: string[]
+  denominatorRecordIds: string[]
+  denominatorDescription: string
+  durationWindow: NonNullable<PlayerCalculationTrace['durationWindow']>
+} {
   const record = fixture.players.find(({ id }) => id === player.id)
+  if (!record) throw new Error(`Player ${player.id} is not in the active fixture.`)
   const subs = fixture.substitutions.filter(({ team }) => team === player.team)
-  let entered = record?.status === 'starter' ? 0 : Number.POSITIVE_INFINITY
+  const coverageStart = elapsedMatchMinute(fixture.coverage.start)
+  const coverageEnd = elapsedMatchMinute(fixture.coverage.end)
+  const windowStart = Math.max(advanced.startElapsed, coverageStart)
+  const windowEnd = Math.max(windowStart, Math.min(advanced.endElapsed, coverageEnd))
+  let entered = record.status === 'starter' ? coverageStart : Number.POSITIVE_INFINITY
   let left = Number.POSITIVE_INFINITY
   for (const sub of subs) {
     const at = elapsedMatchMinute(sub.clock)
-    if (sub.playerOnId === player.id) entered = at
-    if (sub.playerOffId === player.id) left = at
+    if (sub.playerOnId === player.id) entered = Math.min(entered, at)
+    if (sub.playerOffId === player.id) left = Math.min(left, at)
   }
-  return Math.max(
-    0,
-    Number(
-      (
-        Math.min(advanced.endElapsed, left) -
-        Math.max(advanced.startElapsed, entered)
-      ).toFixed(1),
-    ),
+  const participationStart = Math.min(windowEnd, Math.max(windowStart, entered))
+  const participationEnd = Math.max(
+    participationStart,
+    Math.min(windowEnd, left),
   )
+  const minutes = Number(Math.max(0, participationEnd - participationStart).toFixed(1))
+  const elapsedLabel = (elapsed: number) =>
+    Number.isInteger(elapsed) ? String(elapsed) : elapsed.toFixed(1)
+  const elapsedRange = (start: number, end: number) =>
+    `elapsed interval [${elapsedLabel(start)}, ${elapsedLabel(end)})`
+  const durationWindow = {
+    recordedCoverageStart: formatMatchClock(fixture.coverage.start),
+    recordedCoverageEnd: formatMatchClock(fixture.coverage.end),
+    selectedWindowStart: formatMatchClock(matchClockAtElapsed(windowStart)),
+    selectedWindowEnd: formatMatchClock(matchClockAtElapsed(windowEnd)),
+    participationStart: formatMatchClock(matchClockAtElapsed(participationStart)),
+    participationEnd: formatMatchClock(matchClockAtElapsed(participationEnd)),
+  }
+  const boundarySubstitutions = subs.filter(({ playerOnId, playerOffId, clock }) =>
+    (playerOnId === player.id || playerOffId === player.id) &&
+    elapsedMatchMinute(clock) >= windowStart &&
+    elapsedMatchMinute(clock) <= windowEnd,
+  )
+  return {
+    minutes,
+    denominator: Number(Math.max(0, windowEnd - windowStart).toFixed(1)),
+    numeratorRecordIds: boundarySubstitutions
+      .filter(({ playerOnId, playerOffId, clock }) => {
+        const at = elapsedMatchMinute(clock)
+        return (playerOnId === player.id && at === participationStart) ||
+          (playerOffId === player.id && at === participationEnd)
+      })
+      .map(({ id }) => id),
+    denominatorRecordIds: boundarySubstitutions.map(({ id }) => id),
+    denominatorDescription:
+      `Recorded fixture coverage (match clock): ${durationWindow.recordedCoverageStart}–${durationWindow.recordedCoverageEnd} ` +
+      `(${elapsedRange(coverageStart, coverageEnd)}). ` +
+      `Selected analysis window (match clock): ${durationWindow.selectedWindowStart}–${durationWindow.selectedWindowEnd} ` +
+      `(${elapsedRange(windowStart, windowEnd)}). ` +
+      `${player.name}'s on-pitch overlap (match clock): ${durationWindow.participationStart}–${durationWindow.participationEnd} ` +
+      `(${elapsedRange(participationStart, participationEnd)}). ` +
+      `Elapsed clock calculation: ${elapsedLabel(participationEnd)} − ${elapsedLabel(participationStart)} = ${minutes} minutes; ` +
+      'added time is included and the half-time break is excluded.',
+    durationWindow,
+  }
 }
 
 function playerResults(
@@ -396,6 +445,7 @@ function playerResults(
       : requestedMetric
         ? new Set([requestedMetric])
         : null
+    const duration = playerWindowDuration(player, fixture, advanced)
     const values: Array<[PlayerStatistic['metric'], number | null]> = [
       ['pass-attempts', passes.length],
       ['pass-completions', completed.length],
@@ -408,7 +458,7 @@ function playerResults(
       ['shots', shots.length],
       ['shots-on-target', onTarget.length],
       ['goals', goals.length],
-      ['minutes-played', selectedWindowMinutes(player, fixture, advanced)],
+      ['minutes-played', duration.minutes],
       ['recoveries', recoveries.length],
       ['pressure-observations', pressures.length],
     ]
@@ -433,6 +483,7 @@ function playerResults(
           'shots',
           'shots-on-target',
           'goals',
+          'minutes-played',
           'recoveries',
           'pressure-observations',
         ],
@@ -442,6 +493,10 @@ function playerResults(
       selected: Array<{ id: string }>
       denominator: Array<{ id: string }>
       value: number | null
+      numerator?: number
+      denominatorValue?: number
+      numeratorRecordIds?: string[]
+      denominatorRecordIds?: string[]
       denominatorDescription: string
     }> = [
       {
@@ -490,6 +545,17 @@ function playerResults(
         denominatorDescription: `Count of recorded goals among ${shots.length} player-attributed shots.`,
       },
       {
+        metric: 'minutes-played',
+        selected: duration.numeratorRecordIds.map((id) => ({ id })),
+        denominator: duration.denominatorRecordIds.map((id) => ({ id })),
+        numerator: duration.minutes,
+        denominatorValue: duration.denominator,
+        numeratorRecordIds: duration.numeratorRecordIds,
+        denominatorRecordIds: duration.denominatorRecordIds,
+        value: duration.minutes,
+        denominatorDescription: duration.denominatorDescription,
+      },
+      {
         metric: 'recoveries',
         selected: recoveries,
         denominator: recoveries,
@@ -504,19 +570,30 @@ function playerResults(
         denominatorDescription: 'Count of this player’s selected pressure observations; pressure coverage is partial.',
       },
     ]
-    for (const { metric, selected, denominator, value, denominatorDescription } of calculationsForPlayer) {
+    for (const {
+      metric,
+      selected,
+      denominator,
+      numerator,
+      denominatorValue,
+      numeratorRecordIds,
+      denominatorRecordIds,
+      value,
+      denominatorDescription,
+    } of calculationsForPlayer) {
       if (!calculationMetrics.has(metric)) continue
       calculations.push({
         playerId: player.id,
         playerName: player.name,
         team: player.team,
         metric,
-        numerator: selected.length,
-        denominator: denominator.length,
+        numerator: numerator ?? selected.length,
+        denominator: denominatorValue ?? denominator.length,
         value,
-        numeratorRecordIds: selected.map(({ id }) => id),
-        denominatorRecordIds: denominator.map(({ id }) => id),
+        numeratorRecordIds: numeratorRecordIds ?? selected.map(({ id }) => id),
+        denominatorRecordIds: denominatorRecordIds ?? denominator.map(({ id }) => id),
         denominatorDescription,
+        ...(metric === 'minutes-played' ? { durationWindow: duration.durationWindow } : {}),
       })
     }
   }
@@ -1543,10 +1620,12 @@ function metricName(metric: ClaimMetric, value?: number): string {
     'pass-completions': 'pass completion',
     recoveries: 'recovery',
     'pressure-observations': 'selected pressure observation',
+    'minutes-played': 'elapsed minute of participation in recorded coverage',
   }
   const pluralLabels: Partial<Record<ClaimMetric, string>> = {
     'shots-on-target': 'shots on target',
     'pressure-observations': 'selected pressure observations',
+    'minutes-played': 'elapsed minutes of participation in recorded coverage',
   }
   if (value === 1) {
     return singularLabels[metric] ?? metric.replaceAll('-', ' ')
@@ -1675,9 +1754,20 @@ function statisticsSentence(result: ClaimResult): string | undefined {
         return `${player.name} completed ${completions} of ${attempts} passes (${rate === null ? 'rate unavailable' : `${rate}%`})`
       }
       const values = metrics
-        .map((metric) => get(metric))
-        .filter((value): value is number | null => value !== undefined)
-        .map((value, index) => formatCount(metrics[index], value))
+        .map((metric) => {
+          const value = get(metric)
+          if (metric !== 'minutes-played' || typeof value !== 'number') {
+            return formatCount(metric, value)
+          }
+          const durationTrace = result.playerCalculations.find(
+            ({ playerId, metric: traceMetric }) =>
+              playerId === player.id && traceMetric === 'minutes-played',
+          )
+          const window = durationTrace?.durationWindow
+          return window
+            ? `${value} elapsed minutes of participation in recorded coverage (${window.selectedWindowStart}–${window.selectedWindowEnd}; on-pitch ${window.participationStart}–${window.participationEnd}; added time included, half-time excluded)`
+            : `${value} elapsed minutes of participation in recorded coverage`
+        })
       return `${player.name}: ${values.join(', ')}`
     })
     return statements.length ? `${joinNaturally(statements)}.` : undefined
@@ -1744,8 +1834,17 @@ function broadPlayerSentence(
     }
   }
   const minutes = values.get('minutes-played')
-  if (typeof minutes === 'number' && minutes > 0 && minutes < 90) {
-    contributions.push(`played ${minutes} minutes in the selected period`)
+  if (typeof minutes === 'number' && minutes > 0) {
+    const durationTrace = result.playerCalculations.find(
+      ({ playerId, metric }) =>
+        playerId === player.id && metric === 'minutes-played',
+    )
+    const window = durationTrace?.durationWindow
+    contributions.push(
+      window
+        ? `was on the pitch for ${minutes} elapsed minutes in the selected recorded window ${window.selectedWindowStart}–${window.selectedWindowEnd} (on-pitch interval ${window.participationStart}–${window.participationEnd}; added time included, half-time excluded)`
+        : `had ${minutes} elapsed minutes of participation in recorded coverage`,
+    )
   }
   if (contributions.length === 0) {
     return `${player.name} participated, but no player-attributed actions are recorded for this period.`
@@ -2504,7 +2603,7 @@ function createEvidenceFoundation(
     players: fixture.players.map((player) => ({
       ...player,
       participation: participationStatus(player, fixture, advanced.endElapsed),
-      minutesInWindow: selectedWindowMinutes(player, fixture, advanced),
+      minutesInWindow: playerWindowDuration(player, fixture, advanced).minutes,
       selectedWindowActions: new Set([
         ...advanced.passes
           .filter(({ playerId, receiverId }) =>

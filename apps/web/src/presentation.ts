@@ -53,7 +53,7 @@ const METRIC_LABELS: Record<string, string> = {
   recoveries: 'recoveries',
   'pressure-observations': 'pressure observations',
   'running-distance': 'running distance',
-  'minutes-played': 'minutes played',
+  'minutes-played': 'elapsed minutes of participation in recorded coverage (added time included)',
 }
 
 export function metricLabel(metric: string): string {
@@ -182,6 +182,7 @@ const SINGULAR: Record<string, string> = {
   'passes attempted': 'pass attempted',
   'passes completed': 'pass completed',
   'pressure observations': 'pressure observation',
+  'elapsed minutes of participation in recorded coverage (added time included)': 'elapsed minute of participation in recorded coverage (added time included)',
 }
 
 function statLabel(metric: string, value: number): string {

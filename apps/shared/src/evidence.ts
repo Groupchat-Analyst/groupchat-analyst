@@ -305,7 +305,7 @@ function activePlayersAt(
   return active
 }
 
-function clockAtElapsed(value: number): MatchClock {
+export function matchClockAtElapsed(value: number): MatchClock {
   const minute = Math.floor(value)
   if (minute <= 48) {
     return minute <= 45
@@ -395,7 +395,7 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
       endElapsed - 0.01,
       startElapsed + ((endElapsed - startElapsed) * (index + 1)) / (seed.passCount + 1),
     )
-    const clock = clockAtElapsed(Math.floor(time))
+    const clock = matchClockAtElapsed(Math.floor(time))
     const active = activeAt(seed.team, time, subs)
     const activePlayerIndex = seed.passers
       ? seed.passers[index] % active.length
@@ -468,7 +468,7 @@ for (const [sequenceIndex, seed] of SEQUENCE_SEEDS.entries()) {
       possessionId: seed.id,
       team: pressureTeam,
       playerId: activeAt(pressureTeam, pressureElapsed, subs)[sequenceIndex % 11],
-      clock: clockAtElapsed(pressureElapsed),
+      clock: matchClockAtElapsed(pressureElapsed),
       location: { x: 44 + (sequenceIndex % 3) * 8, y: 25 + (sequenceIndex % 5) * 10 },
       type: sequenceIndex % 2 ? 'pressured-pass' : 'challenge',
     })
@@ -494,7 +494,7 @@ const buildUpPossessionIds = new Set(spec.buildUpPossessionIds)
       possessionId: extraSequence.id,
       team: extra.team,
       playerId: activeAt(extra.team, extraElapsed, subs)[extra.rosterSlot],
-      clock: clockAtElapsed(extraElapsed),
+      clock: matchClockAtElapsed(extraElapsed),
       location: extra.location,
       type: 'pressured-pass',
     })
@@ -698,8 +698,8 @@ export function calculateEvidence(
       id: interval.id,
       team: interval.team,
       status: interval.status,
-      start: clippedStart > intervalStart ? clockAtElapsed(clippedStart) : interval.start,
-      end: isClipped ? clockAtElapsed(clippedEnd) : interval.end,
+      start: clippedStart > intervalStart ? matchClockAtElapsed(clippedStart) : interval.start,
+      end: isClipped ? matchClockAtElapsed(clippedEnd) : interval.end,
       durationMinutes,
       ...(isClipped ? {} : { endReason: interval.endReason }),
       relatedEventIds: isClipped ? [] : interval.relatedEventIds,

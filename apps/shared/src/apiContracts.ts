@@ -263,6 +263,7 @@ export type PlayerCalculationTrace = {
     | 'shots'
     | 'shots-on-target'
     | 'goals'
+    | 'minutes-played'
     | 'recoveries'
     | 'pressure-observations'
   numerator: number
@@ -271,6 +272,14 @@ export type PlayerCalculationTrace = {
   numeratorRecordIds: string[]
   denominatorRecordIds: string[]
   denominatorDescription: string
+  durationWindow?: {
+    recordedCoverageStart: string
+    recordedCoverageEnd: string
+    selectedWindowStart: string
+    selectedWindowEnd: string
+    participationStart: string
+    participationEnd: string
+  }
 }
 
 export type ClaimEvidence = {

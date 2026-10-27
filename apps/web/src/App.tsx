@@ -156,7 +156,7 @@ function metricLabel(metric: string): string {
   if (metric === 'pass-completion-percentage') return 'pass completion'
   if (metric === 'pass-attempts') return 'pass attempts'
   if (metric === 'pass-completions') return 'pass completions'
-  if (metric === 'minutes-played') return 'selected-window minutes'
+  if (metric === 'minutes-played') return 'elapsed participation minutes (recorded window; added time included)'
   if (metric === 'recoveries') return 'recorded recoveries'
   if (metric === 'pressure-observations') return 'selected pressure observations'
   return metric
@@ -337,9 +337,11 @@ function ClaimCard({
               ))}
               {result.playerCalculations.map((trace) => (
                 <section key={`${trace.playerId}-${trace.metric}`}>
-                  <h4>{trace.playerName} · {trace.metric.replaceAll('-', ' ')}</h4>
+                  <h4>{trace.playerName} · {trace.metric === 'minutes-played' ? 'participation within recorded window' : trace.metric.replaceAll('-', ' ')}</h4>
                   <p>
-                    {trace.metric === 'pass-completion-percentage'
+                    {trace.metric === 'minutes-played'
+                      ? `${trace.value ?? 0} elapsed minutes`
+                      : trace.metric === 'pass-completion-percentage'
                       ? `${trace.numerator}/${trace.denominator} (${trace.value === null ? 'rate not available' : `${trace.value}%`})`
                       : trace.metric === 'pass-completions'
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
@@ -364,8 +366,10 @@ function ClaimCard({
 
 function EvidenceFoundationPanel({
   foundation,
+  selectedPeriodLabel,
 }: {
   foundation: AnalysisResponse['evidenceFoundation']
+  selectedPeriodLabel: string
 }) {
   const roster = foundation.players
   const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
@@ -521,7 +525,7 @@ function EvidenceFoundationPanel({
                 .map((player) => (
                   <li key={player.id}>
                     <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <span>{player.minutesInWindow} elapsed participation minutes within {selectedPeriodLabel} (added time included) · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -532,7 +536,7 @@ function EvidenceFoundationPanel({
                 .map((player) => (
                   <li key={player.id}>
                     <strong>{player.name} · {player.participation.replaceAll('-', ' ')}</strong>
-                    <span>{player.minutesInWindow} selected-window minutes · {player.selectedWindowActions} recorded actions</span>
+                    <span>{player.minutesInWindow} elapsed participation minutes within {selectedPeriodLabel} (added time included) · {player.selectedWindowActions} recorded actions</span>
                   </li>
                 ))}
             </ol>
@@ -1190,7 +1194,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
 
 
             {analysis && view === 'analyst' && !hasUnresolvedSubject && needsPassMap(analysis) && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
-            {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />}
+            {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} selectedPeriodLabel={analysis.selectedPeriodLabel} />}
             {analysis && !hasUnresolvedSubject && (
               <details className="all-evidence match-events"><summary>Explore match events <span>{analysis.periodEvents.length} recorded</span></summary>{referenceList(analysis.periodEvents, analysis.evidenceFoundation.players)}</details>
             )}
