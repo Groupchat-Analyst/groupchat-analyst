@@ -40,7 +40,8 @@ test('captured shots outputs replay with the expected figures', async () => {
 test('captured "parked the bus" reply does not use a possession template', async () => {
   const result = await analyzeOpinion(request('Northbridge parked the bus.', 57), replay(captured[2]))
   assert.equal(result.claims[0].assessment, 'insufficient evidence for a firm conclusion')
-  assert.doesNotMatch(result.fanReply, /possession part|backs up|55\.4%|Possession alone/i)
+  assert.doesNotMatch(result.fanReply, /possession part|backs up|goes against|Possession alone/i)
+  assert.match(result.fanReply, /For context only:.*does not support or contradict defensive shape/s)
   assert.match(result.fanReply, /defensive shape/)
   assert.doesNotMatch(JSON.stringify(result.claims[0].limitation), /possession-majority/)
 })

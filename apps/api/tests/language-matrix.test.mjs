@@ -27,17 +27,17 @@ const cases = [
   { n: 12, text: 'Northbridge keep giving it away', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /defensive third 2, middle third 2, final third 1/, evidence: 'some' },
   { n: 13, text: 'Northbridge are sloppy on the ball', ds: R, clock: FT, intent: SUBJ, assessment: INSUF, reply: /defensive third 1, middle third 5, final third 2/, evidence: 'some' },
   { n: 14, text: 'Eastport had more shots than Northbridge', ds: B, clock: S2(57), intent: 'factual-claim', assessment: 'contradicted', stats: [['Northbridge', 4], ['Eastport', 4]], reply: /level on 4 shots each/, evidence: 'some' },
-  { n: 15, text: 'Eastport are not testing the keeper', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /4 shots.*0 goals/, evidence: 'some', status: 'partial', note: 'reports shots and goals, not the shots-on-target figure the expected response names' },
+  { n: 15, text: 'Eastport are not testing the keeper', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /recorded 2 shots on target.*“Testing the keeper” is a qualitative judgement/s, stats: [['Eastport', 4], ['Eastport', 0], ['Eastport', 2]], evidence: 'some' },
   { n: 16, text: 'Eastport have little attacking threat', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /4 shots.*not chance quality or attacking threat/, evidence: 'some' },
   { n: 17, text: 'Eastport are wasteful in front of goal', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /4 shots.*No chance-quality or expected-goals data/, evidence: 'some' },
   { n: 18, text: 'Eastport missed a sitter', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /4 shots.*No chance-quality or expected-goals data/, evidence: 'some' },
   { n: 19, text: 'Northbridge dominated possession', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, stats: [['Northbridge', 55.4], ['Eastport', 44.6]], reply: /Possession alone doesn't settle overall dominance/, evidence: 'some' },
   { n: 20, text: 'Eastport had more possession than Northbridge', ds: R, clock: FT, intent: 'factual-claim', assessment: 'supported', stats: [['Northbridge', 41.8], ['Eastport', 58.2]], reply: /Eastport had 58\.2% of recorded possession to Northbridge's 41\.8%/, evidence: 'some' },
-  { n: 21, text: 'Northbridge parked the bus', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /Nothing here records defensive shape/, evidence: 'none', status: 'partial', note: 'says defensive shape is unrecorded but shows no labelled possession context' },
-  { n: 22, text: 'Northbridge are sitting deep', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /Nothing here records defensive shape/, evidence: 'none', status: 'partial', note: 'same as case 21' },
+  { n: 21, text: 'Northbridge parked the bus', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /Nothing here records defensive shape.*For context only: Northbridge had 55\.4%.*Eastport's 44\.6%.*does not support or contradict defensive shape/s, stats: [['Northbridge', 55.4], ['Eastport', 44.6]], evidence: 'some', contextOnly: true },
+  { n: 22, text: 'Northbridge are sitting deep', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /Nothing here records defensive shape.*For context only: Northbridge had 55\.4%.*does not support or contradict defensive shape/s, stats: [['Northbridge', 55.4], ['Eastport', 44.6]], evidence: 'some', contextOnly: true },
   { n: 23, text: 'Eastport are pinned back', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /territory and pressing intensity are not recorded/, evidence: 'none' },
   { n: 24, text: 'Eastport cannot get out of their half', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /territory and pressing intensity are not recorded/, evidence: 'none' },
-  { n: 25, text: 'Northbridge are pressing high', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /pressing intensity are not recorded/, evidence: 'none', status: 'partial', note: 'does not surface the sampled pressure observations the expected response names' },
+  { n: 25, text: 'Northbridge are pressing high', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: /Northbridge have 2 selected pressure observations.*partial sample.*doesn't show continuous pressing, how high it was, or its intensity/s, stats: [['Northbridge', 2], ['Eastport', 2]], evidence: 'some', contextOnly: true },
   { n: 26, text: 'Eastport have the momentum', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, stats: [['Northbridge', 55.4], ['Eastport', 44.6]], reply: /Momentum is not recorded/, evidence: 'some' },
   { n: 27, text: 'Northbridge had more possession than Eastport', ds: R, clock: S2(88), period: 'last-10-minutes', intent: 'factual-claim', assessment: 'supported', stats: [['Northbridge', 88.9], ['Eastport', 11.1]], reply: /Northbridge had 88\.9%/, evidence: 'some' },
   { n: 28, text: 'Eastport scored before half-time', ds: B, clock: S2(57), intent: 'factual-claim', assessment: 'contradicted', stats: [['Eastport', 0]], reply: /no Eastport goal before half-time/, evidence: 'none' },
@@ -68,14 +68,18 @@ for (const c of cases) {
     const evidence = r.claims.reduce((total, x) => total + (x.evidence ?? []).length, 0)
     if (c.evidence === 'none') assert.equal(evidence, 0, 'no unrelated evidence')
     else assert.ok(evidence > 0, 'cites evidence')
+    if (c.contextOnly) {
+      const roles = r.claims[0].evidence.map((item) => item.role)
+      assert.ok(roles.length > 0 && roles.every((role) => role === 'context'), 'context evidence is never supporting or challenging')
+    }
     assert.notEqual(r.fanReply, '', 'non-empty reply')
     assert.ok(!/couldn't match that to something I can check/.test(r.fanReply), 'no generic refusal')
   })
 }
 
-test('matrix totals: 42 cases, 38 pass, 4 partial, 0 fail', () => {
+test('matrix totals: 42 cases, 42 pass, 0 partial, 0 fail', () => {
   assert.equal(cases.length, 42)
   const partial = cases.filter((c) => c.status === 'partial')
-  assert.deepEqual(partial.map((c) => c.n), [15, 21, 22, 25])
-  assert.equal(cases.length - partial.length, 38)
+  assert.deepEqual(partial.map((c) => c.n), [])
+  assert.equal(cases.length - partial.length, 42)
 })

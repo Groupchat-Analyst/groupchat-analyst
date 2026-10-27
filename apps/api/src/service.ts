@@ -1491,28 +1491,45 @@ function assessOneClaim(
     )
   }
 
+  const context = topicContext(claim, advanced, scopedEvents)
+  const withContextStatistics = context
+    ? [
+        ...statistics.filter(
+          ({ team, metric }) =>
+            !context.statistics.some((item) => item.team === team && item.metric === metric),
+        ),
+        ...context.statistics,
+      ]
+    : statistics
+
   return {
     claim,
     assessment,
     periodLabel: periodLabel(claim, selectedPeriodLabel, allSelectedEvents),
-    statistics,
+    statistics: withContextStatistics,
     playerStatistics: playerData.statistics,
     playerCalculations: playerData.calculations,
     evidenceAvailability: resolvedAvailability,
-    evidence: canRetrieveSubjectEvidence
-      ? evidenceForClaim(
-          claim,
-          assessment,
-          scopedEvents,
-          resolvedAvailability,
-          advanced,
-          fixture.players,
-          anchorEvent,
-        )
-      : [],
-    calculations: canRetrieveSubjectEvidence
-      ? calculationTraces(claim, advanced, scopedEvents)
-      : [],
+    evidence: [
+      ...(canRetrieveSubjectEvidence
+        ? evidenceForClaim(
+            claim,
+            assessment,
+            scopedEvents,
+            resolvedAvailability,
+            advanced,
+            fixture.players,
+            anchorEvent,
+          )
+        : []),
+      ...(context?.evidence ?? []),
+    ],
+    calculations: [
+      ...(canRetrieveSubjectEvidence
+        ? calculationTraces(claim, advanced, scopedEvents)
+        : []),
+      ...(context?.calculations ?? []),
+    ],
     limitation: makeLimitation(claim, resolvedAvailability, assessment, advanced),
   }
 }
@@ -1680,7 +1697,7 @@ function statisticsSentence(result: ClaimResult): string | undefined {
     const values = teamStatistics.map(
       ({ metric, value }) => `recorded ${formatCount(metric, value)}`,
     )
-    return `${team} ${values.join(' and ')}`
+    return `${team} ${joinNaturally(values)}`
   })
   return statements.length ? `${joinNaturally(statements)}.` : undefined
 }
@@ -1936,6 +1953,10 @@ function answerForClaim(
     return `${answer} These are sparse synthetic records, not a complete performance measure or overall rating.`
   }
   if (claim.intent === 'subjective-judgement') {
+    const contextSentence = topicContextSentence(claim, advanced)
+    if (contextSentence) {
+      return `The available match events do not establish the broader judgement: “${claim.text}”. ${contextSentence}`
+    }
     return `The available match events do not establish the broader judgement: “${claim.text}”.`
   }
   if (result.assessment === 'insufficient evidence for a firm conclusion') {
@@ -2041,7 +2062,7 @@ function topicReply(
     }
   }
   if (!player && (topic === 'defensive-approach' || topic === 'pressure-progression')) return undefined
-  const parts = [facts, negated ? "Negating a take doesn't change what the records can show; they can't settle it either way." : undefined, topicLimitation(topic)]
+  const parts = [facts, negated ? "Negating a take doesn't change what the records can show; they can't settle it either way." : undefined, topicLimitation(topic), topicContextSentence(claim, advanced) || undefined]
   if (player && (topic === 'overall-performance' || topic === 'involvement')) {
     parts.push(`For a specific count, ask “How many passes did ${player.name} complete?” or “How many shots did ${player.name} have?”`)
   }
@@ -2056,7 +2077,118 @@ function concernsDefensiveShape(claim: InterpretedClaim): boolean {
   return defensiveShapePattern.test(claim.text)
 }
 
-function fanScope(claim: InterpretedClaim, events: MatchEvent[]): string {
+type TopicContextKind = 'keeper' | 'possession-context' | 'pressure-sample'
+
+/** Which recorded context (never a verdict) a broad team opinion may carry, from its shared topic class. */
+function topicContextKind(claim: InterpretedClaim): TopicContextKind | undefined {
+  if (
+    claim.intent !== 'subjective-judgement' ||
+    claim.meaning.category !== 'performance-judgement' ||
+    !claim.subject ||
+    claim.playerSubject ||
+    claim.clarificationNeeds.length > 0 ||
+    claim.timePeriod.kind !== 'selected'
+  ) {
+    return undefined
+  }
+  const topic = classifyOpinion(claim.text)?.topic
+  if (topic === 'attacking-output' && /\btesting the (?:goal)?keeper\b/i.test(claim.text)) return 'keeper'
+  if (topic === 'defensive-approach') return 'possession-context'
+  if (topic === 'pressure-progression' && /\bpress(?:ed|ing)?\b/i.test(claim.text)) return 'pressure-sample'
+  return undefined
+}
+
+function topicContext(
+  claim: InterpretedClaim,
+  advanced: EvidenceCalculation,
+  scopedEvents: MatchEvent[],
+): { statistics: TeamStatistic[]; evidence: ClaimEvidence[]; calculations: CalculationTrace[] } | undefined {
+  const kind = topicContextKind(claim)
+  if (!kind || !claim.subject) return undefined
+  const team = claim.subject
+  const none = { statistics: [], evidence: [], calculations: [] }
+  if (kind === 'keeper') {
+    return {
+      ...none,
+      statistics: [{
+        team,
+        metric: 'shots-on-target',
+        value: statValue(team, 'shots-on-target', scopedEvents, advanced),
+      }],
+    }
+  }
+  if (kind === 'possession-context') {
+    if (advanced.denominatorMinutes === 0 || !advanced.possessionCoverageComplete) return none
+    return {
+      statistics: TEAMS.map((side) => ({
+        team: side,
+        metric: 'possession-percentage' as const,
+        value: advanced.teams[side].possessionPercentage,
+      })),
+      evidence: advanced.possessionIntervals
+        .filter((interval) => interval.status === 'controlled' && interval.team)
+        .map((interval) => ({
+          role: 'context' as const,
+          reference: {
+            id: interval.id,
+            time: `${formatMatchClock(interval.start)}–${formatMatchClock(interval.end)}`,
+            team: interval.team!,
+            description: `${interval.durationMinutes} recorded minutes of controlled possession (context only; not evidence of defensive shape).`,
+          },
+        })),
+      calculations: calculationTraces(
+        { ...claim, requiredEvidence: ['possession'] },
+        advanced,
+        scopedEvents,
+      ),
+    }
+  }
+  const observations = advanced.pressures.filter((pressure) => pressure.team === team)
+  return {
+    statistics: TEAMS.map((side) => ({
+      team: side,
+      metric: 'pressure-observations' as const,
+      value: advanced.pressures.filter((pressure) => pressure.team === side).length,
+    })),
+    evidence: observations.map((pressure) => ({
+      role: 'context' as const,
+      reference: {
+        id: pressure.id,
+        time: formatMatchClock(pressure.clock),
+        team: pressure.team,
+        description: `Selected ${pressure.type.replaceAll('-', ' ')} observation by ${pressure.playerId}; pressure coverage is partial (context only).`,
+      },
+    })),
+    calculations: [],
+  }
+}
+
+/** Fan-facing sentence for that context, with its attribution and what it cannot show. */
+function topicContextSentence(claim: InterpretedClaim, advanced: EvidenceCalculation): string {
+  const kind = topicContextKind(claim)
+  if (!kind || !claim.subject) return ''
+  const team = claim.subject
+  const opponent = TEAMS.find((side) => side !== team)!
+  if (kind === 'keeper') {
+    return '“Testing the keeper” is a qualitative judgement. Shots on target are a recorded count only; they don’t show how hard the keeper was tested.'
+  }
+  if (kind === 'possession-context') {
+    const own = advanced.teams[team].possessionPercentage
+    const other = advanced.teams[opponent].possessionPercentage
+    const context = advanced.denominatorMinutes > 0 && advanced.possessionCoverageComplete && own !== null && other !== null
+      ? ` For context only: ${team} had ${own}% of recorded controlled possession to ${opponent}'s ${other}% (contested and out-of-play minutes excluded). That does not support or contradict defensive shape.`
+      : ''
+    return `Nothing here records defensive shape or positioning.${context}`
+  }
+  const count = (side: MatchTeam) => advanced.pressures.filter((pressure) => pressure.team === side).length
+  const own = count(team)
+  const sample = own === 0
+    ? `No selected pressure observations are recorded for ${team} in this window; with only a sample recorded, that doesn't show ${team} weren't pressing.`
+    : `${team} have ${plural(own, 'selected pressure observation')} in this window (${opponent}: ${count(opponent)}).`
+  return `${sample} Pressure is recorded only for selected possessions, so this is a partial sample: it doesn't show continuous pressing, how high it was, or its intensity.`
+  }
+
+  function fanScope(claim: InterpretedClaim, events: MatchEvent[]): string {
   if (claim.timePeriod.kind !== 'before-event') return ''
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find(({ id }) => id === anchorId)
@@ -2213,6 +2345,10 @@ function fanAnswerForClaim(
     return `${answer} That's sparse data, so it isn't a full read on ${claim.playerSubject.name}'s game.`
   }
   if (claim.intent === 'subjective-judgement') {
+    const contextSentence = topicContextSentence(claim, advanced)
+    if (contextSentence) {
+      return `That's a bigger football opinion than the match events can settle: “${quote}”. ${contextSentence}`
+    }
     const shape = concernsDefensiveShape(claim)
       ? " Nothing here records defensive shape or positioning, and possession share doesn't tell you how a side set up."
       : classifyOpinion(claim.text)?.topic === 'pressure-progression'
