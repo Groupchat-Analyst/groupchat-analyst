@@ -13,6 +13,7 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 - Broad opinions (for example “Saka has had a horrible game”) get the player’s recorded contributions with no rating.
 - “Check again” at a later minute produces a deterministic comparison; the card, copied text and PNG are built from the same content and name the fixture, version and how the opinion was read.
 - Dataset selection is allowlisted server-side. Omitting `datasetId` selects the original match; unknown or malformed IDs are rejected.
+- An accessible language selector provides English, Spanish, French, German and Arabic throughout the interface and receipts. Language changes do not submit or rerun analysis and preserve the active draft and conversation.
 
 ## Accurate AI architecture
 
@@ -25,18 +26,31 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 | Check | Result |
 | --- | --- |
-| API tests | 313 pass, including stubbed captured-call replay and duration boundary regressions |
-| Web tests | 122 pass |
-| Web typecheck/build/lint | Pass |
+| API tests | 346 pass, including captured-call replay, fixture, duration and language regressions |
+| Web tests | 136 pass |
+| API/web typecheck, web lint and production build | Pass |
 | `git diff --check` | Pass |
-| Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
-| Browser (desktop + 390 px/320 px emulation, local stack) | Prior Stage 1/2 checks plus current direct demo route: 0 analyze calls on entry, 1 on explicit submit, 0 on replay movement, 1 on explicit recheck. Both new fixture identities and team names verified in replies and exports; see `docs/NEXT_SESSION.md`. |
-| Language matrix | 42 inputs: 42 pass, 0 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
+| Baseline fixture hash | Unchanged (`fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`, 70 passes, 17 turnovers) |
+| Language matrices | English corpus: 42/42 PASS. Five languages: 30/30 PASS (six asserted behavior classes per language). Broader non-English rule coverage and all live Foundry interpretation are unverified. |
+| Browser (local rules) | Submit at 57′: 1 analyze call; replay move: 0; explicit 58′ recheck: 1; locale switching, navigation, copy and download: 0 extra. Five-language switching preserved the exact draft, clock, period, conversation and comparison. Desktop/390 px/320 px emulation; no horizontal overflow; keyboard-focus indicator visible. |
+| Arabic receipt | Actual downloaded PNG decoded at 2160×2420 and visually inspected. Original opinion, scope, identity/version, figures, event times and local-provider label also verified in copied text. Actual PNGs in other languages were not inspected. |
 | Native share on a real phone | **Unverified** |
+| Live multilingual Foundry | **Not run**. Language acceptance used local rules only; no prompt/schema/credential changes. |
 | Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
-| Offline call-3 duration repair | Captured interpretation replayed through the real validation/service path with stubbed transport; Fan/Analyst/copy/card-label regressions pass. The repaired call-3 presentation later matched in one bounded live run. Actual PNG bytes remain uninspected. |
+| Offline call-3 duration repair | Captured interpretation replayed through the real validation/service path with stubbed transport; Fan/Analyst/copy/card-label regressions pass. The repaired call-3 presentation later matched in one bounded live run. The PNG from that Foundry run remains uninspected; the separate local Arabic PNG inspection above does not change that result. |
 | Live Foundry for application `14bb523` | 4 requests; calls 1–3 met expectations; stopped after call 4's semantic-validation failure. Calls 5–6 not run. Comparison, copied receipt and share preview checked with existing responses; actual PNG bytes not independently inspected. No additional analysis requests during receipt inspection. |
 | Offline Bruno clarification repair (`86dd8d1`) | Exact call-4 capture replays through adapter, validation and service with a stub transport. Six focused regressions and 316 API tests pass; isolated browser replay shows the clarification and Foundry label. No live retest. |
+
+## Multilingual application candidate (`642c6e9`)
+
+English, Spanish, French, German and Arabic now have reusable interface/receipt resources and a bounded local interpretation matrix. Each language passed the same six behavior classes; English additionally passed the 42-case local acceptance corpus. The UI test suite covers translated comparison and receipt content, clarification/errors, provider disclosures, mixed-script Arabic SVG and preserved opinion text. The local browser run confirmed the persisted language preference, RTL direction, state preservation across locale changes, no extra analysis calls, 1280/390/320 px layouts, and visible keyboard focus. Only the Arabic PNG was actually downloaded, decoded and visually inspected.
+
+This is not multilingual Foundry verification. The wider local rule corpus is English-only; non-English interpretation is limited to the documented six cases. Translations have not received independent native-speaker review. No live model calls or external translation services were used.
+
+### Separate deployment gates (not implemented)
+
+- No durable atomic request allowance, per-client cap, cross-instance/restart counter, exhaustion behavior or Foundry kill switch exists.
+- No judge-accessible hosted AI route is implemented. Public configuration remains local rules only.
 
 Final Stage 2 follow-up (27 October 2026; application commit `2343167`): catalog foreign-team opponents are preserved distinctly and rejected without team attribution, statistics or evidence, and are not sent to a supplied model provider. Uncatalogued comparison opponents now prompt for clarification rather than inheriting the fixture's second team. Valid fixture aliases and descriptive opinions remain covered. Homepage limitations and the compound demonstration route were corrected; the direct guided route was rehearsed with explicit submit/recheck. API 308/308 and web 121/121 pass; baseline hash remains unchanged.
 

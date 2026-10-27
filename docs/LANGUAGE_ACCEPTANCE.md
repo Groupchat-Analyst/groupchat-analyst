@@ -66,6 +66,29 @@ Match key: **B** = Original match (`…-analysis-demo` 3.0.0, 57′ unless state
 
 Totals, verified by per-case assertions in `apps/api/tests/language-matrix.test.mjs` (intent, assessment, statistics, reply meaning, evidence presence): 42 inputs, 42 PASS, 0 PARTIAL, 0 FAIL. Four cases (#15, #21, #22, #25) were previously PARTIAL and were repaired, without changing their expectations, through shared topic handling (`topicContext` in `apps/api/src/service.ts`), with regressions in `apps/api/tests/topic-context.test.mjs` covering windows, negated forms and the new fixtures. Possession shown for #21–22 is context only (role “context”) and is never used for or against defensive shape; pressure for #25 is a selected-possession sample. Two older tests that forbade any percentage in a “parked the bus” reply were refined to allow possession only inside that labelled sentence. This is a bounded local-rule corpus, not general language understanding. Completed-pass count comparisons (“X completed more passes than Y”, with fewer/negated/as-many forms, aliases and windows) are covered by `apps/api/tests/completed-passes.test.mjs`. Cases 29–33, 38 and 42 were repaired through shared semantics (count assertions, strict goal anchors, multi-player expansion) and are covered by `apps/api/tests/semantic-assertions.test.mjs`.
 
+## Five-language acceptance matrix
+
+The selector exposes English, Español, Français, Deutsch and العربية. The local interpreter accepts a deliberately bounded, shared set of six opinion classes per language. Each cell below represents an asserted API case in `apps/api/tests/multilingual-matrix.test.mjs`; checks include the canonical intent, assessment, fixture/time, statistics, evidence and response meaning, not merely a translated string.
+
+| Language | 57′→58′ guided comparison | Ambiguous Bruno | Negated comparison | Zero shots-on-target claim | Qualified Saka judgement | Unavailable distance | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| English | PASS | PASS | PASS | PASS | PASS | PASS | 6/6 PASS |
+| Español | PASS | PASS | PASS | PASS | PASS | PASS | 6/6 PASS |
+| Français | PASS | PASS | PASS | PASS | PASS | PASS | 6/6 PASS |
+| Deutsch | PASS | PASS | PASS | PASS | PASS | PASS | 6/6 PASS |
+| العربية | PASS | PASS | PASS | PASS | PASS | PASS | 6/6 PASS |
+
+Totals: **30/30 PASS, 0 PARTIAL, 0 FAIL**. Together with the separate English corpus above, this is a measured capability boundary, not a claim that every rule or arbitrary football wording works in every language. For the six-case matrix, the Saka judgement is evaluated at 60′ on the Return fixture; its evidence is checked against the selected-time cutoff. The Bruno result keeps the requested pass metric while leaving player identity unresolved and returns no attributed records, count or claim evidence.
+
+## Interface, conversation and export checks
+
+- Fourteen focused web localization regressions cover locale metadata/direction, the translated home walkthrough, supported input templates, clarification and failed-check text, dynamic evidence and comparison wording, provider and fixture disclosures, copied/export text and SVG generation. Arabic receipts set RTL direction and isolate mixed-script names, scores and minutes.
+- A local-provider browser pass used ordinary pointer actions and verified the translated home and four-match selector at desktop and 390 px, then the conversation at 1280 px and 390 px. At 320 px the page had no horizontal overflow. Keyboard Tab navigation visibly focused the language selector (3 px outline). The Arabic language and RTL direction survived a page refresh and route navigation.
+- The guided conversation submitted once at 57′ and explicitly rechecked once at 58′: exactly two analysis requests. Replay movement, five-language switching, copy and receipt download added none. Across locale changes, the saved opinion, two turns, 58′ clock, period, comparison and edited draft remained unchanged.
+- The actual downloaded Arabic PNG was decoded (2160×2420) and visually inspected. It fits within the card and retains the original opinion, 58′ scope, dataset/version, figures, event times and local-provider label; copied receipt text matches. Other non-English receipt strings/SVGs are covered by automated regressions, but an actual PNG was visually inspected only in Arabic.
+
+Remaining gaps: the four non-English interpreter paths are tested only for these six forms; the broader 42-case corpus is English-only. No live multilingual Foundry calls were made, no external translation service was used, and the Foundry prompt/schema were not changed. The generated translations have not had independent native-speaker review. Real-device layout, screen-reader use, a complete accessibility audit and native phone sharing remain unverified.
+
 Limits of that result:
 - These are **local-rule** results only. Foundry interpretation of these forms is **unverified**; the Foundry schema and prompt are unchanged and cannot emit the local-only `shot-location` evidence kind.
 - “Before the goal” counts strictly before the resolved goal, computed over all recorded events up to the selected time, not the Last-10-minutes window.
