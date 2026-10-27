@@ -48,8 +48,8 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
     name: 'Original match',
     teams: ['Northbridge', 'Eastport'],
     teamAliases: [['Northbridge'], ['Eastport']],
-    scenario: 'An equaliser at 58′ and a late Eastport lead. Try the shots-on-target opinion at 57′, then 58′.',
-    description: 'Northbridge v Eastport — the verified demonstration fixture.',
+    scenario: 'Explore this fictional match through its recorded events and evidence.',
+    description: 'A fictional football fixture for exploring evidence at selected moments.',
     fictional: true,
     moments: [
       { label: '45+3′ · Northbridge goal', clock: stoppage(1, 45, 3) },
@@ -72,8 +72,8 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
     name: 'Return match',
     teams: ['Northbridge', 'Eastport'],
     teamAliases: [['Northbridge'], ['Eastport']],
-    scenario: 'Eastport keep the ball, Northbridge take the shots, and a stoppage-time Northbridge goal settles it.',
-    description: 'Northbridge v Eastport — Eastport keep the ball, Northbridge take the shots.',
+    scenario: 'Explore this fictional match through its recorded events and evidence.',
+    description: 'A fictional football fixture for exploring evidence at selected moments.',
     fictional: true,
     moments: [
       { label: '26′ · Eastport goal', clock: { period: 1, minute: 26 } },
@@ -93,11 +93,11 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
   {
     id: WESTHAVEN_DATASET_ID_PUBLIC,
     version: '1.0.0',
-    name: 'Goalless match',
+    name: 'Westhaven fixture',
     teams: ['Westhaven FC', 'Kingswell City'],
     teamAliases: [['Westhaven FC', 'Westhaven'], ['Kingswell City', 'Kingswell']],
-    scenario: 'No goals. Westhaven take nine shots, Kingswell never test the keeper, then Kingswell hold the ball late on.',
-    description: 'Westhaven FC v Kingswell City — a goalless match with a late change in possession.',
+    scenario: 'Explore this fictional match through its recorded events and evidence.',
+    description: 'A fictional football fixture for exploring evidence at selected moments.',
     fictional: true,
     moments: [
       { label: '45+3′ · half-time', clock: stoppage(1, 45, 3) },
@@ -116,11 +116,11 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
   {
     id: REDMERE_DATASET_ID_PUBLIC,
     version: '1.0.0',
-    name: 'Late winner',
+    name: 'Redmere fixture',
     teams: ['Redmere FC', 'Alderwick United'],
     teamAliases: [['Redmere FC', 'Redmere'], ['Alderwick United', 'Alderwick']],
-    scenario: 'Redmere lead, Alderwick equalise, then a 78′ substitute scores the winner at 88′.',
-    description: 'Redmere FC v Alderwick United — a late substitution and a late winner.',
+    scenario: 'Explore this fictional match through its recorded events and evidence.',
+    description: 'A fictional football fixture for exploring evidence at selected moments.',
     fictional: true,
     moments: [
       { label: '33′ · Redmere goal', clock: { period: 1, minute: 33 } },

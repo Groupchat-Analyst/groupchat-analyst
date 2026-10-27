@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MatchReplayResponse } from '../../shared/src/apiContracts'
 import type { MatchTeam } from '../../shared/src/matchClock'
-import { formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
-import { clockKey, type ReplaySnapshot } from './replayController'
+import { elapsedMatchMinute, formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
+import { clockKey, REPLAY_LOAD_ERROR, type ReplaySnapshot } from './replayController'
 import { teamMonogram } from './teamMonogram'
 import { LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
 import { localizedTeamMonogram } from '../../shared/src/displayNames'
+import { translateText } from '../../shared/src/localization'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -70,7 +71,7 @@ function EventLog({ frame, homeTeam }: { frame: Replay | null; homeTeam: string 
   }, [added, count])
 
   return (
-    <ol className="event-log-list" ref={listRef} aria-label="Recorded events in match order">
+    <ol className="event-log-list" ref={listRef} aria-label="Recorded events in match order" tabIndex={0}>
       {frame?.events.map((event) => (
         <li
           key={event.id}
@@ -196,21 +197,29 @@ export function MatchHeader({
 
       {error && (
         <p className="replay-error" role="alert">
-          {error} <button type="button" className="link-button" onClick={onRetry}>Try again</button>
+          {translateText(
+            displayed ? `${REPLAY_LOAD_ERROR} The last loaded moment is still shown.` : REPLAY_LOAD_ERROR,
+            language,
+          )}{' '}
+          <button type="button" className="link-button" onClick={onRetry}>{translateText('Try again', language)}</button>
         </p>
       )}
 
       <div className="moment-chips" role="group" aria-label="Jump to a key moment">
-        {keyMoments.map(({ label, clock }) => (
-          <button
-            key={label}
-            type="button"
-            aria-pressed={clockKey(clock) === clockKey(requested)}
-            onClick={() => onSeek(clock)}
-          >
-            {label}
-          </button>
-        ))}
+        {keyMoments.map(({ label, clock }) => {
+          const hasOccurred = displayedClock !== null
+            && elapsedMatchMinute(clock) <= elapsedMatchMinute(displayedClock)
+          return (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={clockKey(clock) === clockKey(requested)}
+              onClick={() => onSeek(clock)}
+            >
+              {hasOccurred ? label : <><bdi dir="ltr">{formatMatchClock(clock)}</bdi> · <span>Recorded moment</span></>}
+            </button>
+          )
+        })}
       </div>
 
       <div className="latest-moment" aria-label="Latest recorded moment">

@@ -377,7 +377,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     return {
       ...base,
       status: 'different-interpretation',
-      headline: `The two checks read this take differently, so I'm not comparing them directly.`,
+      headline: 'The two checks interpret this opinion differently, so they cannot be compared directly.',
       lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
       caveats: ['The interpreted claims differ, so no like-for-like change is reported.'],
     }

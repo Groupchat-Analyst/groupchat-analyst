@@ -71,8 +71,8 @@ import './matchday.css'
 const MATCH_TIME_OPTIONS = getMatchTimeOptions()
 const REPLAY_DWELL_MS = 900
 const INITIAL_MATCH_TIME: MatchClock = {
-  period: 2,
-  minute: 57,
+  period: 1,
+  minute: 1,
 }
 
 type RequestOperation =
@@ -1031,7 +1031,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     replaySnapshot.status === 'loading' &&
     (replaySnapshot.displayedClock === null ||
       clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
-  const examples = dataset.examples
+  const committedClock = replaySnapshot.displayedClock
+  const examples = committedClock
+    ? dataset.examples.filter(({ clock }) => !isLaterClock(clock, committedClock))
+    : []
   const shareModel = useMemo<ShareCardModel | null>(
     () => (analysis && submittedContext && !hasPlayerChoices
       ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language, datasetId)
@@ -1594,13 +1597,15 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                   {isLoadingSubmit ? 'Checking…' : isSeeking ? 'Moving…' : 'Check this moment'}<ArrowIcon />
                 </button>
               </div>
-              <div className="suggestions" role="group" aria-label="Example opinions">
-                <span>Examples (these fill the box; nothing is sent until you check)</span>
-                {examples.map((example) => {
-                  const text = localizedExample(example.text, language)
-                  return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${translateNarrative(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
-                })}
-              </div>
+              {examples.length > 0 && (
+                <div className="suggestions" role="group" aria-label="Example opinions">
+                  <span>Examples (these fill the box; nothing is sent until you check)</span>
+                  {examples.map((example) => {
+                    const text = localizedExample(example.text, language)
+                    return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${translateNarrative(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
+                  })}
+                </div>
+              )}
               <p className="input-hint" id="input-hint">Fictional match: every performance and result is invented.</p>
               {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
             </form>

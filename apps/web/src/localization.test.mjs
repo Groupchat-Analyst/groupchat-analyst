@@ -5,6 +5,7 @@ import {
   canonicalizeSupportedFootballOpinion,
   localizedExample,
   translateNarrative,
+  translateText,
 } from '../../shared/src/localization.ts'
 import { DATASET_CATALOG } from '../../shared/src/datasetCatalog.ts'
 import {
@@ -71,10 +72,55 @@ const acceptance = [
   },
 ]
 
+test('replay failures and retry stay localized without exposing transport details', () => {
+  const expected = {
+    en: ['The match could not be loaded.', 'The match could not be loaded. The last loaded moment is still shown.', 'Try again'],
+    es: ['No se pudo cargar el partido.', 'No se pudo cargar el partido. Se sigue mostrando el último momento cargado.', 'Intentar de nuevo'],
+    fr: ['Le match n’a pas pu être chargé.', 'Le match n’a pas pu être chargé. Le dernier instant chargé reste affiché.', 'Réessayer'],
+    de: ['Das Spiel konnte nicht geladen werden.', 'Das Spiel konnte nicht geladen werden. Der letzte geladene Moment wird weiterhin angezeigt.', 'Erneut versuchen'],
+    ar: ['تعذّر تحميل المباراة.', 'تعذّر تحميل المباراة. لا تزال آخر لحظة تم تحميلها معروضة.', 'أعد المحاولة'],
+  }
+  for (const { code } of APP_LANGUAGES) {
+    assert.deepEqual(
+      expected[code].map((message) => translateText(message, code)),
+      expected[code],
+      code,
+    )
+    assert.ok(expected[code].every((message) => !message.includes('Failed to fetch')), code)
+  }
+})
+
 test('all five locales have explicit label, native name, and direction metadata', () => {
   assert.deepEqual(APP_LANGUAGES.map(({ code }) => code), ['en', 'es', 'fr', 'de', 'ar'])
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'ar').direction, 'rtl')
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'es').nativeLabel, 'Español')
+})
+
+test('fixture catalog copy is neutral and the opinion wording is localized', () => {
+  const scenario = 'Explore this fictional match through its recorded events and evidence.'
+  const description = 'A fictional football fixture for exploring evidence at selected moments.'
+  const spoilers = /\b(?:equalis\w*|goal\w*|winner|win|lead|goalless|score)\b/iu
+  for (const fixture of DATASET_CATALOG) {
+    assert.equal(fixture.scenario, scenario, fixture.id)
+    assert.equal(fixture.description, description, fixture.id)
+    assert.doesNotMatch(fixture.name, spoilers, fixture.id)
+    assert.doesNotMatch(fixture.scenario, spoilers, fixture.id)
+    assert.doesNotMatch(fixture.description, spoilers, fixture.id)
+  }
+
+  for (const { code } of APP_LANGUAGES) {
+    if (code === 'en') continue
+    assert.notEqual(translateNarrative('Nothing has been recorded yet.', code), 'Nothing has been recorded yet.', code)
+    assert.notEqual(translateNarrative(scenario, code), scenario, code)
+    assert.notEqual(translateNarrative(description, code), description, code)
+    assert.notEqual(translateNarrative('Recorded moment', code), 'Recorded moment', code)
+    assert.notEqual(translateNarrative('See how one minute changes the opinion', code), 'See how one minute changes the opinion', code)
+    assert.notEqual(
+      translateNarrative('The two checks interpret this opinion differently, so they cannot be compared directly.', code),
+      'The two checks interpret this opinion differently, so they cannot be compared directly.',
+      code,
+    )
+  }
 })
 
 test('Arabic display names cover every canonical team and player identity in all fixtures', () => {
@@ -189,6 +235,8 @@ test('Arabic metadata, metric explanation, and period translations retain identi
     localizeMatchText(translateNarrative('Original match v3.0.0', 'ar'), baselineId, 'ar'),
     'المباراة الأصلية v3.0.0',
   )
+  assert.equal(translateNarrative('Westhaven fixture v1.0.0', 'ar'), 'مباراة وستهافن v1.0.0')
+  assert.equal(translateNarrative('Redmere fixture v1.0.0', 'ar'), 'مباراة ريدمير v1.0.0')
   const explanation = localizeMatchText(
     translateNarrative(
       'Report pass completions for Bruno Fernandes from selected synthetic records.',

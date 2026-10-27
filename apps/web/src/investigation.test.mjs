@@ -65,7 +65,7 @@ test('different interpretations are reported plainly and are not compared', () =
   const comparison = compareSnapshots(earlier, later)
   assert.equal(comparison.status, 'different-interpretation')
   assert.equal(comparison.pairs.length, 0)
-  assert.match(comparison.headline, /read this take differently/)
+  assert.match(comparison.headline, /interpret this opinion differently/)
   assert.equal(buildChangeCard(OPINION, earlier, later, comparison), null)
 })
 
