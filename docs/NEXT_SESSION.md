@@ -1,5 +1,14 @@
 # Next-session handoff
 
+## Bounded live Foundry run (application `14bb523`; stopped after call 4)
+
+- Preflight confirmed a clean worktree at docs commit `09b93eac1ce34dcd85083aa56e355ba726baaed2`; application and fixture files matched `14bb52314a70370851900726fbf620f0fb42e309`. The isolated API/UI used ports 7417/5417 with process-only overrides. The existing 5416 service and public deployment were untouched; no warm-up or model call preceded the six-input sequence.
+- Four browser submissions produced four Foundry responses and four API analyze invocations. Calls 1–3 passed: Original 57′ contradicted at 2–2 shots on target; Check again at 58′ supported at Eastport 3–Northbridge 2; Return 60′ resolved Bukayo Saka and returned a qualified judgement with no overall rating, correctly explaining 62 elapsed participation minutes within the selected recorded window `[1, 63)`, with no future evidence.
+- Call 4, Original 58′, “How many passes did Bruno complete?”, was the first failure. Foundry output mentioned Fernandes and Guimarães but represented the ambiguous query with an evidence request rejected by application semantic validation (`Claim 1 intent does not match its evidence request`). API returned 502; no answer or final provider label was rendered. Calls 5–6 were not run. No retries, replacement calls or post-failure analysis requests occurred.
+- Comparison, share preview and copied call-2 receipt were checked using the existing responses; copying and inspection added 0 analyze requests. The PNG button reported “Card image downloaded,” but the harness did not expose a download event and the file could not be independently opened; actual PNG-byte inspection is unverified.
+- The run used 3,864/599/4,463; 3,916/714/4,630; 3,837/737/4,574; and 3,916/851/4,767 prompt/completion/total tokens for calls 1–4 respectively. Exact timings, fixtures, clocks, outcomes and explicit not-run entries are in [the sanitized ledger](./foundry-14bb523-bounded-live-ledger.json). Raw captures were appended to the ignored local file and preserved; the four earlier historical captures remain. The isolated ports are closed. No code, fixtures, prompts, stored settings, Azure resources or deployment were changed.
+- Submission notes now record the actual stop result. The failed Bruno interpretation is a remaining Foundry semantic-validation defect; this bounded run does not establish broad reliability or authorize a rerun. Native phone sharing and actual PNG bytes remain unverified.
+
 ## Offline call-3 duration repair (application `14bb52314a70370851900726fbf620f0fb42e309`)
 
 - Replayed the captured call-3 interpretation through `FoundryInterpretationProvider`, real validation, and `analyzeOpinion` with a stubbed transport. The result uses Return fixture `northbridge-eastport-return-demo` v1.0.0, the selected 60′ match clock, match-so-far scope, Saka (`north-player-09`), and excludes later events.
@@ -177,14 +186,14 @@ Current walkthrough is **local-provider verified** (local interpreter), not Foun
 
 ## 3. Foundry verification status and remaining blocker
 
-The authorised six-input run recorded above stopped after call 3 because its 60′ response did not distinguish match-clock time from elapsed participation. The offline replay at application `14bb52314a70370851900726fbf620f0fb42e309` confirms the 62-minute figure is the half-open elapsed interval `[1, 63)` within recorded coverage, not future play; the application now explains that calculation. This is not a live correction or verification. Calls 4–6 remain unrun. The exact proposed six-call follow-up is in [SUBMISSION.md](./SUBMISSION.md); it is not authorized by this handoff and requires fresh explicit approval.
+The earlier run against `2343167` stopped after call 3 on ambiguous duration wording; the offline repair confirmed the 62-minute figure is elapsed participation in recorded coverage, not future play. The separate six-input plan tied to `14bb523` was then explicitly authorized and attempted once. It stopped after call 4 on a Bruno semantic-validation failure; calls 5–6 remain unrun. See the new ledger and result in [SUBMISSION.md](./SUBMISSION.md). That run authorization is spent; do not make further calls without fresh explicit approval.
 
 The current host still has an 8192 completion-token ceiling, 30 s provider timeout, no retry loop, and 45 s browser deadline. These bound a single request; they are not a durable total allowance. The judge-accessible allowance, per-client limit, exhaustion/fallback semantics, and fixture-aware Foundry team context/schema remain proposed—not implemented. No live verification was performed for Westhaven/Kingswell or Redmere/Alderwick in this run.
 
-Three calls cannot establish production reliability: repeatability, broad language coverage, failure rate, latency distribution, cost at scale, or parity with local wording remain unknown.
+Four calls cannot establish production reliability: repeatability, broad language coverage, failure rate, latency distribution, cost at scale, or parity with local wording remain unknown.
 
 ## 4. Next actions (priority order)
 
-1. If desired, obtain fresh explicit approval before running the proposed six-call Foundry follow-up tied to `14bb52314a70370851900726fbf620f0fb42e309`.
-2. Keep public Foundry disabled until the separate durable allowance, per-client cap, failure handling and exhaustion labels are implemented and approved.
+1. Keep public Foundry disabled until the separate durable allowance, per-client cap, failure handling and exhaustion labels are implemented and approved.
+2. Obtain fresh explicit approval before any further live Foundry calls; address the call-4 semantic-validation mismatch offline first.
 3. Obtain Rob's feedback and prepare deployment/submission materials.

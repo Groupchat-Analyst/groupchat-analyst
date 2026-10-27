@@ -1,0 +1,209 @@
+{
+  "title": "Bounded live Foundry verification",
+  "run_date": "2026-10-27",
+  "branch": "feature/explore-more-matches",
+  "application_commit": "14bb52314a70370851900726fbf620f0fb42e309",
+  "documentation_commit_before_run": "09b93eac1ce34dcd85083aa56e355ba726baaed2",
+  "preflight": {
+    "worktree": "clean",
+    "application_and_fixtures_match_commit": true,
+    "api_port": 7417,
+    "web_port": 5417,
+    "existing_browser_service_untouched": true,
+    "process_overrides": "Foundry provider enabled and raw response capture enabled; no values or credentials recorded",
+    "stored_configuration_changed": false,
+    "model_calls_before_run": 0,
+    "local_functions_host_note": "AzureWebJobsStorage health was reported unhealthy by Core Tools; the isolated Functions worker and API remained responsive."
+  },
+  "controls": {
+    "maximum_outbound_foundry_requests": 6,
+    "actual_outbound_foundry_requests": 4,
+    "api_analyze_invocations": 4,
+    "successful_raw_captures_appended": 4,
+    "raw_capture_lines_before": 3,
+    "raw_capture_lines_after": 7,
+    "completion_token_limit": 8192,
+    "provider_timeout_seconds": 30,
+    "browser_deadline_seconds": 45,
+    "retries": 0,
+    "warm_up_calls": 0,
+    "model_or_prompt_changes": false,
+    "stop_rule": "Stop on the first transport, authentication, HTTP, schema, semantic-validation, truncation, timeout, provider, interpretation, result, or request-count failure."
+  },
+  "calls": [
+    {
+      "number": 1,
+      "status": "attempted; Foundry response received; expected result met",
+      "input": "Eastport had more shots on target.",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "57′",
+      "period": "Match so far",
+      "provider": "foundry",
+      "provider_label": "Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "comparison": "Eastport greater than Northbridge"
+      },
+      "assessment": "contradicted",
+      "figures": {
+        "Eastport_shots_on_target": 2,
+        "Northbridge_shots_on_target": 2
+      },
+      "evidence_event_ids_captured": false,
+      "request_started_at_utc": "2026-10-27T13:24:18.866Z",
+      "browser_request_duration_ms": 5947,
+      "usage_tokens": {
+        "prompt": 3864,
+        "completion": 599,
+        "total": 4463
+      }
+    },
+    {
+      "number": 2,
+      "status": "attempted; Foundry response received; expected result met",
+      "input": "Eastport had more shots on target.",
+      "submitted_via": "Check again on call 1's saved opinion",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "58′",
+      "period": "Match so far",
+      "provider": "foundry",
+      "provider_label": "Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Eastport had more shots on target than Northbridge.",
+        "intent": "factual-claim",
+        "metric": "shots-on-target",
+        "comparison": "Eastport greater than Northbridge"
+      },
+      "assessment": "supported",
+      "figures": {
+        "Eastport_shots_on_target": 3,
+        "Northbridge_shots_on_target": 2
+      },
+      "comparison_with_call_1": "The conversation displayed the 57′ to 58′ change from contradicted (2–2) to supported (Eastport 3, Northbridge 2).",
+      "receipt_checks": {
+        "share_preview": "Displayed the opinion, selected time, assessment, figures, comparison, fixture/version and Foundry provider.",
+        "copied_card_text": "Clipboard text matched the preview and named the Original fixture/version and Foundry.",
+        "png_button": "UI reported the image download, but the browser harness exposed no download event and the generated PNG bytes were not independently inspected.",
+        "additional_analysis_requests_during_comparison_and_receipt_inspection": 0
+      },
+      "evidence_event_ids_captured": false,
+      "request_started_at_utc": "2026-10-27T13:25:25.247Z",
+      "browser_request_duration_ms": 7589,
+      "usage_tokens": {
+        "prompt": 3916,
+        "completion": 714,
+        "total": 4630
+      }
+    },
+    {
+      "number": 3,
+      "status": "attempted; Foundry response received; expected result met",
+      "input": "Saka has had a horrible game",
+      "fixture": "Return",
+      "dataset_id": "northbridge-eastport-return-demo",
+      "dataset_version": "1.0.0",
+      "selected_time": "60′",
+      "period": "Match so far",
+      "provider": "foundry",
+      "provider_label": "Fictional match · Foundry · server-side interpretation",
+      "interpretation": {
+        "claim": "Bukayo Saka has had a horrible game so far.",
+        "resolved_player": "Bukayo Saka",
+        "player_id": "north-player-09",
+        "intent": "subjective-judgement",
+        "assessment": "insufficient evidence for a firm conclusion"
+      },
+      "reported_contributions": {
+        "shots_on_target": 2,
+        "completed_passes": 5,
+        "pass_attempts": 5,
+        "participation_minutes_label": "elapsed participation within recorded coverage",
+        "participation_minutes": 62,
+        "overall_rating": "not inferred"
+      },
+      "time_scope_trace": {
+        "selected_match_clock_window": "1′–60′",
+        "selected_elapsed_interval": "[1, 63)",
+        "recorded_coverage_elapsed_interval": "[1, 97)",
+        "added_time": "Included where covered",
+        "half_time": "Excluded",
+        "future_events_included": false
+      },
+      "evidence_event_ids_captured": false,
+      "request_started_at_utc": "2026-10-27T13:27:50.789Z",
+      "browser_request_duration_ms": 6449,
+      "usage_tokens": {
+        "prompt": 3837,
+        "completion": 737,
+        "total": 4574
+      }
+    },
+    {
+      "number": 4,
+      "status": "attempted; Foundry returned structured output; application rejected it with HTTP 502",
+      "input": "How many passes did Bruno complete?",
+      "fixture": "Original",
+      "dataset_id": "northbridge-eastport-analysis-demo",
+      "dataset_version": "3.0.0",
+      "selected_time": "58′",
+      "period": "Match so far",
+      "provider_response": "Received and captured; no transport/authentication/Foundry HTTP failure was observed.",
+      "interpreted_ambiguity": "Bruno Fernandes or Bruno Guimarães",
+      "interpretation_shape": "Statistical request with an evidence-request shape incompatible with application validation.",
+      "application_error": "Claim 1 intent does not match its evidence request.",
+      "application_result": "Semantic-validation failure; API returned 502; browser showed an error and no answer provider label.",
+      "provider": "foundry",
+      "request_started_at_utc": "2026-10-27T14:12:25.009Z",
+      "browser_request_duration_ms": 7722,
+      "usage_tokens": {
+        "prompt": 3916,
+        "completion": 851,
+        "total": 4767
+      },
+      "stop_reason": "First semantic-validation failure; calls 5 and 6 were not submitted."
+    },
+    {
+      "number": 5,
+      "status": "not run; stopped after call 4",
+      "input": "Kingswell City had no shots on target.",
+      "fixture": "Westhaven FC v Kingswell City",
+      "dataset_id": "westhaven-kingswell-demo",
+      "selected_time": "90+4′",
+      "period": "Match so far",
+      "provider": "not run",
+      "usage_tokens": "unknown; not run"
+    },
+    {
+      "number": 6,
+      "status": "not run; stopped after call 4",
+      "input": "Abraham has scored",
+      "fixture": "Redmere FC v Alderwick United",
+      "dataset_id": "redmere-alderwick-demo",
+      "selected_time": "88′",
+      "period": "Match so far",
+      "provider": "not run",
+      "usage_tokens": "unknown; not run"
+    }
+  ],
+  "run_outcome": {
+    "completed": false,
+    "stopped_after_call": 4,
+    "stopping_failure": "Call 4 Foundry output was rejected by application semantic validation.",
+    "actual_outbound_foundry_requests": 4,
+    "unexpected_or_additional_analysis_requests": 0,
+    "isolated_api_and_ui_stopped": true,
+    "isolated_ports_closed": true,
+    "public_deployment_or_azure_changes": false,
+    "stored_configuration_changes": false,
+    "application_or_fixture_changes": false,
+    "broad_reliability_claim": false,
+    "png_bytes_independently_inspected": false
+  },
+  "capture_handling": "Four new raw Foundry captures were appended to the pre-existing three-line git-ignored capture file. Historical captures and ledgers were preserved. This ledger contains no credentials, endpoint, headers, raw provider output, or stored configuration values."
+}
