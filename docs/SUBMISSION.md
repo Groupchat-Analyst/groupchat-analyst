@@ -24,13 +24,15 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 | Check | Result |
 | --- | --- |
-| API tests | 246 pass (Node 22.23.3), local provider |
+| API tests | 303 pass, local provider |
 | Web tests | 121 pass |
 | Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
-| Browser (desktop + 390 px/320 px emulation, local stack) | Stage 1 journey and race checks (see NEXT_SESSION.md); Stage 2: both new fixtures load with correct names/score, no overflow at 1280/390/320, 0 analyze calls on load, example prefills without a request, one request on submit, Analyst view and pass map use the fixture’s team names |
+| Browser (desktop + 390 px/320 px emulation, local stack) | Prior Stage 1/2 checks plus current direct demo route: 0 analyze calls on entry, 1 on explicit submit, 0 on replay movement, 1 on explicit recheck. Both new fixture identities and team names verified in replies and exports; see `docs/NEXT_SESSION.md`. |
 | Language matrix | 42 inputs: 42 pass, 0 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
 | Live Foundry for the current work | **None** |
+
+Final Stage 2 follow-up (27 October 2026; application commit `36ce40c`): the foreign-team regression now produces an explicit unrecognized limitation with no claim attribution, statistics or evidence, and does not call a supplied model provider. Distinct foreign and fixture names are preserved through the slot adapter. Share receipts and the static homepage receipt show the team pairing, fixture/version and actual provider where applicable. The documented direct demo route was rehearsed with explicit submit/recheck. API 303/303 and web 121/121 pass; baseline hash remains unchanged. This work was offline/local only.
 
 Independent review note: the additional composition repairs have nine regression tests and the complete 42-case local corpus passes. The captured baseline responses also pass through the actual web comparison/share functions offline. Browser rendering could not be independently repeated in the review runtime; the following interaction results are the supplied candidate's reported checks. Native phone sharing and live Foundry remain unverified.
 
@@ -86,7 +88,7 @@ Dependencies: a new storage resource and a code change in the API; both need exp
 
 ### Proposed fixed live acceptance set (execution NOT authorised)
 
-Candidate commit: `935a29c` (application commit: labelled keeper/defensive-shape/pressure context, matrix asserting 42 pass; a docs-only commit that records this SHA may follow it). Exact inputs: the six opinions listed above, on the fixtures and times stated there. Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Not executed; do not run it from this document.
+Candidate commit: `36ce40c` (latest application commit, including the final Stage 2 identity fixes). Exact inputs: the six opinions listed above, on the fixtures and times stated there. Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Not executed; do not run it from this document.
 
 1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
 2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).
