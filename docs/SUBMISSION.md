@@ -27,19 +27,30 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 | Check | Result |
 | --- | --- |
 | API tests | 358 pass, including captured-call replay, fixture, duration, player-resolution and language regressions |
-| Web tests | 137 pass |
+| Web tests | 140 pass |
 | API/web typecheck, web lint and production build | Pass |
 | `git diff --check` | Pass |
 | Baseline fixture verification | Fixture source blobs remain unchanged; 70 passes and 17 turnovers. The historical semantic digest is `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` and was not recomputed in this release. |
+| Event-detail localization | Structured match events plus representative completed/incomplete passes, linked passes, turnovers and selected pressure records from all four fixtures are covered in Spanish, French, German and Arabic. Comparison details, copied text, receipt SVGs, expanded evidence and labeled English source records are covered. |
 | Language matrices | English corpus: 42/42 PASS. Five languages: 30/30 PASS (six asserted behavior classes per language). Broader non-English rule coverage and all live Foundry interpretation are unverified. |
 | Browser (local rules) | Existing walkthrough checks remain; all five player-selection flows passed with pointer and keyboard choice, preserving original opinion, language, draft, scope and one conversation turn. Five analysis and five explicit selection API requests; no interpreter call during selection. Explicit retry after an injected failure made no automatic retry or duplicate turn. A→B late success and A→B→A late failure did not alter the new draft, conversation or error state. |
-| Arabic receipt | For player selection, clicked the UI download action and captured the exact PNG blob passed to its download anchor. Valid 2160×1584 PNG, 340,825 bytes; visually inspected. It contains the original Arabic opinion, selected Bruno Fernandes, 1 completed pass, 58′ scope, Northbridge v Eastport, Original v3.0.0, local-rules and user-selection disclosures. Mixed Arabic/Latin layout is legible; some event/detail labels remain English. Playwright did not expose a native download event, so the exact anchor payload—not a second rasterization—was captured. |
+| Arabic receipt | After selecting Bruno Fernandes, clicked the UI download action and captured its exact anchor payload. Valid 2160×1512 PNG, 347,159 bytes; SHA-256 `28F388DA5383223E749CBFA9FE731682973053757B7DCB97F09B9F0EF513367C`; visually inspected. It contains the preserved English opinion, selected player, 1 completed pass, 58′ scope, Northbridge v Eastport, Original v3.0.0, local-provider disclosure and Arabic event detail. Playwright did not expose a native download event; the anchor payload—not a second rasterization—was inspected. |
 | Native share on a real phone | **Unverified** |
 | Live multilingual Foundry | **Not run**. Language acceptance used local rules only; no prompt/schema/credential changes. |
 | Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
 | Offline call-3 duration repair | Captured interpretation replayed through the real validation/service path with stubbed transport; Fan/Analyst/copy/card-label regressions pass. The repaired call-3 presentation later matched in one bounded live run. The PNG from that Foundry run remains uninspected; the separate local Arabic PNG inspection above does not change that result. |
 | Live Foundry for application `14bb523` | 4 requests; calls 1–3 met expectations; stopped after call 4's semantic-validation failure. Calls 5–6 not run. Comparison, copied receipt and share preview checked with existing responses; actual PNG bytes not independently inspected. No additional analysis requests during receipt inspection. |
 | Offline Bruno clarification repair (`86dd8d1`) | Exact call-4 capture replays through adapter, validation and service with a stub transport. Six focused regressions and 316 API tests pass; isolated browser replay shows the clarification and Foundry label. No live retest. |
+
+## Event-detail localization release (`c153f14`)
+
+Event descriptions now localize dynamic completed/incomplete passes (including linked-pass wording), incomplete-pass turnovers and selected pressure observations. Actor names are resolved from each fixture’s structured roster. Times, teams, pitch thirds, linked associations and partial/context-only qualifications are retained. The evidence-coverage details for recorded passing and possession losses are localized. Fixture source data was not altered.
+
+Expanded technical records show the translated description and identify the original English source wording explicitly; that source wording and the stable record IDs remain unchanged. The four-fixture regression covers fixture match events and representative structured pass/turnover/pressure details through the conversation evidence path, comparisons, copied card text and generated receipt SVGs in all four non-English languages.
+
+An isolated browser run used the local rule interpreter: one Bruno ambiguity analysis and its existing zero-interpreter-call selection continuation. Locale changes made **zero analysis requests** and preserved the answer, original opinion, draft and then-current replay clock/period. The Arabic receipt was captured from the actual download anchor and visually inspected. The web suite is 140/140; API and web typecheck/build, web lint and `git diff --check` pass. The four canonical fixture sources match the parent commit byte-for-byte; the historical semantic digest was not recomputed.
+
+This was offline localization verification only: no live model or translation calls. Remaining English includes the user’s preserved original wording, proper names, explicitly labeled source text, and non-event interpretation metadata (including the local interpreter’s “What we understood” description). Native-speaker review and real-device sharing remain unverified.
 
 ## Multilingual application candidate (`642c6e9`)
 
