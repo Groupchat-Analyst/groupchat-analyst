@@ -189,3 +189,40 @@ The captured call-4 output itself—not an older passing capture—was replayed 
 The offline result preserves the submitted opinion and Original fixture/version at 58′ Match so far, asks which Bruno, and yields no player/team statistics, calculation, pass count, or claim evidence. The isolated browser replay rendered this clarification and the actual Foundry provider label. Regressions retain rejection of missing clarification, incompatible metric/evidence, malformed output, contradictory identity and intent, while confirming explicitly named Bruno Fernandes uses only his attributed records. API build and 316/316 tests pass; focused Bruno cases 6/6 pass. This is an offline repair, not live Foundry verification; no prompts, settings, historical captures, fixtures or the earlier shots/Saka behaviors were changed.
 
 After call 2, the comparison, share preview and copied receipt were checked; the copied text matched the preview and named the fixture/version and Foundry. These inspections made zero additional analysis requests. The PNG button reported a successful download, but the browser harness did not expose a download event and the generated PNG bytes could not be located for independent inspection. This remains unverified. Four calls cannot establish broad Foundry reliability. Full sanitized inputs, figures, timings and token usage are in [the run ledger](./foundry-14bb523-bounded-live-ledger.json); raw captures remain ignored and local. The isolated API/UI were stopped; no application, Azure, credential or public deployment changes were made.
+
+### 1′ starting view and replay acceptance follow-up
+
+The normal match view now starts at 1′. Fixture names and descriptions are neutral, later key-moment labels remain generic until their time is displayed, and prepared examples do not appear before their own recorded time. The 57′/58′ Home walkthrough remains a separate, explicitly illustrative preview. Visible “take” wording was replaced by “opinion” in the Home demo action, comparison headline and README. Dataset IDs, team/player identities, canonical event/evidence fixtures, analysis calculations, selected-time behavior and comparison logic were not rewritten.
+
+#### Fresh-entry matrix and navigation
+
+A fresh local origin had no saved local-storage keys. Home → Try it Out → match selection was exercised for each of the four fixtures in English, Spanish, French, German and Arabic: **20 combinations**. All 20 returned a successful HTTP 200 replay response with the correct dataset ID/version and `selectedTime: 1′`; the scoreboard was 0–0, the event list was empty, later timeline labels were neutral, future prepared examples were hidden, and the empty state was localized. Entry and language selection generated **zero** analysis requests. In Vite development, React StrictMode deliberately performs an effect cleanup/restart: the network log contained 40 replay attempts, 20 aborted development attempts and 20 successful responses. No hidden or automatic retry loop was observed.
+
+Direct fixture links, refresh and browser Back/Forward were checked and restored the correct match at 1′. Desktop and 390×844 mobile Arabic views of Westhaven/Kingswell at 1′ were captured and inspected. Mobile document width was 375 px, with no horizontal overflow. The displayed 0–0 score, selected clock, latest-moment empty state and event-list cutoff all belonged to the returned `westhaven-kingswell-demo` v1.0.0 frame.
+
+#### Explicit local-rules example submissions
+
+| Fixture | Prepared opinion | Selected time / period | Local result |
+| --- | --- | --- | --- |
+| Original v3.0.0 | `Eastport had more shots on target than Northbridge.` | 57′ / Match so far | Contradicted |
+| Return v1.0.0 | `Northbridge had more possession than Eastport` | 88′ / Last 10 minutes | Supported |
+| Westhaven v1.0.0 | `Kingswell City had no shots on target.` | 90+4′ / Match so far | Supported |
+| Redmere v1.0.0 | `Abraham has scored` | 88′ / Match so far | Supported |
+
+Each opinion was selected from that fixture’s prepared examples and explicitly submitted. The request’s dataset, selected clock and period matched the prepared example; the response carried the same dataset ID/version and selected time with `provider: local`.
+
+#### Replay lifecycle and failure handling
+
+The controller regression deliberately released 20′ before a stale 58′ response after 1′ → 58′ → 20′. Only the 20′ frame remained displayed; fixture identity, time, score, event list and latest event stayed coherent. Additional regressions cover A → B → A late completion, disposal while playing, one playback dwell timer, first-half added time, the 45+3′ → 46′ boundary, the final 90+4′ stop, timeout and explicit-only retry.
+
+A controlled browser failure in the earlier uncommitted run aborted local `/api/replay` and exposed “Failed to fetch.” The repair now replaces transport, HTTP, invalid-frame and timeout details with one shared localized match-loading message and explicit retry, retaining the last valid frame and failed requested clock. Offline controller regressions distinguish transport rejection from HTTP failure; browser injection verified localized failure and retry in all five languages, plus a separate HTTP 503 path. Neither path retries automatically. A pre-existing StrictMode cancellation remains silent. The original failing preview's startup/routing configuration is unavailable in the records; its cause remains **unconfirmed**.
+
+App-owned scrollbars use a thin dark track and muted thumb. Arabic desktop/mobile checks found no horizontal page overflow; horizontal moment chips remained keyboard-focusable and the event list scrolled with keyboard input. A scrollbar supplied by the external preview wrapper is outside the app DOM and was not inspected.
+
+The guided walkthrough was exercised from an ordinary 1′ visit: selecting it prepared 57′ and the opinion without analysis; submit made one request; moving to 58′ made none; recheck made the second request. Both responses used `provider: local`, with the 57′ tie at 2–2 and the 58′ result Eastport 3–Northbridge 2. The comparison and share-card preview were inspected. Desktop guided-comparison, Arabic desktop/mobile, and built-preview smoke screenshots are saved in the current Copilot session's files as `guided-comparison-receipt-58-desktop.png`, `guided-arabic-desktop-full.png`, `guided-arabic-mobile-full.png`, and `built-preview-1-minute-smoke.png`.
+
+The built frontend was served at **http://127.0.0.1:5196/** and browser-tested against the local API: the replay returned HTTP 200 with the expected fixture/version at 1′, 0–0 and no events, with zero analysis requests. Vite `preview.proxy` now mirrors the local `/api` proxy. That bounded smoke server was stopped after the check. The local review preview remains available at **http://localhost:5195/** with the detached Vite server on port 5195 and local Azure Functions API on port 6174, forced to `CLAIM_INTERPRETER_PROVIDER=local`. It is not the publicly hosted site and has not been deployed. Because the original failing preview startup/routing configuration is unavailable, the original failure cause remains unconfirmed; the current local configuration and built-preview path do not establish it.
+
+Final checks for this follow-up: **151/151 web tests**, **363/363 API tests**, web build/typecheck, lint and `git diff --check` passed. Canonical fixture source files were unchanged; the historical semantic digest was not recomputed. Production signing-key configuration, hosted verification, real-phone sharing and remaining Foundry verification are still open. The durable allowance and judge-accessible AI route remain separate, unimplemented work. No live model call, external translation, merge, deployment, Azure change or credential change was made.
+
+Application repair commit: `4d845e3` (`Harden replay navigation and localized recovery`). This documentation update is committed separately for review.

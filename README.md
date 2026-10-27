@@ -1,6 +1,6 @@
 # Groupchat Analyst
 
-Check a football take against the match. Type an opinion, replay a fictional match to a chosen minute, and get a plain-language answer with the evidence, what it can and cannot establish, and a shareable receipt. Replay to a later minute and press **Check again** to see exactly what changed.
+Check a football opinion against the match. Type an opinion, replay a fictional match to a chosen minute, and get a plain-language answer with the evidence, what it can and cannot establish, and a shareable receipt. Replay to a later minute and press **Check again** to see exactly what changed.
 
 > **Synthetic data.** Every match, player action and result is invented. Real-player names are used in invented scenarios; nothing here reflects real performances. There is no video, tracking, xG or injury data.
 
@@ -23,8 +23,8 @@ Open the home page, choose **Try it out**, then pick a match. The app has hash r
 | --- | --- | --- |
 | Original match | `northbridge-eastport-analysis-demo` 3.0.0 | The verified demonstration fixture. 57′→58′ shots-on-target walkthrough. Unchanged (hash `fb5335ff…`). |
 | Return match | `northbridge-eastport-return-demo` 1.0.0 | Eastport keep the ball (58.2%), Northbridge take the shots (11–4), 2–1 at 90+4′. Stoppage-time events, a late Northbridge spell that differs from the whole match, zero-attempt players. |
-| Goalless match | `westhaven-kingswell-demo` 1.0.0 | Westhaven FC v Kingswell City, 0–0: 9 shots (5 on target) v 3 (0), Kingswell hold the ball late. No goal anchor exists, zero shots on target, a no-pass player, an ambiguous “Pedro”. |
-| Late winner | `redmere-alderwick-demo` 1.0.0 | Redmere FC v Alderwick United, 1–2: goals at 33′, 61′ and a 78′ substitute’s 88′ winner. Three goals make “before the goal” ambiguous. |
+| Westhaven fixture | `westhaven-kingswell-demo` 1.0.0 | Westhaven FC v Kingswell City; includes shot, possession, player-availability and ambiguous “Pedro” examples. |
+| Redmere fixture | `redmere-alderwick-demo` 1.0.0 | Redmere FC v Alderwick United; includes multiple goal anchors and a substitute-scoring example. |
 
 Each match offers key-moment chips and five example opinions. Examples only fill the box, time and period; nothing is sent until you press **Check this moment**. All fixtures are illustrative synthetic event samples, not complete tracking data: no xG, running distance, video or continuous defensive shape. The two newer squads use dated roster-snapshot names as fictional identities only. Internally they share the original team slots; the API translates team names in and out.
 
@@ -75,7 +75,7 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (local rules): home, four-match selection and conversation at 1280 px and 390 px; 320 px has no horizontal overflow. Keyboard navigation visibly focuses the language selector. The 57′ submit and 58′ explicit recheck made exactly two analyze requests; replay movement, language changes, navigation, copy and PNG generation made none. Switching through all five locales retained the exact draft, clock and two-turn comparison. An actual downloaded Arabic receipt PNG (2160×2420) was decoded and visually inspected; its copied text and image retain the submitted opinion, 58′ scope, fixture/version, figures, event times and local-provider label. Other-language receipt strings and SVGs have automated regressions. Native sharing on a real phone is **unverified**.
 
-Automated checks: **363/363 API tests** and **144/144 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated checks: **363/363 API tests** and **151/151 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
 Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 
