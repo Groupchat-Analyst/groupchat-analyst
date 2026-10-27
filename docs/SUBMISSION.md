@@ -28,7 +28,7 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 | Web tests | 121 pass |
 | Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
 | Browser (desktop + 390 px/320 px emulation, local stack) | Stage 1 journey and race checks (see NEXT_SESSION.md); Stage 2: both new fixtures load with correct names/score, no overflow at 1280/390/320, 0 analyze calls on load, example prefills without a request, one request on submit, Analyst view and pass map use the fixture’s team names |
-| Language matrix | 42 inputs: 38 pass, 4 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
+| Language matrix | 42 inputs: 42 pass, 0 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
 | Live Foundry for the current work | **None** |
 
@@ -86,7 +86,7 @@ Dependencies: a new storage resource and a code change in the API; both need exp
 
 ### Proposed fixed live acceptance set (execution NOT authorised)
 
-Candidate commit: `86b7c64` (final stabilisation application commit: completed-pass comparisons, asserted language matrix; a docs-only commit that records this SHA may follow it). Exact inputs: the six opinions listed above, on the fixtures and times stated there. Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Not executed; do not run it from this document.
+Candidate commit: `935a29c` (application commit: labelled keeper/defensive-shape/pressure context, matrix asserting 42 pass; a docs-only commit that records this SHA may follow it). Exact inputs: the six opinions listed above, on the fixtures and times stated there. Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Not executed; do not run it from this document.
 
 1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
 2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).
