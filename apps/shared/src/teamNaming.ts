@@ -19,7 +19,8 @@ export const IDENTITY_NAMING: TeamNaming = {
   aliases: [['Northbridge'], ['Eastport']],
 }
 
-const FOREIGN = 'Foreignclub'
+type ForeignSlot = 'northbridge' | 'eastport'
+type ForeignTeams = Partial<Record<ForeignSlot, string>>
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -27,7 +28,7 @@ export function isIdentityNaming(naming: TeamNaming): boolean {
   return naming.teams[0] === SLOT_TEAMS[0] && naming.teams[1] === SLOT_TEAMS[1]
 }
 
-export type SlottedOpinion = { text: string; foreign: string | null }
+export type SlottedOpinion = { text: string; foreign: ForeignTeams }
 
 /**
  * Rewrites team names in an opinion to slot names. A slot name that belongs to another fixture
@@ -35,12 +36,8 @@ export type SlottedOpinion = { text: string; foreign: string | null }
  * as one of this fixture's teams.
  */
 export function toSlotOpinion(opinion: string, naming: TeamNaming): SlottedOpinion {
-  if (isIdentityNaming(naming)) return { text: opinion, foreign: null }
-  let foreign: string | null = null
-  let text = opinion.replace(/\b(Northbridge|Eastport)\b/gi, (match) => {
-    foreign ??= match
-    return FOREIGN
-  })
+  if (isIdentityNaming(naming)) return { text: opinion, foreign: {} }
+  let text = opinion
   const entries = naming.aliases
     .flatMap((names, slot) => names.map((name) => ({ name, slot })))
     .sort((a, b) => b.name.length - a.name.length)
@@ -50,19 +47,29 @@ export function toSlotOpinion(opinion: string, naming: TeamNaming): SlottedOpini
       `@@${slot}@@`,
     )
   }
+  const foreign: ForeignTeams = {}
+  text = text.replace(/\b(Northbridge|Eastport)\b/gi, (match) => {
+    const slot: ForeignSlot =
+      match.toLowerCase() === 'northbridge' ? 'northbridge' : 'eastport'
+    foreign[slot] ??= match
+    return `__foreign_${slot}__`
+  })
   text = text.replace(/@@(\d)@@/g, (_, slot) => SLOT_TEAMS[Number(slot)])
   return { text, foreign }
 }
 
-function localizeText(value: string, naming: TeamNaming, foreign: string | null): string {
+function localizeText(value: string, naming: TeamNaming, foreign: ForeignTeams): string {
   return value
-    .replace(/\bNorthbridge\b/g, naming.teams[0])
-    .replace(/\bEastport\b/g, naming.teams[1])
-    .replace(new RegExp(`\\b${FOREIGN}\\b`, 'g'), foreign ?? FOREIGN)
+    .replace(/\b(Northbridge|Eastport)\b/g, (slot) =>
+      slot === SLOT_TEAMS[0] ? naming.teams[0] : naming.teams[1],
+    )
+    .replace(/__foreign_(northbridge|eastport)__/gi, (marker, slot: ForeignSlot) =>
+      foreign[slot] ?? marker,
+    )
 }
 
 /** Deeply replaces slot names in string values and object keys with the fixture's display names. */
-export function toDisplay<T>(value: T, naming: TeamNaming, foreign: string | null = null): T {
+export function toDisplay<T>(value: T, naming: TeamNaming, foreign: ForeignTeams = {}): T {
   if (isIdentityNaming(naming)) return value
   const walk = (node: unknown): unknown => {
     if (typeof node === 'string') return localizeText(node, naming, foreign)

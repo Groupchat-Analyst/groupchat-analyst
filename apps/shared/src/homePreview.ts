@@ -6,6 +6,7 @@
 export const HOME_PREVIEW = {
   datasetId: 'northbridge-eastport-analysis-demo',
   datasetVersion: '3.0.0',
+  teams: ['Northbridge', 'Eastport'] as const,
   opinion: 'Eastport had more shots on target than Northbridge.',
   frames: [
     {

@@ -14,6 +14,7 @@ test('the homepage preview matches the real local analysis at 57′ and 58′', 
     assert.equal(real.provider, 'local')
     assert.equal(real.evidenceFoundation.dataset.id, HOME_PREVIEW.datasetId)
     assert.equal(real.evidenceFoundation.dataset.version, HOME_PREVIEW.datasetVersion)
+    assert.deepEqual(Object.keys(real.score), HOME_PREVIEW.teams)
     assert.equal(real.claims[0].assessment, frame.assessment)
     assert.equal(real.fanReply, frame.reply)
     assert.deepEqual(real.score, frame.score)

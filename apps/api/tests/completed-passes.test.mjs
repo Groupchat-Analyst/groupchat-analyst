@@ -61,7 +61,11 @@ test('player comparison uses completions, not attempts, including negation', asy
   assert.doesNotMatch(b.fanReply, /attempt/)
 })
 
-test('a slot name from another fixture is clarified, not guessed', async () => {
+test('a slot name from another fixture is explicitly rejected, not assigned to a team', async () => {
   const r = await run('Eastport completed more passes than Northbridge', WEST, FT)
-  assert.equal(r.claims[0].assessment, 'clarification needed')
+  assert.equal(r.claims[0].assessment, 'unrecognized language')
+  assert.equal(r.claims[0].claim.subject, null)
+  assert.deepEqual(r.claims[0].statistics, [])
+  assert.deepEqual(r.claims[0].evidence, [])
+  assert.match(r.fanReply, /Eastport and Northbridge are not part of Westhaven FC v Kingswell City/)
 })

@@ -9,8 +9,11 @@ const JOURNEY = ['Choose a match', 'Enter an opinion', 'Check a moment', 'Check 
 function PreviewSwitch() {
   const [minute, setMinute] = useState<number>(HOME_PREVIEW.frames[0].minute)
   const frame = HOME_PREVIEW.frames.find((candidate) => candidate.minute === minute) ?? HOME_PREVIEW.frames[0]
-  const { Northbridge: nbScore, Eastport: eaScore } = frame.score
-  const { Northbridge: nbShots, Eastport: eaShots } = frame.shotsOnTarget
+  const [home, away] = HOME_PREVIEW.teams
+  const homeScore = frame.score[home]
+  const awayScore = frame.score[away]
+  const homeShots = frame.shotsOnTarget[home]
+  const awayShots = frame.shotsOnTarget[away]
   const holds = frame.assessment === 'supported'
 
   return (
@@ -59,15 +62,15 @@ function PreviewSwitch() {
             </div>
             <div className="lp-line">
               <dt>Shots on target</dt>
-              <dd>Northbridge {nbShots} · Eastport {eaShots}</dd>
+              <dd>{home} {homeShots} · {away} {awayShots}</dd>
             </div>
             <div className="lp-line lp-score">
               <dt>Match score (a different figure)</dt>
-              <dd>Northbridge {nbScore}–{eaScore} Eastport</dd>
+              <dd>{home} {homeScore}–{awayScore} {away}</dd>
             </div>
           </dl>
           <p className="lp-receipt-foot">
-            Illustrative · fictional replay · local rules · Original match v{HOME_PREVIEW.datasetVersion}
+            Illustrative · fictional replay · local rules · {home} v {away} · Original match v{HOME_PREVIEW.datasetVersion}
           </p>
         </article>
       </div>

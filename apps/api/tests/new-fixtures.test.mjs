@@ -5,6 +5,7 @@ import { getReplayFrame } from '../dist/api/src/functions/replay.js'
 import { resolveDataset } from '../dist/api/src/datasets.js'
 import { validateFixtureIntegrity } from '../dist/shared/src/fixtureIntegrity.js'
 import { SYNTHETIC_MATCH_EVENTS } from '../dist/shared/src/match.js'
+import { toDisplay, toSlotOpinion } from '../dist/shared/src/teamNaming.js'
 
 const WEST = 'westhaven-kingswell-demo'
 const RED = 'redmere-alderwick-demo'
@@ -68,11 +69,70 @@ test('recent window differs from the whole match', async () => {
   assert.notEqual(whole.claims[0].assessment, recent.claims[0].assessment)
 })
 
-test('another match’s team name is not silently reinterpreted', async () => {
-  const r = await ask('Eastport had more shots than Westhaven', WEST)
-  assert.ok(!/Eastport|Northbridge/.test(JSON.stringify(r)) || r.claims[0].assessment !== 'supported')
-  assert.notEqual(r.claims[0].assessment, 'supported')
-  assert.notEqual(r.claims[0].assessment, 'contradicted')
+test('foreign opponents are preserved distinctly and never attributed to a fixture team', async () => {
+  let providerCalls = 0
+  const provider = {
+    name: 'foundry',
+    async interpret() {
+      providerCalls += 1
+      throw new Error('Foreign team opinions must not be sent to a model provider')
+    },
+  }
+  for (const [datasetId, opinion, foreignNames, fixtureTeams] of [
+    [WEST, 'Eastport had more shots than Northbridge', ['Eastport', 'Northbridge'], ['Westhaven FC', 'Kingswell City']],
+    [RED, 'Northbridge had more shots than Eastport', ['Northbridge', 'Eastport'], ['Redmere FC', 'Alderwick United']],
+  ]) {
+    const r = await analyzeOpinion({
+      opinion,
+      datasetId,
+      selectedClock: FT,
+      period: 'match-so-far',
+    }, provider)
+    const claim = r.claims[0]
+    assert.equal(r.provider, 'local')
+    assert.match(r.providerLabel, /local rule-based interpreter/)
+    assert.equal(claim.assessment, 'unrecognized language')
+    assert.equal(claim.claim.intent, 'unrecognized-language')
+    assert.equal(claim.claim.subject, null)
+    assert.equal(claim.claim.meaning.comparison, null)
+    assert.equal(claim.claim.requiredEvidence.length, 0)
+    assert.deepEqual(claim.statistics, [])
+    assert.deepEqual(claim.evidence, [])
+    assert.ok(foreignNames.every((name) => claim.claim.text.includes(name)))
+    assert.ok(foreignNames.every((name) => r.fanReply.includes(name)))
+    assert.ok(fixtureTeams.every((name) => r.fanReply.includes(name)))
+    assert.match(r.fanReply, /not part of/)
+    assert.doesNotMatch(JSON.stringify(r), /__foreign_|Foreignclub/)
+  }
+  assert.equal(providerCalls, 0)
+})
+
+test('short team aliases retain distinct fixture identities in claim and reply', async () => {
+  const west = await ask('Westhaven had more shots than Kingswell', WEST)
+  const red = await ask('Redmere had more shots than Alderwick', RED, { period: 2, minute: 57 })
+  assert.equal(west.claims[0].claim.subject, 'Westhaven FC')
+  assert.equal(west.claims[0].claim.meaning.comparison.opponent, 'Kingswell City')
+  assert.match(west.fanReply, /Westhaven FC have 9 shots to Kingswell City's 3/)
+  assert.equal(red.claims[0].claim.subject, 'Redmere FC')
+  assert.equal(red.claims[0].claim.meaning.comparison.opponent, 'Alderwick United')
+  assert.match(red.fanReply, /Redmere FC have 4 shots to Alderwick United's 2/)
+})
+
+test('slot translation preserves distinct names, including names containing the opposite slot', () => {
+  const naming = {
+    teams: ['Eastport United', 'Northbridge City'],
+    aliases: [['Eastport United'], ['Northbridge City']],
+  }
+  const slotted = toSlotOpinion('Eastport United beat Northbridge City', naming)
+  assert.deepEqual(slotted.foreign, {})
+  assert.equal(slotted.text, 'Northbridge beat Eastport')
+  assert.deepEqual(
+    toDisplay(
+      { score: { Northbridge: 2, Eastport: 1 }, reply: 'Northbridge beat Eastport' },
+      naming,
+    ),
+    { score: { 'Eastport United': 2, 'Northbridge City': 1 }, reply: 'Eastport United beat Northbridge City' },
+  )
 })
 
 test('a player from another fixture is not resolved', async () => {

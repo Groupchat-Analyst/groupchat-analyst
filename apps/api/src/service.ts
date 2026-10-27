@@ -2562,8 +2562,50 @@ export async function analyzeOpinion(
   const dataset = resolveDataset(parsed.datasetId)
   const slotted = toSlotOpinion(parsed.opinion, dataset.naming)
   const request = { ...parsed, opinion: slotted.text }
-  const response = await analyzeSlottedOpinion(request, dataset, provider, fixtureOverride)
-  return toDisplay(response, dataset.naming, slotted.foreign)
+  const response = await analyzeSlottedOpinion(
+    request,
+    dataset,
+    Object.keys(slotted.foreign).length > 0 ? new LocalInterpretationProvider() : provider,
+    fixtureOverride,
+  )
+  if (Object.keys(slotted.foreign).length > 0) {
+    const teams = dataset.naming.teams
+    const foreignMarkers = Object.keys(slotted.foreign).map((slot) => `__foreign_${slot}__`)
+    const names = foreignMarkers.join(' and ')
+    const fanReply = `${names} ${foreignMarkers.length === 1 ? 'is' : 'are'} not part of ${teams[0]} v ${teams[1]}. I have not attributed this opinion to either team or selected team-specific evidence.`
+    const unsupported = {
+      ...response,
+      fanReply,
+      summary: `${fanReply}\n\nSelected period: ${response.selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`,
+      claims: response.claims.map((result) => ({
+        ...result,
+        claim: {
+          ...result.claim,
+          subject: null,
+          playerSubject: null,
+          playerMetric: null,
+          intent: 'unrecognized-language' as const,
+          meaning: {
+            category: 'other' as const,
+            description: 'The opinion names a team outside this fixture.',
+            comparison: null,
+          },
+          requiredEvidence: [],
+          clarificationNeeds: [],
+        },
+        assessment: 'unrecognized language' as const,
+        statistics: [],
+        playerStatistics: [],
+        playerCalculations: [],
+        calculations: [],
+        evidenceAvailability: [],
+        evidence: [],
+        limitation: 'The named team is not part of this fixture, so no team-specific evidence was selected.',
+      })),
+    }
+    return toDisplay(unsupported, dataset.naming, slotted.foreign)
+  }
+  return toDisplay(response, dataset.naming)
 }
 
 async function analyzeSlottedOpinion(

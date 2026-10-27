@@ -296,7 +296,9 @@ export const SYNTHETIC_LABEL = 'Synthetic data · fictional match'
 export function sourceFooter(analysis: AnalysisResponse): string {
   const dataset = analysis.evidenceFoundation.dataset
   const entry = findCatalogEntry(dataset?.id)
-  const match = entry ? `${entry.name} v${dataset.version}` : null
+  const match = entry && dataset
+    ? `${entry.teams[0]} v ${entry.teams[1]} · ${entry.name} v${dataset.version}`
+    : null
   const reader = analysis.provider === 'local' ? 'read by local rules' : 'read by Foundry (server-side)'
   return [SYNTHETIC_LABEL, match, reader].filter(Boolean).join(' · ')
 }
