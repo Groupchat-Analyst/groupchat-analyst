@@ -768,9 +768,10 @@ function claimFromText(
       ? `Compare ${playerComparison.subjectPlayer.name} and ${playerComparison.opponentPlayer.name} on recorded ${metric.replaceAll('-', ' ')} in the selected period.`
       : `Whether ${playerComparison.subjectPlayer.name}'s recorded ${metric.replaceAll('-', ' ')} value ${relation} ${playerComparison.opponentPlayer.name}'s.`
   } else if (requestedPlayerMetric) {
+    const requestedPlayer = playerSubject?.name ?? 'the named player'
     description = requestedPlayerMetric.metric === 'running-distance'
-      ? `Running distance for ${playerSubject?.name} is not recorded in this fixture.`
-      : `Report ${requestedPlayerMetric.metric.replaceAll('-', ' ')} for ${playerSubject?.name} from selected synthetic records.`
+      ? `Running distance for ${requestedPlayer} is not recorded in this fixture.`
+      : `Report ${requestedPlayerMetric.metric.replaceAll('-', ' ')} for ${requestedPlayer} from selected synthetic records.`
   } else if (metricComparison) {
     metric = metricComparison.metric
     comparison = {

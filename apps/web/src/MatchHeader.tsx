@@ -5,6 +5,8 @@ import { formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
 import { clockKey, type ReplaySnapshot } from './replayController'
 import { teamMonogram } from './teamMonogram'
 import { LocalizedMarkup } from './localization'
+import { useLocalization } from './localizationContext'
+import { localizedTeamMonogram } from '../../shared/src/displayNames'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -12,6 +14,7 @@ type Replay = MatchReplayResponse
 type ReplayEvent = Replay['events'][number]
 
 type MatchHeaderProps = {
+  datasetId: string
   teams: readonly [string, string]
   timeline: MatchClock[]
   snapshot: ReplaySnapshot
@@ -91,6 +94,7 @@ function EventLog({ frame, homeTeam }: { frame: Replay | null; homeTeam: string 
 }
 
 export function MatchHeader({
+  datasetId,
   teams,
   timeline,
   snapshot,
@@ -102,6 +106,7 @@ export function MatchHeader({
   onPause,
   onRetry,
 }: MatchHeaderProps) {
+  const { language } = useLocalization()
   const { requested, displayed, displayedClock, status, error, playing } = snapshot
   const last = timeline.length - 1
   const requestedIndex = timeline.findIndex((clock) => clockKey(clock) === clockKey(requested))
@@ -137,16 +142,16 @@ export function MatchHeader({
     <section className="match-header" aria-labelledby="match-header-title">
       <h2 id="match-header-title" className="visually-hidden">Fictional match replay</h2>
       <div className="scoreboard">
-        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">{teamMonogram(teams[0])}</span>{teams[0]}</div>
+        <div className="team-name north"><span className="team-monogram north" aria-hidden="true">{localizedTeamMonogram(datasetId, teams[0], language) ?? teamMonogram(teams[0])}</span>{teams[0]}</div>
         <div
           className={`score${scoreChanged ? ' is-changed' : ''}${displayed ? '' : ' is-empty'}`}
           aria-hidden="true"
         >
-          {scoreText}
+          <bdi dir="ltr">{scoreText}</bdi>
         </div>
-        <div className="team-name east">{teams[1]}<span className="team-monogram east" aria-hidden="true">{teamMonogram(teams[1])}</span></div>
+        <div className="team-name east">{teams[1]}<span className="team-monogram east" aria-hidden="true">{localizedTeamMonogram(datasetId, teams[1], language) ?? teamMonogram(teams[1])}</span></div>
         <div className="match-clock" aria-hidden="true">
-          <span className="clock-value">{displayedLabel ?? requestedLabel}</span>
+          <span className="clock-value" dir="ltr">{displayedLabel ?? requestedLabel}</span>
           <span className="clock-state">
             {error
               ? 'Showing the last loaded moment'

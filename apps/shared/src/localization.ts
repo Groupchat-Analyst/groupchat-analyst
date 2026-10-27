@@ -87,6 +87,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Illustrative conversation': 'Conversación ilustrativa',
     'Evidence receipt': 'Comprobante de pruebas',
     Opinion: 'Opinión',
+    'Original wording': 'Texto original',
     Verdict: 'Veredicto',
     'Shots on target': 'Tiros a puerta',
     'shots on target': 'tiros a puerta',
@@ -198,6 +199,8 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Relevant retrieved events': 'Eventos pertinentes recuperados',
     'These fixture events provide context for this opinion; they do not prove a subjective assessment.': 'Estos eventos del partido contextualizan la opinión, pero no demuestran una valoración subjetiva.',
     'How this was calculated': 'Cómo se calculó',
+    'Player statistics': 'Estadísticas del jugador',
+    'Answer ready': 'Respuesta lista',
     'Technical record · IDs': 'Registro técnico · identificadores',
     'Match data & coverage': 'Datos del partido y cobertura',
     'SOURCE & COVERAGE': 'FUENTE Y COBERTURA',
@@ -378,6 +381,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Illustrative conversation': 'Conversation illustrative',
     'Evidence receipt': 'Reçu de preuves',
     Opinion: 'Avis',
+    'Original wording': 'Formulation originale',
     Verdict: 'Verdict',
     'Shots on target': 'Tirs cadrés',
     'shots on target': 'tirs cadrés',
@@ -489,6 +493,8 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Relevant retrieved events': 'Événements pertinents récupérés',
     'These fixture events provide context for this opinion; they do not prove a subjective assessment.': 'Ces événements donnent du contexte à cet avis ; ils ne prouvent pas une appréciation subjective.',
     'How this was calculated': 'Méthode de calcul',
+    'Player statistics': 'Statistiques du joueur',
+    'Answer ready': 'Réponse prête',
     'Technical record · IDs': 'Données techniques · identifiants',
     'Match data & coverage': 'Données du match et couverture',
     'SOURCE & COVERAGE': 'SOURCE ET COUVERTURE',
@@ -665,6 +671,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Illustrative conversation': 'Beispielgespräch',
     'Evidence receipt': 'Beleg',
     Opinion: 'Meinung',
+    'Original wording': 'Ursprünglicher Wortlaut',
     Verdict: 'Urteil',
     'Shots on target': 'Schüsse aufs Tor',
     'shots on target': 'Schüsse aufs Tor',
@@ -776,6 +783,8 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Relevant retrieved events': 'Abgerufene relevante Ereignisse',
     'These fixture events provide context for this opinion; they do not prove a subjective assessment.': 'Diese Ereignisse liefern Kontext zur Meinung, beweisen aber kein subjektives Urteil.',
     'How this was calculated': 'So wurde berechnet',
+    'Player statistics': 'Spielerstatistiken',
+    'Answer ready': 'Antwort bereit',
     'Technical record · IDs': 'Technischer Datensatz · IDs',
     'Match data & coverage': 'Spieldaten und Abdeckung',
     'SOURCE & COVERAGE': 'QUELLE UND ABDECKUNG',
@@ -887,14 +896,14 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Return match': 'مباراة الإياب',
     'Goalless match': 'مباراة بلا أهداف',
     'Late winner': 'فوز متأخر',
-    'An equaliser at 58′ and a late Eastport lead. Try the shots-on-target opinion at 57′, then 58′.': 'تعادل عند 58′ ثم تقدم Eastport في وقت متأخر. جرّب رأي التسديدات على المرمى عند 57′ ثم 58′.',
-    'Eastport keep the ball, Northbridge take the shots, and a stoppage-time Northbridge goal settles it.': 'يحتفظ Eastport بالكرة ويسدد Northbridge، ثم يحسم هدف لـNorthbridge في الوقت بدل الضائع المباراة.',
-    'No goals. Westhaven take nine shots, Kingswell never test the keeper, then Kingswell hold the ball late on.': 'لا أهداف. يسدد Westhaven تسع مرات ولا يختبر Kingswell الحارس، ثم يحتفظ Kingswell بالكرة في وقت متأخر.',
-    'Redmere lead, Alderwick equalise, then a 78′ substitute scores the winner at 88′.': 'يتقدم Redmere ثم يعادل Alderwick، ويسجل بديل دخل عند 78′ هدف الفوز عند 88′.',
-    'Northbridge v Eastport — the verified demonstration fixture.': 'Northbridge ضد Eastport — مباراة العرض الخيالية التي تم التحقق منها.',
-    'Northbridge v Eastport — Eastport keep the ball, Northbridge take the shots.': 'Northbridge ضد Eastport — يحتفظ Eastport بالكرة ويسدد Northbridge.',
-    'Westhaven FC v Kingswell City — a goalless match with a late change in possession.': 'Westhaven FC ضد Kingswell City — مباراة بلا أهداف مع تغير متأخر في الاستحواذ.',
-    'Redmere FC v Alderwick United — a late substitution and a late winner.': 'Redmere FC ضد Alderwick United — تبديل متأخر ثم هدف فوز في وقت متأخر.',
+    'An equaliser at 58′ and a late Eastport lead. Try the shots-on-target opinion at 57′, then 58′.': 'تعادل عند 58′ ثم تقدم إيستبورت في وقت متأخر. جرّب رأي التسديدات على المرمى عند 57′، ثم 58′.',
+    'Eastport keep the ball, Northbridge take the shots, and a stoppage-time Northbridge goal settles it.': 'يحتفظ إيستبورت بالكرة ويسدد نورثبريدج، ثم يحسم هدف لنورثبريدج في الوقت بدل الضائع المباراة.',
+    'No goals. Westhaven take nine shots, Kingswell never test the keeper, then Kingswell hold the ball late on.': 'لا أهداف. يسدد وستهافن تسع مرات ولا يختبر كينغزويل سيتي الحارس، ثم يحتفظ كينغزويل سيتي بالكرة في وقت متأخر.',
+    'Redmere lead, Alderwick equalise, then a 78′ substitute scores the winner at 88′.': 'يتقدم ريدمير ثم يعادل ألدرويك يونايتد، ويسجل بديل دخل عند 78′ هدف الفوز عند 88′.',
+    'Northbridge v Eastport — the verified demonstration fixture.': 'نورثبريدج ضد إيستبورت — مباراة العرض الخيالية التي تم التحقق منها.',
+    'Northbridge v Eastport — Eastport keep the ball, Northbridge take the shots.': 'نورثبريدج ضد إيستبورت — يحتفظ إيستبورت بالكرة ويسدد نورثبريدج.',
+    'Westhaven FC v Kingswell City — a goalless match with a late change in possession.': 'وستهافن ضد كينغزويل سيتي — مباراة بلا أهداف مع تغير متأخر في الاستحواذ.',
+    'Redmere FC v Alderwick United — a late substitution and a late winner.': 'ريدمير ضد ألدرويك يونايتد — تبديل متأخر ثم هدف فوز في وقت متأخر.',
     'An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.': 'معاينة توضيحية لإعادة المباراة الخيالية، مبنية على إجابات مؤكدة بالقواعد المحلية. ليست محادثة مباشرة ولا يستخدم فيها نموذج ذكاء اصطناعي.',
     'Evidence receipt at': 'إيصال الأدلة عند',
     'Illustrative · fictional replay · local rules ·': 'توضيحي · إعادة خيالية · قواعد محلية ·',
@@ -921,9 +930,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'example opinions': 'آراء تجريبية',
     '· fictional ·': '· خيالي ·',
     'See how one minute changes the take': 'شاهد كيف يتغير الرأي خلال دقيقة',
-    'Type an opinion, e.g. How many shots did Eastport have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى Eastport؟',
-    'Type an opinion, e.g. How many shots did Kingswell City have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى Kingswell City؟',
-    'Type an opinion, e.g. How many shots did Alderwick United have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى Alderwick United؟',
+    'Type an opinion, e.g. How many shots did Eastport have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى إيستبورت؟',
+    'Type an opinion, e.g. How many shots did Kingswell City have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى كينغزويل سيتي؟',
+    'Type an opinion, e.g. How many shots did Alderwick United have?': 'اكتب رأياً، مثلاً: كم تسديدة لدى ألدرويك يونايتد؟',
     'A counter-attacking effort goes wide.': 'انتهت محاولة مرتدة خارج المرمى.',
     'The replay is ready.': 'الإعادة جاهزة.',
     'Skip to your opinion': 'انتقل مباشرة إلى رأيك',
@@ -933,7 +942,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Football opinions. A fuller picture.': 'آراء كروية. صورة أوضح.',
     'Demo match analysis': 'تحليل مباراة تجريبية',
     You: 'أنت',
-    'Northbridge covered more distance than Eastport': 'قطع Northbridge مسافة أكبر من Eastport',
+    'Northbridge covered more distance than Eastport': 'قطع نورثبريدج مسافة أكبر من إيستبورت',
     'Physical data that is not recorded': 'بيانات بدنية غير مسجلة',
     'Synthetic data': 'بيانات اصطناعية',
     'fictional match': 'مباراة خيالية',
@@ -952,6 +961,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Illustrative conversation': 'محادثة توضيحية',
     'Evidence receipt': 'إيصال الأدلة',
     Opinion: 'الرأي',
+    'Original wording': 'الصياغة الأصلية',
     Verdict: 'التقييم',
     'Shots on target': 'تسديدات على المرمى',
     'shots on target': 'تسديدات على المرمى',
@@ -1011,6 +1021,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Jump to a key moment': 'الانتقال إلى لحظة مهمة',
     'Showing the last loaded moment': 'عرض آخر لحظة تم تحميلها',
     'Loading…': 'جارٍ التحميل…',
+    'Loading the match…': 'جارٍ تحميل المباراة…',
     Conversation: 'المحادثة',
     'Answer detail': 'تفاصيل الإجابة',
     Fan: 'المشجع',
@@ -1168,6 +1179,102 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     No: 'لا',
     'Selected pressure records': 'ملاحظات الضغط المحددة',
   },
+}
+
+const arabicSupplementalTranslations: Record<string, string> = {
+  Claim: 'الادعاء',
+  GOAL: 'هدف',
+  'Player statistics': 'إحصاءات اللاعب',
+  'Answer ready': 'الإجابة جاهزة',
+  'Both teams': 'كلا الفريقين',
+  '% possession': 'نسبة الاستحواذ',
+  '% pass completion': 'نسبة التمريرات المكتملة',
+  recoveries: 'استعادات',
+  'running distance': 'مسافة الجري',
+  'elapsed minutes of participation in recorded coverage (added time included)': 'دقائق المشاركة المنقضية ضمن التغطية المسجلة (يشمل الوقت بدل الضائع)',
+  'defensive shape and positioning (not recorded, so no verdict)': 'الشكل الدفاعي والتمركز (غير مسجل، لذلك لا يصدر حكم)',
+  'Broad player opinion: his recorded contributions, no rating': 'تقييم عام للاعب يستعرض مساهماته المسجلة من دون منحه درجة.',
+  'Factual claim that changes between 57′ and 58′': 'ادعاء واقعي تتغير نتيجته بين الدقيقتين 57′ و58′.',
+  'Ambiguous name: asks which Bruno': 'اسم ملتبس: يُطلب تحديد برونو المقصود.',
+  'Tactical opinion the records cannot settle': 'رأي تكتيكي لا تستطيع السجلات حسمه.',
+  'Physical data that is not recorded': 'بيانات بدنية غير مسجلة.',
+  'Two claims: possession and shots can point different ways': 'ادعاءان: قد يشير الاستحواذ والتسديد إلى نتيجتين مختلفتين.',
+  'Last-10-minutes window that differs from the whole match': 'نافذة الدقائق العشر الأخيرة تختلف عن المباراة كاملة.',
+  'Passing evidence with no benchmark': 'أدلة تمرير بلا معيار للمقارنة.',
+  'Recorded possession losses by pitch third': 'حالات فقدان الاستحواذ المسجلة بحسب ثلث الملعب.',
+  'A zero-count claim on shots on target': 'ادعاء بعدم تسجيل أي تسديدة على المرمى.',
+  'A player with shots but no recorded pass attempts': 'لاعب لديه تسديدات، لكن لم تُسجل له محاولات تمرير.',
+  'No goal is recorded, so the question has no anchor': 'لم يُسجل أي هدف، لذلك لا يوجد هدف مرجعي للسؤال.',
+  'Ambiguous name: asks which Pedro': 'اسم ملتبس: يُطلب تحديد بيدرو المقصود.',
+  'A substitute’s goal, which only exists from 88′': 'هدف البديل مسجل عند الدقيقة 88′ فقط.',
+  'A universal claim checked against every recorded shot': 'ادعاء شامل تمت مراجعته مقابل كل تسديدة مسجلة.',
+  'Three goals are recorded, so the question asks which one': 'سُجلت ثلاثة أهداف، لذا يلزم تحديد الهدف المقصود.',
+  'A factual comparison that is supported on the full match': 'مقارنة واقعية تدعمها بيانات المباراة كاملة.',
+  'View evidence': 'عرض الأدلة',
+  Subject: 'الموضوع',
+  'What we understood': 'فهمنا للطلب',
+  'Request type': 'نوع الطلب',
+  'Selected period': 'الفترة المحددة',
+  'Historical anchor': 'المرجع التاريخي',
+  'Evidence needs': 'الأدلة المطلوبة',
+  available: 'متاح',
+  'not recorded': 'غير مسجل',
+  'Statistic request answered from the selected records': 'إجابة الإحصاء من السجلات المحددة',
+  'The list below contains the relevant attributed records. Calculation denominators are available in the expandable trace.': 'تتضمن القائمة السجلات ذات الصلة والمنسوبة للاعب أو الفريق. ويمكن الاطلاع على مقامات الحساب في تفاصيل التتبع القابلة للتوسيع.',
+  'These recorded events provide context, not a complete performance measure or verdict on the broader judgement.': 'توفر هذه الأحداث المسجلة سياقاً فقط، ولا تمثل مقياساً كاملاً للأداء أو حكماً على التقييم العام.',
+  'Recorded turnover locations and linked passes': 'مواقع فقدان الكرة المسجلة والتمريرات المرتبطة',
+  'These turnovers come only from the explicitly linked, partial build-up sample. Associated records do not establish tactical causes.': 'تأتي حالات فقدان الكرة هذه من عينة جزئية محددة لمرحلة البناء ومرتبطة صراحةً. ولا تثبت السجلات المرتبطة أسباباً تكتيكية.',
+  'These are all-pass turnovers. Associated records do not establish tactical causes.': 'هذه حالات فقدان الكرة الناتجة عن تمريرات غير مكتملة. ولا تثبت السجلات المرتبطة أسباباً تكتيكية.',
+  'No matching recorded evidence': 'لا توجد أدلة مسجلة مطابقة',
+  'No unrelated event lists or statistics are substituted for this request.': 'لم تُستبدل بهذا الطلب قوائم أحداث أو إحصاءات غير مرتبطة.',
+  'Relevant retrieved events': 'الأحداث المسترجعة ذات الصلة',
+  'These fixture events provide context for this opinion; they do not prove a subjective assessment.': 'توفر أحداث المباراة سياقاً لهذا الرأي، لكنها لا تثبت تقييماً ذاتياً.',
+  'How this was calculated': 'كيفية إجراء الحساب',
+  'Technical record · IDs': 'السجل التقني · المعرّفات',
+  'Numerator IDs:': 'معرّفات البسط:',
+  'Denominator IDs:': 'معرّفات المقام:',
+  'participation within recorded window': 'المشاركة ضمن النافذة المسجلة',
+  'completions among': 'تمريرات مكتملة من أصل',
+  attempts: 'محاولات',
+  'rate not available': 'النسبة غير متاحة',
+  'rate unavailable': 'النسبة غير متاحة',
+  'recorded window': 'النافذة المسجلة',
+  'added time included': 'يشمل الوقت بدل الضائع',
+  'half-time excluded': 'يستثني الاستراحة',
+  'elapsed minutes': 'دقائق منقضية',
+  'statistics provided': 'إحصاءات فقط، بلا حكم',
+  'Claim evidence references': 'مراجع أدلة الادعاء',
+  'Original wording': 'الصياغة الأصلية',
+  'SOURCE & COVERAGE': 'المصدر والتغطية',
+  'Match data & coverage': 'بيانات المباراة والتغطية',
+  'Synthetic fixture': 'مباراة اصطناعية',
+  'Possession percentages use only recorded controlled-possession minutes; contested play and time out of play are excluded.': 'تُحسب نسب الاستحواذ من دقائق السيطرة المسجلة فقط، مع استبعاد اللعب المتنازع عليه وخارج اللعب.',
+  'Claims in this opinion': 'الادعاءات في هذا الرأي',
+  'Evidence period': 'فترة الأدلة',
+  'Match time': 'وقت المباراة',
+  'Asking about': 'السؤال عن',
+  Change: 'تغيير',
+  'Send opinion': 'إرسال الرأي',
+  'Check this moment': 'تحقق من هذه اللحظة',
+  'Checking the match…': 'جارٍ التحقق من المباراة…',
+  claim: 'ادعاء',
+  claims: 'ادعاءات',
+  'Simulated match using real-player names. All performances and results are fictional.': 'مباراة محاكاة تستخدم أسماء لاعبين حقيقية كمعرّفات خيالية. جميع الأداء والنتائج خيالية.',
+  'Second simulated match using real-player names. All performances and results are fictional; this is an illustrative event sample, not a complete tracking dataset.': 'المباراة المحاكاة الثانية تستخدم أسماء لاعبين حقيقية كمعرّفات خيالية. جميع الأداء والنتائج خيالية؛ وهذه عينة توضيحية من الأحداث وليست بيانات تتبع كاملة.',
+  'Third simulated match using real-player names. All performances and results are fictional; this is an illustrative event sample, not a complete tracking dataset.': 'المباراة المحاكاة الثالثة تستخدم أسماء لاعبين حقيقية كمعرّفات خيالية. جميع الأداء والنتائج خيالية؛ وهذه عينة توضيحية من الأحداث وليست بيانات تتبع كاملة.',
+  'Fourth simulated match using real-player names. All performances and results are fictional; this is an illustrative event sample, not a complete tracking dataset.': 'المباراة المحاكاة الرابعة تستخدم أسماء لاعبين حقيقية كمعرّفات خيالية. جميع الأداء والنتائج خيالية؛ وهذه عينة توضيحية من الأحداث وليست بيانات تتبع كاملة.',
+  'Timestamped match events': 'أحداث المباراة المؤرخة',
+  'Possession duration': 'مدة الاستحواذ',
+  'Pass outcomes and locations': 'نتائج التمرير ومواقعه',
+  'Possession losses and recoveries': 'فقدان الاستحواذ والاستعادات',
+  'Pressure events': 'أحداث الضغط',
+  'Lineups and substitutions': 'التشكيلات والتبديلات',
+  'Player-attributed synthetic actions': 'أحداث اصطناعية منسوبة للاعبين',
+  'Continuous player/ball tracking': 'تتبع متواصل للاعبين والكرة',
+  'Synchronized video': 'فيديو متزامن',
+  'Physical measurements': 'قياسات بدنية',
+  'Defined build-up phase': 'مرحلة بناء محددة',
+  'Expected-goal or other advanced models': 'نماذج الأهداف المتوقعة أو نماذج متقدمة أخرى',
 }
 
 const evidenceTranslations: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = {
@@ -1498,6 +1605,10 @@ const localizedFootballOpinions: ReadonlyArray<{
     canonical: (team, opponent) => `${team} had more shots on target than ${opponent}.`,
   },
   {
+    pattern: /^سجل (?<team>.+?) تسديدات أكثر على المرمى من (?<opponent>.+?)[.!?؟]*$/iu,
+    canonical: (team, opponent) => `${team} had more shots on target than ${opponent}.`,
+  },
+  {
     pattern: /^(?<team>.+?) no tuvo más tiros a puerta que (?<opponent>.+?)[.!?؟]*$/iu,
     canonical: (team, opponent) => `${team} did not have more shots on target than ${opponent}.`,
   },
@@ -1514,6 +1625,10 @@ const localizedFootballOpinions: ReadonlyArray<{
     canonical: (team, opponent) => `${team} did not have more shots on target than ${opponent}.`,
   },
   {
+    pattern: /^لم يسجل (?<team>.+?) تسديدات على المرمى أكثر من (?<opponent>.+?)[.!?؟]*$/iu,
+    canonical: (team, opponent) => `${team} did not have more shots on target than ${opponent}.`,
+  },
+  {
     pattern: /^¿?Cuántos pases completó Bruno\??$/iu,
     canonical: () => 'How many passes did Bruno complete?',
   },
@@ -1526,8 +1641,16 @@ const localizedFootballOpinions: ReadonlyArray<{
     canonical: () => 'How many passes did Bruno complete?',
   },
   {
-    pattern: /^كم تمريرة أكمل برونو\s*[؟?]*$/iu,
-    canonical: () => 'How many passes did Bruno complete?',
+    pattern: /^كم تمريرة أكمل (?<player>.+?)[؟?]*$/iu,
+    canonical: (player) => {
+      const shortAliases: Record<string, string> = {
+        برونو: 'Bruno',
+        ساكا: 'Saka',
+        مارتن: 'Martin',
+        مارتين: 'Martin',
+      }
+      return `How many passes did ${shortAliases[player.trim()] ?? player} complete?`
+    },
   },
   {
     pattern: /^(?<team>.+?) no tuvo ningún tiro a puerta[.!?؟]*$/iu,
@@ -1546,6 +1669,10 @@ const localizedFootballOpinions: ReadonlyArray<{
     canonical: (team) => `${team} had no shots on target.`,
   },
   {
+    pattern: /^لم يسجل (?<team>.+?) أي تسديدة على المرمى[.!?؟]*$/iu,
+    canonical: (team) => `${team} had no shots on target.`,
+  },
+  {
     pattern: /^Saka ha tenido un partido horrible[.!?؟]*$/iu,
     canonical: () => 'Saka has had a horrible game.',
   },
@@ -1558,8 +1685,8 @@ const localizedFootballOpinions: ReadonlyArray<{
     canonical: () => 'Saka has had a horrible game.',
   },
   {
-    pattern: /^قدم ساكا مباراة سيئة للغاية[.!?؟]*$/iu,
-    canonical: () => 'Saka has had a horrible game.',
+    pattern: /^قدم (?<player>.+?) مباراة سيئة للغاية[.!?؟]*$/iu,
+    canonical: (player) => `${player} has had a horrible game.`,
   },
   {
     pattern: /^(?<team>.+?) aparcó el autobús[.!?؟]*$/iu,
@@ -1584,8 +1711,91 @@ export function translateText(text: string, language: AppLanguage): string {
   const leading = text.match(/^\s*/)?.[0] ?? ''
   const trailing = text.match(/\s*$/)?.[0] ?? ''
   const content = text.slice(leading.length, text.length - trailing.length)
-  const translated = translations[language]?.[content] ?? evidenceTranslations[language]?.[content] ?? content
+  const translated =
+    (language === 'ar' ? arabicSupplementalTranslations[content] : undefined) ??
+    translations[language]?.[content] ??
+    evidenceTranslations[language]?.[content] ??
+    content
   return `${leading}${translated}${trailing}`
+}
+
+function arabicCountedMetricLabel(countText: string, metric: string): string | undefined {
+  const forms: Record<string, { singular: string; dual: string; plural: string }> = {
+    'shots on target': {
+      singular: 'تسديدة على المرمى',
+      dual: 'تسديدتان على المرمى',
+      plural: 'تسديدات على المرمى',
+    },
+    shots: { singular: 'تسديدة', dual: 'تسديدتان', plural: 'تسديدات' },
+    goals: { singular: 'هدف', dual: 'هدفان', plural: 'أهداف' },
+    'passes completed': {
+      singular: 'تمريرة مكتملة',
+      dual: 'تمريرتان مكتملتان',
+      plural: 'تمريرات مكتملة',
+    },
+    'pass completions': {
+      singular: 'تمريرة مكتملة',
+      dual: 'تمريرتان مكتملتان',
+      plural: 'تمريرات مكتملة',
+    },
+    'pass completion': {
+      singular: 'تمريرة مكتملة',
+      dual: 'تمريرتان مكتملتان',
+      plural: 'تمريرات مكتملة',
+    },
+    'passes attempted': {
+      singular: 'محاولة تمرير',
+      dual: 'محاولتا تمرير',
+      plural: 'محاولات تمرير',
+    },
+    'pass attempts': {
+      singular: 'محاولة تمرير',
+      dual: 'محاولتا تمرير',
+      plural: 'محاولات تمرير',
+    },
+    recoveries: { singular: 'استعادة', dual: 'استعادتان', plural: 'استعادات' },
+    'recorded recoveries': {
+      singular: 'استعادة مسجلة',
+      dual: 'استعادتان مسجلتان',
+      plural: 'استعادات مسجلة',
+    },
+    'pressure observations': {
+      singular: 'ملاحظة ضغط',
+      dual: 'ملاحظتا ضغط',
+      plural: 'ملاحظات ضغط',
+    },
+    'selected pressure observations': {
+      singular: 'ملاحظة ضغط محددة',
+      dual: 'ملاحظتا ضغط محددتان',
+      plural: 'ملاحظات ضغط محددة',
+    },
+    'elapsed minutes': {
+      singular: 'دقيقة منقضية',
+      dual: 'دقيقتان منقضيتان',
+      plural: 'دقائق منقضية',
+    },
+    minutes: { singular: 'دقيقة', dual: 'دقيقتان', plural: 'دقائق' },
+    'elapsed participation minutes (recorded window; added time included)': {
+      singular: 'دقيقة مشاركة منقضية (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)',
+      dual: 'دقيقتان مشاركة منقضيتان (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)',
+      plural: 'دقائق مشاركة منقضية (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)',
+    },
+    'elapsed minutes of participation in recorded coverage (added time included)': {
+      singular: 'دقيقة مشاركة منقضية ضمن التغطية المسجلة (يشمل الوقت بدل الضائع)',
+      dual: 'دقيقتان مشاركة منقضيتان ضمن التغطية المسجلة (يشمل الوقت بدل الضائع)',
+      plural: 'دقائق مشاركة منقضية ضمن التغطية المسجلة (يشمل الوقت بدل الضائع)',
+    },
+    turnovers: { singular: 'حالة فقدان', dual: 'حالتا فقدان', plural: 'حالات فقدان' },
+    'recorded actions': { singular: 'حدث مسجل', dual: 'حدثان مسجلان', plural: 'أحداث مسجلة' },
+  }
+  const metricForms = forms[metric]
+  if (!metricForms) return undefined
+
+  const count = Number(countText.replaceAll(',', ''))
+  if (!Number.isFinite(count)) return undefined
+  if (count === 2) return metricForms.dual
+  if (count === 0 || (count >= 3 && count <= 10)) return metricForms.plural
+  return metricForms.singular
 }
 
 export function canonicalizeSupportedFootballOpinion(opinion: string): string {
@@ -1847,6 +2057,16 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   const exact = translateText(text, language)
   if (exact !== text) return exact
 
+  const movingTo = text.match(/^Moving to (.+)…$/u)
+  if (movingTo) {
+    return {
+      es: `Avanzando a ${movingTo[1]}…`,
+      fr: `Passage à ${movingTo[1]}…`,
+      de: `Weiter zu ${movingTo[1]}…`,
+      ar: `جارٍ الانتقال إلى ${movingTo[1]}…`,
+    }[language]
+  }
+
   const comparison = translateComparisonNarrative(text, language)
   if (comparison !== null) return comparison
 
@@ -1890,6 +2110,42 @@ export function translateNarrative(text: string, language: AppLanguage): string 
     }[language]
   }
 
+  const recentPeriod = text.match(/^Last 10 minutes ending (.+)$/u)
+  if (recentPeriod) return `آخر عشر دقائق حتى ${recentPeriod[1]}`
+
+  const claimEvidenceCount = text.match(/^All (\d+) claim evidence references$/u)
+  if (claimEvidenceCount) {
+    const count = claimEvidenceCount[1]
+    return `كل مراجع الأدلة الخاصة بالادعاء (${count})`
+  }
+
+  const claimNumber = text.match(/^Claim (\d+)$/u)
+  if (claimNumber) return `الادعاء ${claimNumber[1]}`
+
+  const playerMetricExplanation = text.match(
+    /^Report (.+?) for (.+?) from selected synthetic records\.$/u,
+  )
+  if (playerMetricExplanation) {
+    const metric = playerMetricExplanation[1]
+    const player = playerMetricExplanation[2]
+    const metricLabel = metric === 'pass completions'
+      ? 'عدد التمريرات المكتملة'
+      : metric === 'pass attempts'
+        ? 'عدد محاولات التمرير'
+        : metric === 'shots on target'
+          ? 'عدد التسديدات على المرمى'
+          : metric === 'shots'
+            ? 'عدد التسديدات'
+            : metric === 'goals'
+              ? 'عدد الأهداف'
+              : metric === 'recoveries'
+                ? 'عدد الاستعادات'
+                : metric === 'pressure observations'
+                  ? 'عدد ملاحظات الضغط'
+                  : metric
+    return `يعرض ${metricLabel} المسجلة للاعب ${player} ضمن السجلات الاصطناعية للفترة المحددة.`
+  }
+
   const sameWording = text.match(/^Same wording, same (match-so-far|last-10-minutes) option( — this checks the saved opinion, not your edit)?\.$/u)
   if (sameWording) {
     const period = sameWording[1] === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
@@ -1911,8 +2167,14 @@ export function translateNarrative(text: string, language: AppLanguage): string 
     )}.`
   }
 
-  const countedMetric = text.match(/^([\d,.]+)(%)?\s+(shots on target|shots|goals|passes completed|pass completions|pass completion|passes attempted|recoveries|pressure observations|possession|elapsed participation minutes(?: \(recorded window; added time included\))?|elapsed minutes|minutes|turnovers|recorded actions)(.*)$/u)
+  const countedMetric = text.match(/^([\d,.]+)(%)?\s+(shots on target|shots|goals|passes completed|pass completions|pass completion|passes attempted|pass attempts|recoveries|recorded recoveries|pressure observations|selected pressure observations|possession|elapsed participation minutes(?: \(recorded window; added time included\))?|elapsed minutes|minutes|turnovers|recorded actions)(.*)$/u)
   if (countedMetric) {
+    if (language === 'ar') {
+      const arabicLabel = arabicCountedMetricLabel(countedMetric[1], countedMetric[3])
+      if (arabicLabel) {
+        return `${countedMetric[1]}${countedMetric[2] ?? ''} ${arabicLabel}${countedMetric[4]}`
+      }
+    }
     const metrics: Record<string, Record<Exclude<AppLanguage, 'en'>, string>> = {
       'shots on target': { es: 'tiros a puerta', fr: 'tirs cadrés', de: 'Schüsse aufs Tor', ar: 'تسديدات على المرمى' },
       shots: { es: 'tiros', fr: 'tirs', de: 'Schüsse', ar: 'تسديدات' },
@@ -1921,8 +2183,11 @@ export function translateNarrative(text: string, language: AppLanguage): string 
       'pass completions': { es: 'pases completados', fr: 'passes réussies', de: 'vollständige Pässe', ar: 'تمريرات مكتملة' },
       'pass completion': { es: 'pases completados', fr: 'passes réussies', de: 'Passerfolge', ar: 'تمريرات مكتملة' },
       'passes attempted': { es: 'pases intentados', fr: 'passes tentées', de: 'Passversuche', ar: 'محاولات تمرير' },
+      'pass attempts': { es: 'intentos de pase', fr: 'tentatives de passe', de: 'Passversuche', ar: 'محاولات تمرير' },
       recoveries: { es: 'recuperaciones', fr: 'récupérations', de: 'Rückeroberungen', ar: 'استعادات' },
+      'recorded recoveries': { es: 'recuperaciones registradas', fr: 'récupérations enregistrées', de: 'erfasste Rückeroberungen', ar: 'استعادات مسجلة' },
       'pressure observations': { es: 'observaciones de presión', fr: 'observations de pressing', de: 'Pressing-Beobachtungen', ar: 'ملاحظات الضغط' },
+      'selected pressure observations': { es: 'observaciones de presión seleccionadas', fr: 'observations de pressing sélectionnées', de: 'ausgewählte Pressing-Beobachtungen', ar: 'ملاحظات الضغط المحددة' },
       possession: { es: 'posesión', fr: 'possession', de: 'Ballbesitz', ar: 'الاستحواذ' },
       'elapsed participation minutes (recorded window; added time included)': { es: 'minutos transcurridos de participación (ventana registrada; incluye el tiempo añadido)', fr: 'minutes écoulées de participation (fenêtre enregistrée ; temps additionnel inclus)', de: 'verstrichene Teilnahmeminuten (erfasster Zeitraum; Nachspielzeit eingeschlossen)', ar: 'دقائق مشاركة منقضية (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)' },
       'elapsed minutes': { es: 'minutos transcurridos', fr: 'minutes écoulées', de: 'verstrichene Minuten', ar: 'دقائق منقضية' },
@@ -2059,8 +2324,25 @@ export function translateNarrative(text: string, language: AppLanguage): string 
       possession: { es: 'posesión', fr: 'possession', de: 'Ballbesitz', ar: 'الاستحواذ' },
     }[checkedComparison[3]]
     if (metric) {
-      return `${checkedComparison[1]} vs ${checkedComparison[2]} · ${metric[language]} · ${translateNarrative(checkedComparison[4], language)}`
+      const versus = {
+        es: 'contra',
+        fr: 'contre',
+        de: 'gegen',
+        ar: 'ضد',
+      }[language]
+      return `${checkedComparison[1]} ${versus} ${checkedComparison[2]} · ${metric[language]} · ${translateNarrative(checkedComparison[4], language)}`
     }
+  }
+
+  const checkedSummary = text.match(
+    /^(.+?) · (.+?) · ((?:Match so far|Last 10 minutes|First half|Second half|Recorded ).+)$/u,
+  )
+  if (checkedSummary) {
+    const what = checkedSummary[2]
+      .split(', ')
+      .map((metric) => translateNarrative(metric, language))
+      .join(language === 'ar' ? '، ' : ', ')
+    return `${translateNarrative(checkedSummary[1], language)} · ${what} · ${translateNarrative(checkedSummary[3], language)}`
   }
 
   const extended = text.match(/^Extended card · (\d+) claims?$/u)
@@ -2070,6 +2352,17 @@ export function translateNarrative(text: string, language: AppLanguage): string 
       fr: `Carte détaillée · ${extended[1]} ${extended[1] === '1' ? 'affirmation' : 'affirmations'}`,
       de: `Erweiterte Karte · ${extended[1]} ${extended[1] === '1' ? 'Behauptung' : 'Behauptungen'}`,
       ar: `بطاقة موسعة · ${extended[1]} ${extended[1] === '1' ? 'ادعاء' : 'ادعاءات'}`,
+    }[language]
+  }
+
+  const remainingMoments = text.match(/^(\d+) more recorded moments? (?:is|are) in the full record\.$/u)
+  if (remainingMoments) {
+    const count = Number(remainingMoments[1])
+    return {
+      es: `Hay ${remainingMoments[1]} ${count === 1 ? 'momento registrado más' : 'momentos registrados más'} en el registro completo.`,
+      fr: `Le relevé complet contient ${remainingMoments[1]} ${count === 1 ? 'autre moment enregistré' : 'autres moments enregistrés'}.`,
+      de: `Im vollständigen Datensatz sind ${remainingMoments[1]} weitere ${count === 1 ? 'Moment' : 'Momente'} erfasst.`,
+      ar: `يوجد ${remainingMoments[1]} ${count === 1 ? 'لحظة واحدة إضافية' : count === 2 ? 'لحظتان إضافيتان' : count >= 3 && count <= 10 ? 'لحظات إضافية' : 'لحظة إضافية'} في السجل الكامل.`,
     }[language]
   }
 
@@ -2238,6 +2531,10 @@ export function translateNarrative(text: string, language: AppLanguage): string 
 
   const stat = text.match(/^(.+?): ([\d,.]+) (shots on target|shots|goals|passes completed|passes attempted|recoveries|pressure observations)(.*)$/u)
   if (stat) {
+    if (language === 'ar') {
+      const arabicLabel = arabicCountedMetricLabel(stat[2], stat[3])
+      if (arabicLabel) return `${stat[1]}: ${stat[2]} ${arabicLabel}${stat[4]}`
+    }
     const metricLabels: Record<string, Record<Exclude<AppLanguage, 'en'>, string>> = {
       'shots on target': { es: 'tiros a puerta', fr: 'tirs cadrés', de: 'Schüsse aufs Tor', ar: 'تسديدات على المرمى' },
       shots: { es: 'tiros', fr: 'tirs', de: 'Schüsse', ar: 'تسديدات' },
@@ -2258,7 +2555,7 @@ export function translateNarrative(text: string, language: AppLanguage): string 
       es: `Hasta ${matchSoFar[1]} del partido`,
       fr: `Jusqu’à ${matchSoFar[1]} du match`,
       de: `Bisheriges Spiel bis ${matchSoFar[1]}`,
-      ar: `حتى ${matchSoFar[1]} من المباراة`,
+      ar: `من بداية المباراة حتى ${matchSoFar[1]}`,
     }[language]
   }
   const recent = text.match(/^Last 10 minutes through (.+)$/u)
@@ -2276,12 +2573,34 @@ export function translateNarrative(text: string, language: AppLanguage): string 
 
 export function localizedExample(text: string, language: AppLanguage): string {
   if (language === 'en') return text
+  const arabicExamples: Record<string, string> = {
+    'Eastport had more possession than Northbridge but Northbridge had more shots':
+      'استحوذ إيستبورت على الكرة أكثر من نورثبريدج، لكن سدد نورثبريدج أكثر.',
+    'Northbridge had more possession than Eastport':
+      'استحوذ نورثبريدج على الكرة أكثر من إيستبورت.',
+    'Saka’s passing has been poor': 'كان تمرير ساكا ضعيفاً.',
+    'Northbridge are sloppy on the ball': 'كان نورثبريدج مهملاً في الاستحواذ على الكرة.',
+    'Westhaven FC had more possession than Kingswell City':
+      'استحوذ وستهافن على الكرة أكثر من كينغزويل سيتي.',
+    'Haaland’s passing has been poor': 'كان تمرير هالاند ضعيفاً.',
+    'Westhaven FC had no shots on target before the goal':
+      'لم يسجل وستهافن أي تسديدة على المرمى قبل الهدف.',
+    'Abraham has scored': 'سجّل أبراهام هدفاً.',
+    'Every Alderwick United shot was on target': 'كانت كل تسديدات ألدرويك يونايتد على المرمى.',
+    'Redmere FC had no shots on target before the goal':
+      'لم يسجل ريدمير أي تسديدة على المرمى قبل الهدف.',
+    'Redmere FC had more shots than Alderwick United':
+      'سدد ريدمير أكثر من ألدرويك يونايتد.',
+    'Jackson has been poor': 'كان أداء جاكسون سيئاً.',
+    'How many passes did Pedro complete?': 'كم تمريرة أكمل بيدرو؟',
+  }
+  if (language === 'ar' && arabicExamples[text]) return arabicExamples[text]
   if (text === 'Eastport had more shots on target than Northbridge.') {
     return {
       es: 'Eastport tuvo más tiros a puerta que Northbridge.',
       fr: 'Eastport a eu plus de tirs cadrés que Northbridge.',
       de: 'Eastport hatte mehr Schüsse aufs Tor als Northbridge.',
-      ar: 'Eastport كان لديه تسديدات أكثر على المرمى من Northbridge.',
+      ar: 'سجل إيستبورت تسديدات أكثر على المرمى من نورثبريدج.',
     }[language]
   }
   if (text === 'Eastport did not have more shots on target than Northbridge.') {
@@ -2289,7 +2608,7 @@ export function localizedExample(text: string, language: AppLanguage): string {
       es: 'Eastport no tuvo más tiros a puerta que Northbridge.',
       fr: 'Eastport n’a pas eu plus de tirs cadrés que Northbridge.',
       de: 'Eastport hatte nicht mehr Schüsse aufs Tor als Northbridge.',
-      ar: 'لم يكن لدى Eastport تسديدات على المرمى أكثر من Northbridge.',
+      ar: 'لم يسجل إيستبورت تسديدات على المرمى أكثر من نورثبريدج.',
     }[language]
   }
   if (text === 'Kingswell City had no shots on target.') {
@@ -2297,7 +2616,7 @@ export function localizedExample(text: string, language: AppLanguage): string {
       es: 'Kingswell City no tuvo ningún tiro a puerta.',
       fr: 'Kingswell City n’a cadré aucun tir.',
       de: 'Kingswell City hatte keinen Schuss aufs Tor.',
-      ar: 'لم يكن لدى Kingswell City أي تسديدة على المرمى.',
+      ar: 'لم يسجل كينغزويل سيتي أي تسديدة على المرمى.',
     }[language]
   }
   if (text === 'How many passes did Bruno complete?') {
@@ -2321,7 +2640,7 @@ export function localizedExample(text: string, language: AppLanguage): string {
       es: 'Northbridge recorrió más distancia que Eastport',
       fr: 'Northbridge a parcouru plus de distance qu’Eastport',
       de: 'Northbridge legte mehr Strecke zurück als Eastport',
-      ar: 'قطع Northbridge مسافة أكبر من Eastport',
+      ar: 'قطع نورثبريدج مسافة أكبر من إيستبورت',
     }[language]
   }
   if (text === 'Northbridge parked the bus' || text === 'Northbridge parked the bus.') {
@@ -2329,7 +2648,7 @@ export function localizedExample(text: string, language: AppLanguage): string {
       es: 'Northbridge aparcó el autobús.',
       fr: 'Northbridge a garé le bus.',
       de: 'Northbridge parkte den Bus.',
-      ar: 'ركن Northbridge الحافلة.',
+      ar: 'ركن نورثبريدج الحافلة.',
     }[language]
   }
   return text

@@ -7,6 +7,12 @@ import {
   translateNarrative,
 } from '../../shared/src/localization.ts'
 import { DATASET_CATALOG } from '../../shared/src/datasetCatalog.ts'
+import {
+  canonicalizeArabicMatchAliases,
+  localizeMatchText,
+  localizedPlayerName,
+  localizedTeamMonogram,
+} from '../../shared/src/displayNames.ts'
 import { SYNTHETIC_MATCH_EVIDENCE } from '../../shared/src/evidence.ts'
 import { SYNTHETIC_MATCH_EVENTS } from '../../shared/src/match.ts'
 import { REDMERE_MATCH_EVIDENCE, REDMERE_MATCH_EVENTS } from '../../shared/src/redmereAlderwick.ts'
@@ -56,12 +62,12 @@ const acceptance = [
   },
   {
     language: 'ar',
-    guided: 'Eastport كان لديه تسديدات أكثر على المرمى من Northbridge.',
-    negated: 'لم يكن لدى Eastport تسديدات على المرمى أكثر من Northbridge.',
-    zero: 'لم يكن لدى Kingswell City أي تسديدة على المرمى.',
+    guided: 'سجل إيستبورت تسديدات أكثر على المرمى من نورثبريدج.',
+    negated: 'لم يسجل إيستبورت تسديدات على المرمى أكثر من نورثبريدج.',
+    zero: 'لم يسجل كينغزويل سيتي أي تسديدة على المرمى.',
     bruno: 'كم تمريرة أكمل برونو؟',
     saka: 'قدم ساكا مباراة سيئة للغاية.',
-    distance: 'قطع Northbridge مسافة أكبر من Eastport',
+    distance: 'قطع نورثبريدج مسافة أكبر من إيستبورت',
   },
 ]
 
@@ -69,6 +75,148 @@ test('all five locales have explicit label, native name, and direction metadata'
   assert.deepEqual(APP_LANGUAGES.map(({ code }) => code), ['en', 'es', 'fr', 'de', 'ar'])
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'ar').direction, 'rtl')
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'es').nativeLabel, 'Español')
+})
+
+test('Arabic display names cover every canonical team and player identity in all fixtures', () => {
+  for (const fixture of fixtureRecords) {
+    const roster = fixture.evidence.players
+    assert.equal(roster.length, 40, fixture.id)
+    for (const player of roster) {
+      const localized = localizedPlayerName(fixture.id, player.id, player.name, 'ar')
+      assert.notEqual(localized, player.name, `${fixture.id}/${player.id}`)
+      assert.match(localized, /\p{Script=Arabic}/u, `${fixture.id}/${player.id}`)
+      assert.doesNotMatch(localized, /[A-Za-z]/u, `${fixture.id}/${player.id}`)
+      assert.equal(localizeMatchText(player.name, fixture.id, 'ar'), localized)
+      assert.equal(
+        canonicalizeArabicMatchAliases(`How many passes did ${localized} complete?`, fixture.id),
+        `How many passes did ${player.name} complete?`,
+        `${fixture.id}/${player.id} input alias`,
+      )
+    }
+
+    const [home, away] = fixture.displayTeams
+    const teams = localizeMatchText(`${home} v ${away}`, fixture.id, 'ar')
+    assert.equal(teams, localizeMatchText(`${home} ضد ${away}`, fixture.id, 'ar'))
+    assert.match(teams, /ضد/u)
+    assert.match(teams, /\p{Script=Arabic}/u)
+    assert.doesNotMatch(teams, /[A-Za-z]/u, fixture.id)
+    assert.match(localizedTeamMonogram(fixture.id, home, 'ar'), /\p{Script=Arabic}/u)
+    assert.match(localizedTeamMonogram(fixture.id, away, 'ar'), /\p{Script=Arabic}/u)
+  }
+})
+
+test('Arabic name aliases preserve shared-name ambiguity and canonical full-name resolution', () => {
+  assert.equal(
+    canonicalizeArabicMatchAliases('كم تمريرة أكمل برونو؟', fixtureRecords[0].id),
+    'كم تمريرة أكمل Bruno؟',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('How many passes did مارتن complete?', fixtureRecords[1].id),
+    'How many passes did Martin complete?',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('كم تمريرة أكمل برونو فيرنانديز؟', fixtureRecords[0].id),
+    'كم تمريرة أكمل Bruno Fernandes؟',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('How many shots did وستهافن have?', fixtureRecords[2].id),
+    'How many shots did Westhaven FC have?',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('How many shots did كينغزويل سيتي have?', fixtureRecords[2].id),
+    'How many shots did Kingswell City have?',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('How many passes did Bruno complete?', fixtureRecords[0].id),
+    'How many passes did Bruno complete?',
+  )
+  assert.equal(
+    canonicalizeArabicMatchAliases('How many passes did بيدرو complete?', fixtureRecords[2].id),
+    'How many passes did Pedro complete?',
+  )
+})
+
+test('Arabic metadata, metric explanation, and period translations retain identity and figures', () => {
+  const baselineId = fixtureRecords[0].id
+  assert.equal(translateNarrative('statistics provided', 'ar'), 'إحصاءات فقط، بلا حكم')
+  assert.equal(translateNarrative('Match so far through 58′', 'ar'), 'من بداية المباراة حتى 58′')
+  assert.equal(translateNarrative('Last 10 minutes ending 90+4′', 'ar'), 'آخر عشر دقائق حتى 90+4′')
+  assert.equal(
+    translateNarrative('15 more recorded moments are in the full record.', 'ar'),
+    'يوجد 15 لحظة إضافية في السجل الكامل.',
+  )
+  assert.equal(translateNarrative('Moving to 57′…', 'ar'), 'جارٍ الانتقال إلى 57′…')
+  assert.equal(translateNarrative('Loading the match…', 'ar'), 'جارٍ تحميل المباراة…')
+  assert.equal(translateNarrative('GOAL', 'ar'), 'هدف')
+  assert.equal(translateNarrative('Bruno Fernandes: 18 passes completed.', 'ar'), 'Bruno Fernandes: 18 تمريرة مكتملة.')
+  assert.equal(translateNarrative('18 pass completions', 'ar'), '18 تمريرة مكتملة')
+  assert.equal(translateNarrative('Bruno Fernandes: 2 passes completed.', 'ar'), 'Bruno Fernandes: 2 تمريرتان مكتملتان.')
+  assert.equal(translateNarrative('Bruno Fernandes: 8 passes completed.', 'ar'), 'Bruno Fernandes: 8 تمريرات مكتملة.')
+  assert.equal(translateNarrative('18 recorded recoveries', 'ar'), '18 استعادة مسجلة')
+  assert.equal(
+    translateNarrative('62 elapsed participation minutes (recorded window; added time included)', 'ar'),
+    '62 دقيقة مشاركة منقضية (ضمن النافذة المسجلة؛ تشمل الوقت بدل الضائع)',
+  )
+  assert.equal(
+    localizeMatchText(
+      translateNarrative('Bruno Fernandes · passes completed · Match so far through 57′', 'ar'),
+      baselineId,
+      'ar',
+    ),
+    'برونو فرنانديز · تمريرات مكتملة · من بداية المباراة حتى 57′',
+  )
+  assert.equal(
+    localizeMatchText(
+      translateNarrative('Northbridge vs Eastport · shots on target · Match so far through 57′', 'ar'),
+      baselineId,
+      'ar',
+    ),
+    'نورثبريدج ضد إيستبورت · تسديدات على المرمى · من بداية المباراة حتى 57′',
+  )
+  assert.equal(
+    translateNarrative('Ambiguous name: asks which Pedro', 'ar'),
+    'اسم ملتبس: يُطلب تحديد بيدرو المقصود.',
+  )
+  const teamSentence = localizeMatchText(
+    translateNarrative('No — Eastport and Northbridge are level on 2 shots on target each.', 'ar'),
+    baselineId,
+    'ar',
+  )
+  assert.match(teamSentence, /إيستبورت/u)
+  assert.match(teamSentence, /نورثبريدج/u)
+  assert.doesNotMatch(teamSentence, /Eastport|Northbridge/u)
+  assert.equal(
+    localizeMatchText(translateNarrative('Original match v3.0.0', 'ar'), baselineId, 'ar'),
+    'المباراة الأصلية v3.0.0',
+  )
+  const explanation = localizeMatchText(
+    translateNarrative(
+      'Report pass completions for Bruno Fernandes from selected synthetic records.',
+      'ar',
+    ),
+    fixtureRecords[1].id,
+    'ar',
+  )
+  assert.match(explanation, /برونو فرنانديز/u)
+  assert.match(explanation, /التمريرات المكتملة/u)
+  assert.doesNotMatch(explanation, /undefined|Report|pass completions/u)
+  assert.equal(
+    translateNarrative('Checked against', 'ar'),
+    'تم التحقق مقابل',
+  )
+})
+
+test('all fixture examples render in Arabic with transliterated team and player names', () => {
+  for (const fixture of fixtureRecords) {
+    for (const example of DATASET_CATALOG.find(({ id }) => id === fixture.id).examples) {
+      const localized = localizeMatchText(localizedExample(example.text, 'ar'), fixture.id, 'ar')
+      const description = localizeMatchText(translateNarrative(example.shows, 'ar'), fixture.id, 'ar')
+      assert.match(localized, /\p{Script=Arabic}/u, `${fixture.id}/${example.id}`)
+      assert.doesNotMatch(localized, /[A-Za-z]/u, `${fixture.id}/${example.id}`)
+      assert.match(description, /\p{Script=Arabic}/u, `${fixture.id}/${example.id} metadata`)
+      assert.doesNotMatch(description, /[A-Za-z]/u, `${fixture.id}/${example.id} metadata`)
+    }
+  }
 })
 
 test('expanded source records identify preserved English wording in the selected language', () => {
@@ -117,6 +265,13 @@ test('the homepage guided opinion is localized in the selected language', () => 
 
 for (const item of acceptance) {
   test(`${item.language}: supported opinion templates normalize without changing claims`, () => {
+    const normalizeInput = (opinion, key) =>
+      item.language === 'ar'
+        ? canonicalizeArabicMatchAliases(
+            opinion,
+            key === 'zero' ? fixtureRecords[2].id : fixtureRecords[0].id,
+          )
+        : opinion
     for (const [key, canonical] of [
       ['guided', 'Eastport had more shots on target than Northbridge.'],
       ['negated', 'Eastport did not have more shots on target than Northbridge.'],
@@ -125,7 +280,11 @@ for (const item of acceptance) {
       ['saka', 'Saka has had a horrible game.'],
       ['distance', 'Northbridge covered more distance than Eastport.'],
     ]) {
-      assert.equal(canonicalizeSupportedFootballOpinion(item[key]), canonical, key)
+      assert.equal(
+        canonicalizeSupportedFootballOpinion(normalizeInput(item[key], key)),
+        canonical,
+        key,
+      )
       const exampleText = key === 'distance' ? canonical.replace(/\.$/u, '') : canonical
       assert.equal(localizedExample(exampleText, item.language), item[key], `example wording for ${key}`)
     }
@@ -176,7 +335,19 @@ test('analyst presentation localizes dynamic result labels and attributed metric
     es: ['contradicha', '2 tiros a puerta', 'Tú ·', 'Cómo se comprobó'],
     fr: ['contredite', '2 tirs cadrés', 'Vous ·', 'Comment cela a été vérifié'],
     de: ['widerlegt', '2 Schüsse aufs Tor', 'Du ·', 'So wurde dies geprüft'],
-    ar: ['مناقض', '2 تسديدات على المرمى', 'أنت ·', 'كيف تم التحقق من ذلك'],
+    ar: ['مناقض', '2 تسديدتان على المرمى', 'أنت ·', 'كيف تم التحقق من ذلك'],
+  }
+  const playerStatisticsLabels = {
+    es: 'Estadísticas del jugador',
+    fr: 'Statistiques du joueur',
+    de: 'Spielerstatistiken',
+    ar: 'إحصاءات اللاعب',
+  }
+  const readyLabels = {
+    es: 'Respuesta lista',
+    fr: 'Réponse prête',
+    de: 'Antwort bereit',
+    ar: 'الإجابة جاهزة',
   }
   const eventDescriptions = {
     es: 'El portero atrapa un cabezazo tras un centro.',
@@ -203,6 +374,8 @@ test('analyst presentation localizes dynamic result labels and attributed metric
     ar: ['نعم', 'لا'],
   }
   for (const [language, phrases] of Object.entries(expected)) {
+    assert.equal(translateNarrative('Player statistics', language), playerStatisticsLabels[language])
+    assert.equal(translateNarrative('Answer ready', language), readyLabels[language])
     assert.equal(translateNarrative('contradicted', language), phrases[0])
     assert.equal(translateNarrative('2 shots on target', language), phrases[1])
     assert.equal(translateNarrative('You ·', language), phrases[2])

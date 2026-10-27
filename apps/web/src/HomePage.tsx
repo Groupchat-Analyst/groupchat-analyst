@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { HOME_PREVIEW } from '../../shared/src/homePreview.ts'
+import { BASELINE_DATASET_ID } from '../../shared/src/datasetCatalog.ts'
 import { LocalizedMarkup } from './localization'
 import './landing.css'
 
@@ -18,7 +19,7 @@ function PreviewSwitch() {
   const holds = frame.assessment === 'supported'
 
   return (
-    <LocalizedMarkup>
+    <LocalizedMarkup datasetId={BASELINE_DATASET_ID}>
       <section className="lp-preview" aria-labelledby="lp-preview-title">
         <div className="lp-preview-head">
           <h2 id="lp-preview-title">Same opinion. Different minute.</h2>

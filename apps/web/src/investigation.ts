@@ -450,6 +450,7 @@ export function buildChangeCard(
   const extended = comparison.pairs.length > 1
   if (extended) blocks.push({ kind: 'notice', text: `Extended card · ${comparison.pairs.length} claims` })
   blocks.push(
+    { kind: 'label', text: 'Original wording' },
     { kind: 'take', text: `“${take}”` },
     {
       kind: 'scope',

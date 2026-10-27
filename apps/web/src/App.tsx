@@ -62,6 +62,7 @@ import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
 import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../../shared/src/datasetCatalog'
 import { localizedExample, translateNarrative, translateText } from '../../shared/src/localization'
+import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
 import { LanguageSelector, LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
 import './App.css'
@@ -219,6 +220,7 @@ function TechnicalRecord({
 function metricLabel(
   metric: string,
   language: ReturnType<typeof useLocalization>['language'],
+  value?: number,
 ): string {
   const label = metric === 'shots-on-target' ? 'shots on target'
     : metric === 'possession-percentage' ? 'possession'
@@ -229,6 +231,11 @@ function metricLabel(
               : metric === 'recoveries' ? 'recorded recoveries'
                 : metric === 'pressure-observations' ? 'selected pressure observations'
                   : metric.replaceAll('-', ' ')
+  if (language === 'ar' && value !== undefined && !metric.includes('percentage')) {
+    const countedLabel = translateNarrative(`${value} ${label}`, language)
+    const prefix = `${value} `
+    if (countedLabel.startsWith(prefix)) return countedLabel.slice(prefix.length)
+  }
   return translateText(label, language)
 }
 
@@ -244,11 +251,13 @@ function ClaimCard({
   index,
   roster,
   take,
+  datasetId,
 }: {
   result: ClaimResult
   index: number
   roster: Roster
   take?: string
+  datasetId: string
 }) {
   const { language } = useLocalization()
   const claim = result.claim
@@ -279,7 +288,7 @@ function ClaimCard({
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language)}
+                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
                 </span>
               </p>
             ))}
@@ -289,12 +298,17 @@ function ClaimCard({
           <div className="broad-stats" aria-label="Player statistics">
             {result.playerStatistics.map((statistic) => (
               <p key={`${statistic.playerId}-${statistic.metric}`}>
-                <strong>{statistic.playerName}</strong>
+                <strong>{localizedPlayerName(
+                        datasetId,
+                        statistic.playerId,
+                        statistic.playerName,
+                        language,
+                      )}</strong>
                 <span>
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language)}
+                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
                 </span>
               </p>
             ))}
@@ -423,7 +437,7 @@ function ClaimCard({
                       ? `${trace.numerator}/${trace.denominator} (${trace.value === null ? 'rate not available' : `${trace.value}%`})`
                       : trace.metric === 'pass-completions'
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
-                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language)}`}
+                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
                   </p>
                   <p>{trace.denominatorDescription}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
@@ -475,7 +489,7 @@ function PlayerResolutionPicker({
               }
             >
               <bdi dir="auto">{candidate.name}</bdi>
-              <span aria-hidden="true"> · </span>
+              <span> · </span>
               <bdi dir="auto">{candidate.team}</bdi>
             </button>
           ))}
@@ -775,7 +789,7 @@ function WhatChanged({
           </div>
           <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
             {changeCard.blocks.map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
@@ -789,28 +803,38 @@ function scopePeriod(period: AnalysisPeriod): string {
   return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
 }
 
-function localizedShareModel(model: ShareCardModel, language: ReturnType<typeof useLocalization>['language']): ShareCardModel {
+function localizedShareModel(
+  model: ShareCardModel,
+  language: ReturnType<typeof useLocalization>['language'],
+  datasetId: string,
+): ShareCardModel {
   return {
     ...model,
-    scope: translateNarrative(model.scope, language),
-    answer: translateNarrative(model.answer, language),
+    scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language),
+    answer: localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
     claims: model.claims.map((claim) => ({
       ...claim,
-      text: translateNarrative(claim.text, language),
-      verdict: claim.verdict ? translateNarrative(claim.verdict, language) : null,
-      facts: claim.facts.map((text) => translateNarrative(text, language)),
-      moments: claim.moments.map((text) => translateNarrative(text, language)),
-      counter: claim.counter.map((text) => translateNarrative(text, language)),
-      limitations: claim.limitations.map((text) => translateNarrative(text, language)),
+      text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
+      verdict: claim.verdict ? localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language) : null,
+      facts: claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      moments: claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      limitations: claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
     })),
-    footer: model.footer ? translateNarrative(model.footer, language) : undefined,
+    footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
   }
 }
 
-function localizedShareCardBlocks(model: ShareCardModel, language: ReturnType<typeof useLocalization>['language']) {
+function localizedShareCardBlocks(
+  model: ShareCardModel,
+  language: ReturnType<typeof useLocalization>['language'],
+  datasetId: string,
+) {
   return shareCardBlocks(model).map((block) => ({
     ...block,
-    text: block.kind === 'take' ? block.text : translateNarrative(block.text, language),
+    text: block.kind === 'take'
+      ? block.text
+      : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
   }))
 }
 
@@ -823,9 +847,11 @@ function TurnMessages({
   onRetryPlayerSelection,
   isResolving,
   requestError,
+  datasetId,
 }: {
   turn: AnswerSnapshot
   view: 'fan' | 'analyst'
+  datasetId: string
   messageRef?: RefObject<HTMLDivElement | null>
   onResolvePlayer: (claimId: string, continuation: string, playerId: string) => void
   onRetryPlayerSelection: () => void
@@ -856,7 +882,7 @@ function TurnMessages({
     <LocalizedMarkup>
     <>
       <div className="msg msg-user">
-        <p className="msg-label">{translateText('You', language)} · {scope}</p>
+        <p className="msg-label">{translateText('You', language)} · {translateText('Original wording', language)} · {scope}</p>
         <p className="msg-text" data-original-opinion="true" dir="auto">{context.opinion}</p>
       </div>
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
@@ -897,7 +923,7 @@ function TurnMessages({
             <summary>How this was checked</summary>
             <div className="claim-result-list">
               {evidenceClaims.map(({ result, index }) => (
-                <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} />
+                <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} datasetId={datasetId} />
               ))}
             </div>
           </details>
@@ -988,10 +1014,15 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       if (!card) return null
       return {
         ...card,
-        blocks: card.blocks.map((block) => ({ ...block, text: translateNarrative(block.text, language) })),
+        blocks: card.blocks.map((block) => ({
+          ...block,
+          text: block.kind === 'take'
+            ? block.text
+            : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
+        })),
       }
     },
-    [comparison, language],
+    [comparison, language, datasetId],
   )
   const hasUnresolvedSubject = Boolean(analysis?.claims.some(({ claim, assessment }) =>
     claim.subject === null && assessment === 'clarification needed'))
@@ -1003,9 +1034,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const examples = dataset.examples
   const shareModel = useMemo<ShareCardModel | null>(
     () => (analysis && submittedContext && !hasPlayerChoices
-      ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language)
+      ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language, datasetId)
       : null),
-    [analysis, submittedContext, language, hasPlayerChoices],
+    [analysis, submittedContext, language, hasPlayerChoices, datasetId],
   )
   const [canNativeShare] = useState(() => supportsFileShare(navigator, new File([''], 'probe.png', { type: 'image/png' })))
   const [demoActive, setDemoActive] = useState(false)
@@ -1013,11 +1044,11 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const singleShare = useMemo(
     () => (shareModel
       ? {
-          key: imageKey('single', localizedShareCardBlocks(shareModel, language)),
-          image: createBlocksImage(localizedShareCardBlocks(shareModel, language), language),
+          key: imageKey('single', localizedShareCardBlocks(shareModel, language, datasetId)),
+          image: createBlocksImage(localizedShareCardBlocks(shareModel, language, datasetId), language),
         }
       : null),
-    [shareModel, language],
+    [shareModel, language, datasetId],
   )
   const changeShare = useMemo(
     () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks, language) } : null),
@@ -1174,7 +1205,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   function fillExample(example: DatasetExample) {
     setPeriod(example.period)
     replay.seek(example.clock)
-    setOpinion(localizedExample(example.text, language))
+    setOpinion(localizeMatchText(localizedExample(example.text, language), datasetId, language))
     document.getElementById('opinion-input')?.focus()
   }
 
@@ -1184,7 +1215,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     setDemoActive(true)
     setPeriod('match-so-far')
     replay.seek(DEMO_CLOCK)
-    setOpinion(localizedExample(DEMO_TAKE, language))
+    setOpinion(localizeMatchText(localizedExample(DEMO_TAKE, language), datasetId, language))
     document.getElementById('opinion-input')?.focus()
   }
 
@@ -1284,7 +1315,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(translateNarrative(canonicalReply(analysis), language))
+      await navigator.clipboard.writeText(
+        localizeMatchText(translateNarrative(canonicalReply(analysis), language), datasetId, language),
+      )
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -1294,7 +1327,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyShareCard() {
     if (!shareModel) return
     try {
-      await navigator.clipboard.writeText(blocksToText(localizedShareCardBlocks(shareModel, language)))
+      await navigator.clipboard.writeText(
+        blocksToText(localizedShareCardBlocks(shareModel, language, datasetId)),
+      )
       setShareMessage('Card text copied.')
     } catch {
       setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
@@ -1336,7 +1371,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   }
 
   function downloadShareCard() {
-    if (shareModel) void downloadImage(createBlocksImage(localizedShareCardBlocks(shareModel, language), language), shareModel.extended, 'groupchat-analyst-card')
+    if (shareModel) void downloadImage(createBlocksImage(localizedShareCardBlocks(shareModel, language, datasetId), language), shareModel.extended, 'groupchat-analyst-card')
   }
 
   function downloadChangeCard() {
@@ -1398,8 +1433,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <details className="share-preview">
           <summary>Preview share card</summary>
           <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
-            {localizedShareCardBlocks(shareModel, language).map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+            {localizedShareCardBlocks(shareModel, language, datasetId).map((block, index) => (
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
@@ -1425,7 +1460,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const pendingScope = pending ? `${formatMatchClock(pending.context.selectedClock)} · ${scopePeriod(pending.context.period)}` : ''
 
   return (
-    <LocalizedMarkup>
+    <LocalizedMarkup datasetId={datasetId}>
     <main className="page-shell analyst-shell" id="main-content">
       <a className="skip-link" href="#opinion-input">Skip to your opinion</a>
       <header className="site-header">
@@ -1440,7 +1475,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title"><bdi dir="ltr">{dataset.teams[0]} v {dataset.teams[1]}</bdi><span> · {dataset.name}</span></h1>
+          <h1 id="page-title"><bdi dir="auto">{dataset.teams[0]} v {dataset.teams[1]}</bdi><span> · {dataset.name}</span></h1>
           <p className="intro-description">{dataset.scenario}</p>
           {demo === 'offer' && isBaseline && (
             <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
@@ -1450,6 +1485,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <div className="workspace-grid">
           <div className="match-column">
             <MatchHeader
+              datasetId={datasetId}
               teams={dataset.teams}
               timeline={MATCH_TIME_OPTIONS}
               snapshot={replaySnapshot}
@@ -1485,6 +1521,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                     <TurnMessages
                       turn={turn}
                       view={view}
+                      datasetId={datasetId}
                       messageRef={index === transcript.length - 1 ? answerRef : undefined}
                       onResolvePlayer={resolvePlayer}
                       onRetryPlayerSelection={retryAnalysis}

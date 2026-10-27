@@ -64,6 +64,7 @@ import {
   validateInterpretation,
 } from './validation.js'
 import { canonicalizeSupportedFootballOpinion } from '../../shared/src/localization.js'
+import { canonicalizeArabicMatchAliases } from '../../shared/src/displayNames.js'
 import {
   signPlayerResolution,
   verifyPlayerResolution,
@@ -2708,7 +2709,11 @@ export async function analyzeOpinion(
   }
   const parsed = parseAnalysisRequest(input)
   const dataset = resolveDataset(parsed.datasetId)
-  const slotted = toSlotOpinion(parsed.opinion, dataset.naming)
+  const opinionWithAliases = canonicalizeArabicMatchAliases(
+    parsed.opinion,
+    dataset.id,
+  )
+  const slotted = toSlotOpinion(opinionWithAliases, dataset.naming)
   const request = { ...parsed, opinion: slotted.text }
   const response = await analyzeSlottedOpinion(
     request,
@@ -2792,6 +2797,7 @@ function playerCandidatesForClaim(
   opinion: string,
   players: PlayerResolutionOption[],
   naming: TeamNaming,
+  datasetId: string,
 ): PlayerResolutionOption[] {
   if (
     claim.intent !== 'statistical-request' ||
@@ -2807,7 +2813,9 @@ function playerCandidatesForClaim(
   ) {
     return []
   }
-  const canonicalOpinion = canonicalizeSupportedFootballOpinion(opinion)
+  const canonicalOpinion = canonicalizeSupportedFootballOpinion(
+    canonicalizeArabicMatchAliases(opinion, datasetId),
+  )
   const groups = new Map<string, PlayerResolutionOption[]>()
   for (const player of players) {
     const aliases = new Set(
@@ -2869,9 +2877,10 @@ function candidateSetsForClaims(
   opinion: string,
   players: PlayerResolutionOption[],
   naming: TeamNaming,
+  datasetId: string,
 ): PlayerResolutionGrant['candidates'] {
   return claims.flatMap((claim) => {
-    const candidates = playerCandidatesForClaim(claim, opinion, players, naming)
+    const candidates = playerCandidatesForClaim(claim, opinion, players, naming, datasetId)
     return candidates.length > 1 ? [{ claimId: claim.id, players: candidates }] : []
   })
 }
@@ -2885,7 +2894,13 @@ function addPlayerResolutionContinuation(
   provider: 'local' | 'foundry',
   selectedPlayers: PlayerResolutionOption[],
 ): AnalysisResponse {
-  const candidates = candidateSetsForClaims(claims, request.opinion, players, naming)
+  const candidates = candidateSetsForClaims(
+    claims,
+    request.opinion,
+    players,
+    naming,
+    resolveDataset(request.datasetId).id,
+  )
   if (candidates.length === 0 && selectedPlayers.length === 0) return response
   const continuation = signPlayerResolution({
     request,
@@ -2944,6 +2959,7 @@ function validateGrant(
     request.opinion,
     players,
     dataset.naming,
+    dataset.id,
   )
   if (JSON.stringify(actualCandidates) !== JSON.stringify(grant.candidates)) {
     throw new InputValidationError('Player clarification candidates do not match this fixture and opinion.')
@@ -2992,6 +3008,7 @@ async function analyzeContinuation(
         request.opinion,
         players,
         dataset.naming,
+        dataset.id,
       ),
       selectedPlayers,
     },
@@ -3047,6 +3064,12 @@ export async function resolvePlayerSelection(
           ...claim,
           subject: player.team,
           playerSubject: player,
+          meaning: {
+            ...claim.meaning,
+            description: claim.playerMetric
+              ? `Report ${claim.playerMetric.replaceAll('-', ' ')} for ${player.name} from selected synthetic records.`
+              : claim.meaning.description,
+          },
           clarificationNeeds: [],
         }
       : claim,

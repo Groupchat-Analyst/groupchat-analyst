@@ -4,6 +4,8 @@ import { HomePage } from './HomePage'
 import { MatchView } from './App'
 import { matchHash, parseRoute, type Route } from './routes'
 import { LanguageSelector, LocalizationProvider, LocalizedMarkup } from './localization'
+import { useLocalization } from './localizationContext'
+import { localizedTeamMonogram } from '../../shared/src/displayNames'
 import './App.css'
 import './home.css'
 
@@ -52,6 +54,7 @@ function monogram(name: string): string {
 }
 
 function Matches({ unknownId }: { unknownId?: string }) {
+  const { language } = useLocalization()
   return (
     <Chrome>
       <section className="home-page" aria-labelledby="page-title">
@@ -60,18 +63,20 @@ function Matches({ unknownId }: { unknownId?: string }) {
         {unknownId !== undefined && <p className="api-error" role="alert">That match isn’t available. Choose one below.</p>}
         <ul className="match-list">
           {DATASET_CATALOG.map((entry) => (
-            <li key={entry.id}>
-              <a className="match-card" href={matchHash(entry.id)}>
-                <span className="match-fixture" aria-hidden="true">
-                  <span className="monogram">{monogram(entry.teams[0])}</span>
-                  <span className="match-v">v</span>
-                  <span className="monogram away">{monogram(entry.teams[1])}</span>
-                </span>
-                <strong>{entry.teams[0]} v {entry.teams[1]}</strong>
-                <span>{entry.scenario}</span>
-                <span className="match-meta">{entry.name} · fictional · {entry.examples.length} example opinions</span>
-              </a>
-            </li>
+            <LocalizedMarkup key={entry.id} datasetId={entry.id}>
+              <li>
+                <a className="match-card" href={matchHash(entry.id)}>
+                  <span className="match-fixture" aria-hidden="true">
+                    <span className="monogram">{localizedTeamMonogram(entry.id, entry.teams[0], language) ?? monogram(entry.teams[0])}</span>
+                    <span className="match-v">v</span>
+                    <span className="monogram away">{localizedTeamMonogram(entry.id, entry.teams[1], language) ?? monogram(entry.teams[1])}</span>
+                  </span>
+                  <strong>{entry.teams[0]} v {entry.teams[1]}</strong>
+                  <span>{entry.scenario}</span>
+                  <span className="match-meta">{entry.name} · fictional · {entry.examples.length} example opinions</span>
+                </a>
+              </li>
+            </LocalizedMarkup>
           ))}
         </ul>
       </section>

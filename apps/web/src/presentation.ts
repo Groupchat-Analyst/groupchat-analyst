@@ -318,6 +318,7 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
     })
   }
   blocks.push(
+    { kind: 'label', text: 'Original wording' },
     { kind: 'take', text: `“${model.take}”` },
     { kind: 'scope', text: model.scope },
     { kind: 'answer', text: model.answer },

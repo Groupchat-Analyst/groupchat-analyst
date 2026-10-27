@@ -4,18 +4,21 @@ import {
   isValidElement,
   useEffect,
   useState,
+  useContext,
+  createContext,
   type ReactNode,
 } from 'react'
 import {
   APP_LANGUAGES,
   DEFAULT_LANGUAGE,
   translateNarrative,
-  translateText,
   type AppLanguage,
 } from '../../shared/src/localization'
+import { localizeMatchText } from '../../shared/src/displayNames'
 import { LocalizationContext, useLocalization } from './localizationContext'
 
 const LANGUAGE_STORAGE_KEY = 'groupchat-analyst-language'
+const DatasetIdContext = createContext<string | undefined>(undefined)
 
 function isAppLanguage(value: string | null): value is AppLanguage {
   return APP_LANGUAGES.some(({ code }) => code === value)
@@ -73,19 +76,23 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
 function translateNode(
   node: ReactNode,
   language: AppLanguage,
+  datasetId?: string,
   inheritedIgnore = false,
 ): ReactNode {
   if (typeof node === 'string') {
-    return inheritedIgnore ? node : translateNarrative(node, language)
+    return inheritedIgnore
+      ? node
+      : localizeMatchText(translateNarrative(node, language), datasetId ?? '', language)
   }
   if (Array.isArray(node)) {
-    return Children.map(node, (child) => translateNode(child, language, inheritedIgnore))
+    return Children.map(node, (child) => translateNode(child, language, datasetId, inheritedIgnore))
   }
   if (!isValidElement<{
     children?: ReactNode
     className?: string
     'data-original-opinion'?: string
     'data-original-source'?: string
+    label?: string
     placeholder?: string
     title?: string
     'aria-label'?: string
@@ -112,25 +119,64 @@ function translateNode(
         ...props,
         ...(automaticDirection ? { dir: 'auto' } : {}),
         ...(props.placeholder
-          ? { placeholder: translateNarrative(props.placeholder, language) }
+          ? {
+              placeholder: localizeMatchText(
+                translateNarrative(props.placeholder, language),
+                datasetId ?? '',
+                language,
+              ),
+            }
           : {}),
-        ...(props.title ? { title: translateText(props.title, language) } : {}),
+        ...(props.title
+          ? { title: localizeMatchText(translateNarrative(props.title, language), datasetId ?? '', language) }
+          : {}),
+        ...(props.label
+          ? { label: localizeMatchText(translateNarrative(props.label, language), datasetId ?? '', language) }
+          : {}),
         ...(props['aria-label']
-          ? { 'aria-label': translateNarrative(props['aria-label'], language) }
+          ? {
+              'aria-label': localizeMatchText(
+                translateNarrative(props['aria-label'], language),
+                datasetId ?? '',
+                language,
+              ),
+            }
           : {}),
         ...(props['aria-description']
-          ? { 'aria-description': translateNarrative(props['aria-description'], language) }
+          ? {
+              'aria-description': localizeMatchText(
+                translateNarrative(props['aria-description'], language),
+                datasetId ?? '',
+                language,
+              ),
+            }
           : {}),
       }
   return cloneElement(node, {
     ...translatedProps,
-    children: translateNode(props.children, language, ignoreChildren),
+    children: translateNode(props.children, language, datasetId, ignoreChildren),
   })
 }
 
-export function LocalizedMarkup({ children }: { children: ReactNode }) {
+function LocalizedContent({
+  children,
+  datasetId,
+}: {
+  children: ReactNode
+  datasetId?: string
+}) {
   const { language } = useLocalization()
-  return <>{Children.map(children, (child) => translateNode(child, language))}</>
+  return <>{Children.map(children, (child) => translateNode(child, language, datasetId))}</>
+}
+
+export function LocalizedMarkup({ children, datasetId }: { children: ReactNode; datasetId?: string }) {
+  const inheritedDatasetId = useContext(DatasetIdContext)
+  const activeDatasetId = datasetId ?? inheritedDatasetId
+  return (
+    <DatasetIdContext.Provider value={activeDatasetId}>
+      <LocalizedContent datasetId={activeDatasetId}>{children}</LocalizedContent>
+    </DatasetIdContext.Provider>
+  )
 }
 
 export function LanguageSelector() {
