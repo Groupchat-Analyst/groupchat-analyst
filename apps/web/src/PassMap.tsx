@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import type { AnalysisResponse } from '../../shared/src/apiContracts'
 import type { MatchTeam } from '../../shared/src/matchClock'
+import { LocalizedMarkup } from './localization'
 
 type Foundation = AnalysisResponse['evidenceFoundation']
 
@@ -20,6 +21,7 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
   const y = (value: number) => 8 + value * 0.64
 
   return (
+    <LocalizedMarkup>
     <details className="pass-map-panel">
       <summary>Explore the pass map</summary>
       <div className="pass-map-content">
@@ -93,5 +95,6 @@ export function PassMap({ foundation }: { foundation: Foundation }) {
         <p className="map-caption">This shows recorded pass locations. It does not show player movement, defensive shape or why a pass succeeded.</p>
       </div>
     </details>
+    </LocalizedMarkup>
   )
 }

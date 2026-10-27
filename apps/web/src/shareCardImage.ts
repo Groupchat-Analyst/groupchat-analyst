@@ -1,4 +1,5 @@
 import { shareCardBlocks, type CardBlock, type CardBlockKind, type ShareCardModel } from './presentation.ts'
+import type { AppLanguage } from '../../shared/src/localization.ts'
 
 export const CARD_WIDTH = 1080
 const PADDING = 64
@@ -40,6 +41,19 @@ function xmlEscape(value: string): string {
     .replaceAll("'", '&apos;')
 }
 
+function rtlSvgText(value: string): string {
+  const pattern = /[0-9]+(?:\+[0-9]+)?′?|[A-Za-z0-9][A-Za-z0-9 .:'’+%–-]*[A-Za-z0-9]/gu
+  let result = ''
+  let cursor = 0
+  for (const match of value.matchAll(pattern)) {
+    const index = match.index ?? 0
+    result += xmlEscape(value.slice(cursor, index))
+    result += `<tspan direction="ltr" unicode-bidi="isolate">${xmlEscape(match[0])}</tspan>`
+    cursor = index + match[0].length
+  }
+  return result + xmlEscape(value.slice(cursor))
+}
+
 export function wrapText(value: string, limit: number): string[] {
   const lines: string[] = []
   let line = ''
@@ -58,9 +72,10 @@ export function wrapText(value: string, limit: number): string[] {
   return lines.length > 0 ? lines : ['']
 }
 
+type Direction = 'ltr' | 'rtl'
 type PlacedLine = { text: string; x: number; y: number; style: Style }
 
-function layout(blocks: CardBlock[]): { lines: PlacedLine[]; height: number } {
+function layout(blocks: CardBlock[], direction: Direction): { lines: PlacedLine[]; height: number } {
   const lines: PlacedLine[] = []
   let y = PADDING + 12
   for (const { kind, text } of blocks) {
@@ -71,7 +86,12 @@ function layout(blocks: CardBlock[]): { lines: PlacedLine[]; height: number } {
     const lineHeight = Math.round(style.size * 1.4)
     wrapText(content, limit).forEach((line, index) => {
       y += index === 0 ? lineHeight - 6 : lineHeight
-      lines.push({ text: line, x: PADDING + indent, y, style })
+      lines.push({
+        text: line,
+        x: direction === 'rtl' ? CARD_WIDTH - PADDING - indent : PADDING + indent,
+        y,
+        style,
+      })
     })
     y += style.gap + 6
   }
@@ -80,16 +100,20 @@ function layout(blocks: CardBlock[]): { lines: PlacedLine[]; height: number } {
 
 export type ShareCardImage = { svg: string; width: number; height: number }
 
-export function createShareCardImage(model: ShareCardModel): ShareCardImage {
-  return createBlocksImage(shareCardBlocks(model))
+export function createShareCardImage(model: ShareCardModel, language: AppLanguage = 'en'): ShareCardImage {
+  return createBlocksImage(shareCardBlocks(model), language)
 }
 
-export function createBlocksImage(blocks: CardBlock[]): ShareCardImage {
-  const { lines, height } = layout(blocks)
+export function createBlocksImage(blocks: CardBlock[], language: AppLanguage = 'en'): ShareCardImage {
+  const direction: Direction = language === 'ar' ? 'rtl' : 'ltr'
+  const { lines, height } = layout(blocks, direction)
   const body = lines
     .map(({ text, x, y, style }) => {
       const spacing = style.spacing ? ` letter-spacing="${style.spacing}"` : ''
-      return `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-size="${style.size}" font-weight="${style.weight}" fill="${style.fill}"${spacing}>${xmlEscape(text)}</text>`
+      const anchor = /^[A-Za-z0-9]/u.test(text) ? 'end' : 'start'
+      const bidi = direction === 'rtl' ? ` direction="rtl" unicode-bidi="plaintext" text-anchor="${anchor}"` : ''
+      const content = direction === 'rtl' ? rtlSvgText(text) : xmlEscape(text)
+      return `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-size="${style.size}" font-weight="${style.weight}" fill="${style.fill}"${spacing}${bidi}>${content}</text>`
     })
     .join('\n')
   const bullets = lines
@@ -97,10 +121,11 @@ export function createBlocksImage(blocks: CardBlock[]): ShareCardImage {
     .map(({ y, style }, index, all) => {
       const previous = all[index - 1]
       if (previous && y - previous.y < Math.round(style.size * 1.4) + 1) return ''
-      return `<circle cx="${PADDING + 8}" cy="${y - style.size * 0.32}" r="4" fill="#d4ff63"/>`
+      const bulletX = direction === 'rtl' ? CARD_WIDTH - PADDING - 8 : PADDING + 8
+      return `<circle cx="${bulletX}" cy="${y - style.size * 0.32}" r="4" fill="#d4ff63"/>`
     })
     .join('\n')
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${height}" viewBox="0 0 ${CARD_WIDTH} ${height}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${height}" viewBox="0 0 ${CARD_WIDTH} ${height}" direction="${direction}" lang="${language}">
 <rect width="${CARD_WIDTH}" height="${height}" fill="#0c110f"/>
 <rect x="16" y="16" width="${CARD_WIDTH - 32}" height="${height - 32}" rx="28" fill="#171e19" stroke="#39453a" stroke-width="2"/>
 ${bullets}

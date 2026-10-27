@@ -33,12 +33,12 @@ import {
   buildShareCardModel,
   canonicalReply,
   CONTEXT_ONLY_LABEL,
+  blocksToText,
   describeEvidence,
   describePeriodLabel,
   isRoutineLimitation,
   isUnsupportedJudgement,
   shareCardBlocks,
-  shareCardText,
   type ShareCardModel,
 } from './presentation'
 import {
@@ -54,12 +54,15 @@ import {
   type ChangeCard,
   type Comparison,
 } from './investigation'
-import { createBlocksImage, createShareCardImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
+import { createBlocksImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
 import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
 import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../../shared/src/datasetCatalog'
+import { localizedExample, translateNarrative, translateText } from '../../shared/src/localization'
+import { LanguageSelector, LocalizedMarkup } from './localization'
+import { useLocalization } from './localizationContext'
 import './App.css'
 import './matchday.css'
 
@@ -139,31 +142,40 @@ function referenceList(references: EvidenceReference[], roster: Roster) {
 
 function TechnicalRecord({ references }: { references: EvidenceReference[] }) {
   return (
-    <details className="technical-record">
-      <summary>Technical record · IDs and original wording</summary>
-      <ul>
-        {references.map((reference) => (
-          <li key={reference.id}><code>{reference.id}</code> · {reference.time} · {reference.team} · {reference.description}</li>
-        ))}
-      </ul>
-    </details>
+    <LocalizedMarkup>
+      <details className="technical-record">
+        <summary>Technical record · IDs and original wording</summary>
+        <ul>
+          {references.map((reference) => (
+            <li key={reference.id}><code>{reference.id}</code> · {reference.time} · {reference.team} · {reference.description}</li>
+          ))}
+        </ul>
+      </details>
+    </LocalizedMarkup>
   )
 }
 
-function metricLabel(metric: string): string {
-  if (metric === 'shots-on-target') return 'shots on target'
-  if (metric === 'possession-percentage') return 'possession'
-  if (metric === 'pass-completion-percentage') return 'pass completion'
-  if (metric === 'pass-attempts') return 'pass attempts'
-  if (metric === 'pass-completions') return 'pass completions'
-  if (metric === 'minutes-played') return 'elapsed participation minutes (recorded window; added time included)'
-  if (metric === 'recoveries') return 'recorded recoveries'
-  if (metric === 'pressure-observations') return 'selected pressure observations'
-  return metric
+function metricLabel(
+  metric: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  const label = metric === 'shots-on-target' ? 'shots on target'
+    : metric === 'possession-percentage' ? 'possession'
+      : metric === 'pass-completion-percentage' ? 'pass completion'
+        : metric === 'pass-attempts' ? 'pass attempts'
+          : metric === 'pass-completions' ? 'pass completions'
+            : metric === 'minutes-played' ? 'elapsed participation minutes (recorded window; added time included)'
+              : metric === 'recoveries' ? 'recorded recoveries'
+                : metric === 'pressure-observations' ? 'selected pressure observations'
+                  : metric.replaceAll('-', ' ')
+  return translateText(label, language)
 }
 
-function evidenceLabel(kind: string): string {
-  return kind.replaceAll('-', ' ')
+function evidenceLabel(
+  kind: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  return translateText(kind.replaceAll('-', ' '), language)
 }
 
 function ClaimCard({
@@ -177,15 +189,17 @@ function ClaimCard({
   roster: Roster
   take?: string
 }) {
+  const { language } = useLocalization()
   const claim = result.claim
   const titleId = `claim-result-${index}`
   const contextOnly = isUnsupportedJudgement(result)
   return (
+    <LocalizedMarkup>
     <article className="claim-result" aria-labelledby={titleId}>
       <h3 className="claim-number" id={titleId}>
         Claim {index + 1}
       </h3>
-      <p className="claim-display">{take ?? claim.text}</p>
+      <p className="claim-display" data-original-opinion="true">{take ?? claim.text}</p>
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
@@ -204,7 +218,7 @@ function ClaimCard({
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric)}
+                  {metricLabel(statistic.metric, language)}
                 </span>
               </p>
             ))}
@@ -219,7 +233,7 @@ function ClaimCard({
                   {statistic.value === null
                     ? 'Not available'
                     : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric)}
+                  {metricLabel(statistic.metric, language)}
                 </span>
               </p>
             ))}
@@ -255,7 +269,7 @@ function ClaimCard({
               {result.evidenceAvailability.map((item) => (
                 <li key={item.kind} className={item.available ? 'available' : 'unavailable'}>
                   <strong>
-                    {evidenceLabel(item.kind)} · {item.available ? 'available' : 'not recorded'}
+                    {evidenceLabel(item.kind, language)} · {item.available ? 'available' : 'not recorded'}
                   </strong>
                   <span>{item.detail}</span>
                 </li>
@@ -305,7 +319,7 @@ function ClaimCard({
               </div>
             )}
             <section>
-              <h3>All {result.evidence.length} claim evidence references</h3>
+              <h3>{translateNarrative(`All ${result.evidence.length} claim evidence references`, language)}</h3>
               <ul className="claim-reference-list">
                 {result.evidence.map(({ role, reference }) => (
                   <li key={`${role}-${reference.id}`}>
@@ -340,12 +354,12 @@ function ClaimCard({
                   <h4>{trace.playerName} · {trace.metric === 'minutes-played' ? 'participation within recorded window' : trace.metric.replaceAll('-', ' ')}</h4>
                   <p>
                     {trace.metric === 'minutes-played'
-                      ? `${trace.value ?? 0} elapsed minutes`
+                      ? `${trace.value ?? 0} ${translateText('elapsed minutes', language)}`
                       : trace.metric === 'pass-completion-percentage'
                       ? `${trace.numerator}/${trace.denominator} (${trace.value === null ? 'rate not available' : `${trace.value}%`})`
                       : trace.metric === 'pass-completions'
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
-                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric)}`}
+                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language)}`}
                   </p>
                   <p>{trace.denominatorDescription}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
@@ -361,6 +375,7 @@ function ClaimCard({
       )}
       </details>
     </article>
+    </LocalizedMarkup>
   )
 }
 
@@ -374,6 +389,7 @@ function EvidenceFoundationPanel({
   const roster = foundation.players
   const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   return (
+    <LocalizedMarkup>
     <details className="evidence-foundation">
       <summary className="foundation-summary">
         <div>
@@ -545,6 +561,7 @@ function EvidenceFoundationPanel({
       </details>
       </div>
     </details>
+    </LocalizedMarkup>
   )
 }
 
@@ -591,8 +608,10 @@ function WhatChanged({
   shareReady: boolean
 }) {
   const { earlier, later, result } = comparison
+  const { language } = useLocalization()
   const separate = result.status !== 'comparable'
   return (
+    <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
       <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
       <p className="change-headline">{result.headline}</p>
@@ -620,7 +639,7 @@ function WhatChanged({
       {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
       {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
-        <summary>Earlier answer · {result.earlierTime} · {earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</summary>
+        <summary>{translateNarrative(`Earlier answer · ${result.earlierTime} · ${earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}`, language)}</summary>
         <p className="server-summary">{snapshotReply(earlier)}</p>
         {checkedAgainst(earlier.analysis).length > 0 && <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(earlier.analysis).join('; ')}</p>}
         <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
@@ -641,11 +660,37 @@ function WhatChanged({
         </details>
       )}
     </section>
+    </LocalizedMarkup>
   )
 }
 
 function scopePeriod(period: AnalysisPeriod): string {
   return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+}
+
+function localizedShareModel(model: ShareCardModel, language: ReturnType<typeof useLocalization>['language']): ShareCardModel {
+  return {
+    ...model,
+    scope: translateNarrative(model.scope, language),
+    answer: translateNarrative(model.answer, language),
+    claims: model.claims.map((claim) => ({
+      ...claim,
+      text: translateNarrative(claim.text, language),
+      verdict: claim.verdict ? translateNarrative(claim.verdict, language) : null,
+      facts: claim.facts.map((text) => translateNarrative(text, language)),
+      moments: claim.moments.map((text) => translateNarrative(text, language)),
+      counter: claim.counter.map((text) => translateNarrative(text, language)),
+      limitations: claim.limitations.map((text) => translateNarrative(text, language)),
+    })),
+    footer: model.footer ? translateNarrative(model.footer, language) : undefined,
+  }
+}
+
+function localizedShareCardBlocks(model: ShareCardModel, language: ReturnType<typeof useLocalization>['language']) {
+  return shareCardBlocks(model).map((block) => ({
+    ...block,
+    text: block.kind === 'take' ? block.text : translateNarrative(block.text, language),
+  }))
 }
 
 // One question and its reply, frozen at the minute and period it was asked.
@@ -658,6 +703,7 @@ function TurnMessages({
   view: 'fan' | 'analyst'
   messageRef?: RefObject<HTMLDivElement | null>
 }) {
+  const { language } = useLocalization()
   const { analysis, context } = turn
   const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
   const checked = checkedAgainst(analysis)
@@ -666,10 +712,11 @@ function TurnMessages({
     ...(isRoutineLimitation(result) ? [] : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
   ])
   return (
+    <LocalizedMarkup>
     <>
       <div className="msg msg-user">
-        <p className="msg-label">You · {scope}</p>
-        <p className="msg-text">{context.opinion}</p>
+        <p className="msg-label">{translateText('You', language)} · {scope}</p>
+        <p className="msg-text" data-original-opinion="true" dir="auto">{context.opinion}</p>
       </div>
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
         <p className="msg-label">Groupchat Analyst · {scope}</p>
@@ -697,13 +744,22 @@ function TurnMessages({
             </div>
           </details>
         )}
-        <p className="msg-attribution">Fictional match · {analysis.provider === 'local' ? 'Local rules, no model connected' : 'Foundry · server-side interpretation'}</p>
+        <p className="msg-attribution">
+          {translateText('Fictional match', language)} · {translateText(
+            analysis.provider === 'local'
+              ? 'Local rules · no model connection'
+              : 'Foundry · server-side interpretation',
+            language,
+          )}
+        </p>
       </div>
     </>
+    </LocalizedMarkup>
   )
 }
 
 export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; autoDemo?: boolean }) {
+  const { language } = useLocalization()
   const dataset = findCatalogEntry(datasetId)!
   const KEY_MOMENTS: KeyMoment[] = dataset.moments
   const isBaseline = datasetId === BASELINE_DATASET_ID
@@ -761,8 +817,16 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(
-    () => (comparison ? buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result) : null),
-    [comparison],
+    () => {
+      if (!comparison) return null
+      const card = buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result)
+      if (!card) return null
+      return {
+        ...card,
+        blocks: card.blocks.map((block) => ({ ...block, text: translateNarrative(block.text, language) })),
+      }
+    },
+    [comparison, language],
   )
   const hasUnresolvedSubject = Boolean(analysis?.claims.some(({ claim, assessment }) =>
     claim.subject === null && assessment === 'clarification needed'))
@@ -773,19 +837,26 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       clockKey(replaySnapshot.displayedClock) !== clockKey(selectedClock))
   const examples = dataset.examples
   const shareModel = useMemo<ShareCardModel | null>(
-    () => (analysis && submittedContext ? buildShareCardModel(submittedContext.opinion, analysis) : null),
-    [analysis, submittedContext],
+    () => (analysis && submittedContext
+      ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language)
+      : null),
+    [analysis, submittedContext, language],
   )
   const [canNativeShare] = useState(() => supportsFileShare(navigator, new File([''], 'probe.png', { type: 'image/png' })))
   const [demoActive, setDemoActive] = useState(false)
   const sharingRef = useRef(false)
   const singleShare = useMemo(
-    () => (shareModel ? { key: imageKey('single', shareCardBlocks(shareModel)), image: createShareCardImage(shareModel) } : null),
-    [shareModel],
+    () => (shareModel
+      ? {
+          key: imageKey('single', localizedShareCardBlocks(shareModel, language)),
+          image: createBlocksImage(localizedShareCardBlocks(shareModel, language), language),
+        }
+      : null),
+    [shareModel, language],
   )
   const changeShare = useMemo(
-    () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks) } : null),
-    [changeCard],
+    () => (changeCard ? { key: imageKey('change', changeCard.blocks), image: createBlocksImage(changeCard.blocks, language) } : null),
+    [changeCard, language],
   )
   const preparedSingle = usePreparedImage(canNativeShare, singleShare?.key ?? null, singleShare?.image ?? null, 'groupchat-analyst-card.png')
   const preparedChange = usePreparedImage(canNativeShare, changeShare?.key ?? null, changeShare?.image ?? null, 'groupchat-analyst-what-changed.png')
@@ -894,7 +965,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   function fillExample(example: DatasetExample) {
     setPeriod(example.period)
     replay.seek(example.clock)
-    setOpinion(example.text)
+    setOpinion(localizedExample(example.text, language))
     document.getElementById('opinion-input')?.focus()
   }
 
@@ -904,7 +975,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     setDemoActive(true)
     setPeriod('match-so-far')
     replay.seek(DEMO_CLOCK)
-    setOpinion(DEMO_TAKE)
+    setOpinion(localizedExample(DEMO_TAKE, language))
     document.getElementById('opinion-input')?.focus()
   }
 
@@ -963,7 +1034,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(canonicalReply(analysis))
+      await navigator.clipboard.writeText(translateNarrative(canonicalReply(analysis), language))
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -973,7 +1044,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyShareCard() {
     if (!shareModel) return
     try {
-      await navigator.clipboard.writeText(shareCardText(shareModel))
+      await navigator.clipboard.writeText(blocksToText(localizedShareCardBlocks(shareModel, language)))
       setShareMessage('Card text copied.')
     } catch {
       setShareMessage('Clipboard access is unavailable. Select the card text above and copy it manually.')
@@ -1015,11 +1086,11 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   }
 
   function downloadShareCard() {
-    if (shareModel) void downloadImage(createShareCardImage(shareModel), shareModel.extended, 'groupchat-analyst-card')
+    if (shareModel) void downloadImage(createBlocksImage(localizedShareCardBlocks(shareModel, language), language), shareModel.extended, 'groupchat-analyst-card')
   }
 
   function downloadChangeCard() {
-    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks), changeCard.extended, 'groupchat-analyst-what-changed')
+    if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks, language), changeCard.extended, 'groupchat-analyst-what-changed')
   }
 
   const latestActions = analysis && submittedContext && shown ? (
@@ -1033,12 +1104,35 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
       {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
       {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
-      {opinion.trim() !== submittedOpinion && <p className="draft-notice">The latest reply is for the saved opinion above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
-      {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">The latest reply is for {formatMatchClock(submittedContext.selectedClock)} · {scopePeriod(submittedContext.period)}. The replay is now at {formatMatchClock(selectedClock)}; that answer has not been recalculated.</p>}
+      {opinion.trim() !== submittedOpinion && (
+        <p className="draft-notice">
+          {translateNarrative(
+            opinion.trim()
+              ? 'The latest reply is for the saved opinion above, not the wording now in the box. “Check this moment” submits the edited wording instead.'
+              : 'The latest reply is for the saved opinion above.',
+            language,
+          )}
+        </p>
+      )}
+      {hasMovedSinceAnswer && (
+        <p className="stale-answer-notice" role="status">
+          {translateNarrative(
+            `The latest reply is for ${formatMatchClock(submittedContext.selectedClock)} · ${scopePeriod(submittedContext.period)}. The replay is now at ${formatMatchClock(selectedClock)}; that answer has not been recalculated.`,
+            language,
+          )}
+        </p>
+      )}
       {canCheckAgain && displayedClock && (
         <div className="check-again">
-          <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
-          <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.</span>
+          <button className="secondary-button" type="button" onClick={checkAgain}>
+            {translateNarrative(`Check again at ${formatMatchClock(displayedClock)}`, language)}<ArrowIcon />
+          </button>
+          <span>
+            {translateNarrative(
+              `Same wording, same ${submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option${opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.`,
+              language,
+            )}
+          </span>
         </div>
       )}
       <div className="share-row">
@@ -1052,7 +1146,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <details className="share-preview">
           <summary>Preview share card</summary>
           <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
-            {shareCardBlocks(shareModel).map((block, index) => (
+            {localizedShareCardBlocks(shareModel, language).map((block, index) => (
               <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
@@ -1065,6 +1159,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const pendingScope = pending ? `${formatMatchClock(pending.context.selectedClock)} · ${scopePeriod(pending.context.period)}` : ''
 
   return (
+    <LocalizedMarkup>
     <main className="page-shell analyst-shell" id="main-content">
       <a className="skip-link" href="#opinion-input">Skip to your opinion</a>
       <header className="site-header">
@@ -1074,11 +1169,12 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         </a>
         <nav className="site-nav" aria-label="Matches"><a href="#/matches">All matches</a></nav>
         <span className="demo-label"><span aria-hidden="true" />Synthetic demo</span>
+        <LanguageSelector />
       </header>
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title">{dataset.teams[0]} v {dataset.teams[1]}<span> · {dataset.name}</span></h1>
+          <h1 id="page-title"><bdi dir="ltr">{dataset.teams[0]} v {dataset.teams[1]}</bdi><span> · {dataset.name}</span></h1>
           <p className="intro-description">{dataset.scenario}</p>
           {demo === 'offer' && isBaseline && (
             <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
@@ -1128,7 +1224,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                   <div className="chat-turn">
                     <div className="msg msg-user">
                       <p className="msg-label">You · {pendingScope}</p>
-                      <p className="msg-text">{pending.context.opinion}</p>
+                      <p className="msg-text" data-original-opinion="true" dir="auto">{pending.context.opinion}</p>
                     </div>
                     {isLoadingSubmit && (
                       <div className="msg msg-bot" role="status">
@@ -1153,7 +1249,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
               <textarea
                 id="opinion-input" value={opinion} onChange={(event) => setOpinion(event.currentTarget.value)}
                 placeholder={`Type an opinion, e.g. How many shots did ${dataset.teams[1]} have?`}
-                rows={3} required aria-describedby="input-hint"
+                rows={3} required aria-describedby="input-hint" dir="auto"
               />
               <div className="composer-bottom">
                 <div className="scope-summary">
@@ -1184,9 +1280,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
               </div>
               <div className="suggestions" role="group" aria-label="Example opinions">
                 <span>Examples (these fill the box; nothing is sent until you check)</span>
-                {examples.map((example) => (
-                  <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${example.shows} · ${formatMatchClock(example.clock)}`}>{example.text}</button>
-                ))}
+                {examples.map((example) => {
+                  const text = localizedExample(example.text, language)
+                  return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${translateNarrative(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
+                })}
               </div>
               <p className="input-hint" id="input-hint">Fictional match: every performance and result is invented.</p>
               {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
@@ -1219,8 +1316,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <details className="about-demo">
           <summary>About this demo & its data</summary>
           <div>
-            <p>{dataset.teams[0]} and {dataset.teams[1]} are fictional teams using real-player names. Every performance and result is invented.</p>
-            <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
+            <p>{`${dataset.teams[0]} and ${dataset.teams[1]} are fictional teams using real-player names. Every performance and result is invented.`}</p>
+            <p>{analysis
+              ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.`
+              : 'The analysis service has not yet reported how it reads questions.'}</p>
             <p>The guided demonstration only prepares a fictional 57′ replay and its opinion; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
             <p>“Share the receipts” appears only where your browser can share image files. It hands the card image to your device’s share sheet and cannot tell whether anything was sent. Copy and download are always available.</p>
             <p>Match statistics use the selected time and evidence period. Possession uses recorded controlled time only; contested and out-of-play time are excluded. Build-up and pressure observations cover selected samples.</p>
@@ -1236,5 +1335,6 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         </div>
       )}
     </main>
+    </LocalizedMarkup>
   )
 }

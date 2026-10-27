@@ -7,8 +7,8 @@
 .brand-mark > span { position: absolute; right: 5px; bottom: 6px; font-size: 26px; }
 .demo-label { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 550; white-space: nowrap; }
 .demo-label > span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.skip-link { position: absolute; top: 8px; left: -9999px; z-index: 5; padding: 10px 16px; background: var(--accent); color: var(--bg); }
-.skip-link:focus { left: 16px; }
+.skip-link { position: absolute; top: 8px; left: 16px; z-index: 5; padding: 10px 16px; background: var(--accent); color: var(--bg); transform: translateY(calc(-100% - 8px)); }
+.skip-link:focus { transform: translateY(0); }
 .analysis-page { width: 100%; padding: 45px 0 35px; }
 .page-intro { margin-bottom: 28px; }
 .eyebrow { display: flex; align-items: center; gap: 9px; margin: 0 0 13px; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .17em; }

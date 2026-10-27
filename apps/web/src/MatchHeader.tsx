@@ -4,6 +4,7 @@ import type { MatchTeam } from '../../shared/src/matchClock'
 import { formatMatchClock, type MatchClock } from '../../shared/src/matchClock'
 import { clockKey, type ReplaySnapshot } from './replayController'
 import { teamMonogram } from './teamMonogram'
+import { LocalizedMarkup } from './localization'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -132,6 +133,7 @@ export function MatchHeader({
     : ''
 
   return (
+    <LocalizedMarkup>
     <section className="match-header" aria-labelledby="match-header-title">
       <h2 id="match-header-title" className="visually-hidden">Fictional match replay</h2>
       <div className="scoreboard">
@@ -229,5 +231,6 @@ export function MatchHeader({
         <EventLog frame={displayed} homeTeam={teams[0]} />
       </details>
     </section>
+    </LocalizedMarkup>
   )
 }

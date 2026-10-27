@@ -47,7 +47,7 @@ const cases = [
   { n: 32, text: 'Every Eastport shot was on target', ds: B, clock: S2(57), intent: 'factual-claim', assessment: 'contradicted', stats: [['Eastport', 4], ['Eastport', 2]], reply: /2 of Eastport's 4 recorded shots were on target, so not every shot was/, evidence: 'some' },
   { n: 33, text: 'Northbridge had no shots on target', ds: B, clock: S2(57), intent: 'factual-claim', assessment: 'contradicted', stats: [['Northbridge', 2]], reply: /2 recorded shots on target from 4 recorded shots/, evidence: 'some' },
   { n: 34, text: 'Eastport had more shots on target than Northbridge but Northbridge had more possession', ds: B, clock: S2(57), claims: [['factual-claim', 'contradicted'], ['factual-claim', 'supported']], reply: /level on 2 shots on target each.*Northbridge had 55\.4%/, evidence: 'some' },
-  { n: 35, text: 'How many passes did Bruno complete?', ds: B, clock: S2(58), intent: 'unrecognized-language', assessment: 'clarification needed', reply: /Bruno Guimarães \(Northbridge\) or Bruno Fernandes \(Eastport\)/, evidence: 'none' },
+  { n: 35, text: 'How many passes did Bruno complete?', ds: B, clock: S2(58), intent: 'statistical-request', assessment: 'clarification needed', reply: /Bruno Guimarães \(Northbridge\) or Bruno Fernandes \(Eastport\)/, evidence: 'none' },
   { n: 36, text: 'How did Saka perform?', ds: B, clock: S2(57), intent: SUBJ, assessment: INSUF, reply: SAKA, evidence: 'some' },
   { n: 37, text: 'How did he play?', ds: B, clock: S2(57), intent: 'unrecognized-language', assessment: 'clarification needed', reply: /Which player does “he” refer to/, evidence: 'none' },
   { n: 38, text: 'Saka and Rice have been poor', ds: B, clock: S2(57), claims: [[SUBJ, INSUF], [SUBJ, INSUF]], reply: /Bukayo Saka scored 1 goal.*Declan Rice/s, evidence: 'some' },
@@ -71,6 +71,13 @@ for (const c of cases) {
     if (c.contextOnly) {
       const roles = r.claims[0].evidence.map((item) => item.role)
       assert.ok(roles.length > 0 && roles.every((role) => role === 'context'), 'context evidence is never supporting or challenging')
+    }
+    if (c.n === 35) {
+      assert.equal(r.claims[0].claim.playerSubject, null, 'the requested metric does not identify a player')
+      assert.equal(r.claims[0].claim.playerMetric, 'pass-completions')
+      assert.deepEqual(r.claims[0].statistics, [])
+      assert.deepEqual(r.claims[0].playerStatistics, [])
+      assert.deepEqual(r.claims[0].evidence, [])
     }
     assert.notEqual(r.fanReply, '', 'non-empty reply')
     assert.ok(!/couldn't match that to something I can check/.test(r.fanReply), 'no generic refusal')

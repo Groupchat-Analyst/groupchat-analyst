@@ -20,6 +20,7 @@ import {
   type CountAssertion,
 } from '../../../shared/src/countAssertions.js'
 import { classifyOpinion, evidenceForTopic } from '../../../shared/src/opinionTopics.js'
+import { canonicalizeSupportedFootballOpinion } from '../../../shared/src/localization.js'
 import type {
   InterpretationContext,
   InterpretationProvider,
@@ -305,7 +306,9 @@ function playerMetricRequest(
             ? 'recoveries'
             : phrase === 'pressure observations' || phrase === 'pressures'
               ? 'pressure-observations'
-              : phrase === 'pass attempts' || phrase === 'passes'
+              : phrase === 'passes' && /\bcomplete\b/i.test(text)
+                ? 'pass-completions'
+                : phrase === 'pass attempts' || phrase === 'passes'
                 ? 'pass-attempts'
                 : phrase === 'pass completion'
                   ? 'pass-completion-percentage'
@@ -675,7 +678,7 @@ function claimFromText(
     (playerMentions.length === 1 ? playerMentions[0] : null)
   const requestedPlayerMetric = playerComparison
     ? undefined
-    : playerMetricRequest(text, playerSubject !== null)
+    : playerMetricRequest(text, playerSubject !== null || playerMentions.length > 1)
   const subject =
     playerSubject?.team ??
     metricComparison?.subject ??
@@ -957,7 +960,8 @@ export class LocalInterpretationProvider implements InterpretationProvider {
     opinion: string,
     context: InterpretationContext,
   ): Promise<unknown> {
-    const claims = splitOpinion(opinion).flatMap((text) => {
+    const locallyInterpretableOpinion = canonicalizeSupportedFootballOpinion(opinion)
+    const claims = splitOpinion(locallyInterpretableOpinion).flatMap((text) => {
       const mentions = mentionedPlayers(text, context.players)
       const sharedJudgement =
         mentions.length >= 2 &&
