@@ -35,17 +35,17 @@ Match key: **B** = Original match (`…-analysis-demo` 3.0.0, 57′ unless state
 | 12 | Northbridge keep giving it away | B 57′ | Possession losses | Recorded turnovers | Subjective judgement, insufficient evidence | PASS |
 | 13 | Northbridge are sloppy on the ball | R 90+4′ | Possession losses by third | Recorded turnovers by third | Subjective judgement, insufficient evidence | PASS |
 | 14 | Eastport had more shots than Northbridge | B 57′ | Shots comparison | Factual verdict with figures | Factual claim, contradicted | PASS |
-| 15 | Eastport are not testing the keeper | B 57′ | Attacking output | Shots on target, no verdict on “testing” | Subjective judgement, insufficient evidence | PASS |
+| 15 | Eastport are not testing the keeper | B 57′ | Attacking output | Shots on target, no verdict on “testing” | Subjective judgement, insufficient evidence | PARTIAL |
 | 16 | Eastport have little attacking threat | B 57′ | Attacking output | Shots, no chance-quality claim | Subjective judgement, insufficient evidence | PASS |
 | 17 | Eastport are wasteful in front of goal | B 57′ | Finishing | Shots and goals; no chance quality | Subjective judgement, insufficient evidence | PASS |
 | 18 | Eastport missed a sitter | B 57′ | Chance quality | Shots; chance quality unrecorded | Subjective judgement, insufficient evidence | PASS |
 | 19 | Northbridge dominated possession | B 57′ | Broad dominance | Context only, no firm verdict | Subjective judgement, insufficient evidence | PASS |
 | 20 | Eastport had more possession than Northbridge | R 90+4′ | Possession comparison | Verdict from controlled time | Factual claim, supported (58.2% v 41.8%) | PASS |
-| 21 | Northbridge parked the bus | B 57′ | Defensive approach | Unavailable defensive shape; possession as labelled context only | Subjective judgement, insufficient evidence; also covered by captured Foundry replay | PASS |
-| 22 | Northbridge are sitting deep | B 57′ | Defensive approach | Same | Same | PASS |
+| 21 | Northbridge parked the bus | B 57′ | Defensive approach | Unavailable defensive shape; possession as labelled context only | Subjective judgement, insufficient evidence; also covered by captured Foundry replay | PARTIAL |
+| 22 | Northbridge are sitting deep | B 57′ | Defensive approach | Same | Same | PARTIAL |
 | 23 | Eastport are pinned back | B 57′ | Pressure/territory | Positional summaries cannot establish control | Subjective judgement, insufficient evidence | PASS |
 | 24 | Eastport cannot get out of their half | B 57′ | Progression | Same | Same | PASS |
-| 25 | Northbridge are pressing high | B 57′ | Pressing | Pressure records are a sample; no verdict | Subjective judgement, insufficient evidence | PASS |
+| 25 | Northbridge are pressing high | B 57′ | Pressing | Pressure records are a sample; no verdict | Subjective judgement, insufficient evidence | PARTIAL |
 | 26 | Eastport have the momentum | B 57′ | Momentum | Recent-window context, no verdict | Subjective judgement, insufficient evidence | PASS |
 | 27 | Northbridge had more possession than Eastport | R 88′, last 10 min | Rolling window | Window figures that differ from the whole match | Factual claim, supported (88.9% in the window; 42.4% cumulative) | PASS |
 | 28 | Eastport scored before half-time | B 57′ | Goal chronology | Factual verdict | Factual claim, contradicted | PASS |
@@ -64,7 +64,7 @@ Match key: **B** = Original match (`…-analysis-demo` 3.0.0, 57′ unless state
 | 41 | Eastport will win | B 57′ | Prediction | Explicit limitation | “That’s a prediction about what happens next, and the records only cover play up to 57′.” | PASS |
 | 42 | Eastport had a shot from outside the box | B 57′ | Shot location | Unavailable or checked against recorded positions | Unavailable data: shot records hold no coordinates or zone, free-text descriptions are not location data, and no other shot count is substituted | PASS (repaired) |
 
-Totals after the repair (local-rule execution, re-run through the real analysis path): 42 inputs, 42 PASS, 0 PARTIAL, 0 FAIL. Cases 29–33, 38 and 42 were repaired through shared semantics (count assertions, strict goal anchors, multi-player expansion) and are covered by `apps/api/tests/semantic-assertions.test.mjs`.
+Totals, verified by per-case assertions in `apps/api/tests/language-matrix.test.mjs` (intent, assessment, statistics, reply meaning, evidence presence): 42 inputs, 38 PASS, 4 PARTIAL, 0 FAIL. Earlier versions of this table over-marked four cases as PASS. PARTIAL: #15 reports shots and goals rather than shots on target; #21 and #22 give no possession context figure and cite no evidence; #25 does not surface the pressure-observation sample. Each still gives a neutral, non-verdict answer rather than a generic refusal. Completed-pass count comparisons (“X completed more passes than Y”, with fewer/negated/as-many forms, aliases and windows) are covered by `apps/api/tests/completed-passes.test.mjs`. Cases 29–33, 38 and 42 were repaired through shared semantics (count assertions, strict goal anchors, multi-player expansion) and are covered by `apps/api/tests/semantic-assertions.test.mjs`.
 
 Limits of that result:
 - These are **local-rule** results only. Foundry interpretation of these forms is **unverified**; the Foundry schema and prompt are unchanged and cannot emit the local-only `shot-location` evidence kind.

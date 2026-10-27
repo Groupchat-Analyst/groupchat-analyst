@@ -1969,7 +1969,8 @@ const defensiveShapePattern = new RegExp(
 )
 
 function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
+  const suffix = /(s|sh|ch|x)$/.test(noun) ? 'es' : 's'
+  return `${count} ${noun}${count === 1 ? '' : suffix}`
 }
 
 /**

@@ -28,7 +28,7 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 | Web tests | 121 pass |
 | Baseline fixture hash | Unchanged (`fb5335ff…`, 70 passes, 17 turnovers) |
 | Browser (desktop + 390 px/320 px emulation, local stack) | Stage 1 journey and race checks (see NEXT_SESSION.md); Stage 2: both new fixtures load with correct names/score, no overflow at 1280/390/320, 0 analyze calls on load, example prefills without a request, one request on submit, Analyst view and pass map use the fixture’s team names |
-| Language matrix | 42 inputs: 42 pass under local rules ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
+| Language matrix | 42 inputs: 38 pass, 4 partial, 0 fail under local rules (asserted) ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
 | Live Foundry for the current work | **None** |
 

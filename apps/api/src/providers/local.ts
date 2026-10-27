@@ -94,6 +94,29 @@ function parsePassCompletionAssertion(
 
 }
 
+const COMPLETED_PASS_COUNT =
+  /\b(?:pass completions|complet(?:e|ed|es)\s+(?:(?:more|fewer|less|as\s+many|the\s+same\s+number\s+of)\s+)?passes|(?:more|fewer|less|as\s+many|the\s+same\s+number\s+of)\s+completed\s+passes|completed\s+passes|pass completion counts?)\b/i
+
+/** Team comparison of completed-pass counts (not attempts or completion percentage). */
+function parseCompletedPassCount(text: string): ParsedComparisonRequest | undefined {
+  if (!COMPLETED_PASS_COUNT.test(text)) return undefined
+  const teams = orderedTeams(text)
+  if (teams.length !== 2 || teams[0] === teams[1]) return undefined
+  const asMany = /\b(?:as\s+many|the\s+same\s+number\s+of)\b/i.test(text)
+  const negated = /\b(?:did\s+not|didn['’]t|not)\b/i.test(text)
+  const operator = asMany
+    ? negated ? 'not-equal' : 'equal'
+    : comparisonOperator(text)
+  if (!operator) return undefined
+  return {
+    subject: teams[0],
+    opponent: teams[1],
+    metric: 'pass-completions',
+    intent: 'factual-claim',
+    operator,
+  }
+}
+
 function normalizeName(value: string): string {
   return value
     .replace(/[Øø]/g, (letter) => letter.toLowerCase() === 'ø' ? 'o' : 'O')
@@ -136,7 +159,7 @@ function playerComparisonMetric(text: string): ClaimMetric | undefined {
   if (/\b(?:running distance|ran\s+(?:farther|further)|covered\s+more\s+ground)\b/i.test(text)) {
     return 'running-distance'
   }
-  if (/\b(?:pass completions|completed\s+(?:(?:more|fewer|less)\s+)?passes|pass completion counts?)\b/i.test(text)) {
+  if (COMPLETED_PASS_COUNT.test(text)) {
     return 'pass-completions'
   }
   if (/\b(?:pass(?:es)?\s+completion(?:\s+(?:percentage|rate))?|passing\s+accuracy|percentage\s+of\s+(?:(?:their|his|her)\s+)?passes|completion\s+rates?)\b/i.test(text)) {
@@ -643,7 +666,8 @@ function claimFromText(
   const passAssertion = parsePassCompletionAssertion(text)
   const runningDistance = parseRunningDistanceComparison(text)
   const singleStatistic = parseSingleStatisticRequest(text)
-  const metricComparison = passRequest ?? passAssertion ?? runningDistance
+  const completedPasses = playerComparison ? undefined : parseCompletedPassCount(text)
+  const metricComparison = passRequest ?? passAssertion ?? completedPasses ?? runningDistance
   const parsedClaim = metricComparison || singleStatistic
     ? undefined
     : interpretClaim(text.replace(GOAL_PHRASE, '')).claims[0]
@@ -721,12 +745,14 @@ function claimFromText(
       operator:
         passRequest
           ? 'comparison-request'
-          : passAssertion?.operator ?? 'greater-than',
+          : metricComparison.operator ?? 'greater-than',
     }
     category = 'factual-comparison'
     intent = metricComparison.intent
     description = passRequest
       ? 'Compare both teams’ recorded pass attempts, completions, and completion percentages in the selected period.'
+      : completedPasses
+        ? `${completedPasses.subject}'s recorded completed passes (a count, not attempts or completion percentage) compared with ${completedPasses.opponent}'s: ${completedPasses.operator}.`
       : passAssertion
         ? `${metricComparison.subject}'s recorded pass completion percentage is ${passAssertion.operator === 'less-than' ? 'lower' : 'higher'} than ${metricComparison.opponent}'s.`
         : `${metricComparison.subject} ran farther than ${metricComparison.opponent}; compare running distance.`
