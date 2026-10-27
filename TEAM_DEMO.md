@@ -7,7 +7,7 @@ This guide describes the public, read-only local-provider candidate. Deployment 
 ## 110-second walkthrough
 
 1. **Problem (10 s).** Football arguments in group chats run on opinion; nobody checks the opinion against the match.
-2. **Home (10 s).** “Football opinions. Checked against the moment.” Press **See the 57′ → 58′ demo**. It opens the Original match, sets 57′ and fills the box. Nothing is submitted.
+2. **Home (10 s).** “Your mate’s got an opinion. Bring the receipts.” Flip the **57′ / 58′** preview switch (static, illustrative, no request) to show the same opinion changing. Press **Try the 57′ → 58′ demo** (the other button is **Explore both matches**). It opens the Original match, sets 57′ and fills the box. Nothing is submitted.
 3. **Check at 57′ (20 s).** Press **Check this moment**: “Eastport had more shots on target than Northbridge.” → no, level at 2 each. Point at **Checked against** and the “Local rules · no model connection” label.
 4. **Replay and recheck (20 s).** **Move to 58′**, then **Check again at 58′**. Now Eastport 3, Northbridge 2, with the new shot at 58′. No cause is inferred.
 5. **Share (15 s).** Open **Share what changed**; the card footer names the fixture, version and local-rules reading. Copy, download or (on a supported phone) **Share the receipts**.

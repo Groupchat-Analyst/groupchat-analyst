@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DATASET_CATALOG } from '../../shared/src/datasetCatalog'
-import { BASELINE_DATASET_ID } from '../../shared/src/datasetCatalog'
+import { HomePage } from './HomePage'
 import { MatchView } from './App'
 import { matchHash, parseRoute, type Route } from './routes'
 import './App.css'
@@ -38,19 +38,7 @@ function Chrome({ children }: { children: React.ReactNode }) {
 function Home() {
   return (
     <Chrome>
-      <section className="home-page" aria-labelledby="page-title">
-        <h1 id="page-title">Football opinions. <span>Checked against the moment.</span></h1>
-        <p className="intro-description">Check an opinion against the recorded match evidence. Move the clock forward, check again, and see what changed.</p>
-        <div className="home-actions">
-          <a className="check-button" href="#/matches">Try it out</a>
-          <a className="secondary-button" href={matchHash(BASELINE_DATASET_ID, true)}>See the 57′ → 58′ demo</a>
-        </div>
-        <ul className="home-notes">
-          <li>Fictional replay: two invented teams and invented events, never real match data.</li>
-          <li>This preview reads opinions with limited local rules and no AI model. Unfamiliar wording may be declined.</li>
-          <li>Planned: a WhatsApp companion. This demo does not read any chat.</li>
-        </ul>
-      </section>
+      <HomePage />
     </Chrome>
   )
 }

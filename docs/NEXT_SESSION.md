@@ -1,5 +1,15 @@
 # Next-session handoff
 
+## Homepage polish (from `b98ac41`)
+
+Scope: homepage only (`HomePage.tsx`, `landing.css`, `Shell.tsx` wiring, small header/nav fixes in `home.css`). Match selector, conversation, analysis, replay, sharing and language behaviour are untouched.
+
+- Hero, two actions (“Try the 57′ → 58′ demo”, “Explore both matches”), disclosure line, 57′/58′ preview switch (chat plus off-white receipt with “Checked at” stamp), four-step journey, WhatsApp-planned section, and an expandable limits explanation.
+- The preview is a static model (`apps/shared/src/homePreview.ts`). `apps/api/tests/home-preview.test.mjs` replays both clocks through the real `analyzeOpinion` and fails if figures, fixture version, assessments or reply text drift. Score (1–0 / 1–1) and shots on target (2–2 / N2–E3) are shown as separate figures.
+- Browser checks (Playwright emulation, ordinary pointer clicks, local stack): opening the homepage and switching 57′/58′ make 0 `/api/analyze` calls; the primary action prepares the draft with 0 analyze calls, and the guided journey (submit, Move to 58′, Check again) makes exactly 2; the secondary action goes to `#/matches`. No horizontal overflow at 1280, 390 or 320 px. Tab order has a 3 px outline at every stop. Reduced-motion removes the fade-in.
+- Limits: emulation only, no real device, no screen reader, native share still unverified on a real phone, no live Foundry calls. Contrast was inspected visually, not measured with a tool.
+- Screenshots: session `files/home-polish-{desktop,390,320}[-full].png`, `home-polish-390-58.png`.
+
 ## Independent offline follow-up (27 October 2026; review base `b7f40e4`)
 
 The uploaded source archive identifies `b7f40e441ac915ca43b9ea69731aca229b7e5d29`, later than `01f9c25`. The following is a review patch against that snapshot, not a new upstream commit.
