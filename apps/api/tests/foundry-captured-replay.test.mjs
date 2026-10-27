@@ -71,26 +71,125 @@ test('captured Bruno request returns the explicit clarification without guessing
   assert.doesNotMatch(result.fanReply, /\d+ (?:completed )?passes?/i)
 })
 
+test('latest captured Bruno interpretation replays unchanged through Foundry validation and service', async () => {
+  const latest = JSON.parse(
+    await readFile(
+      new URL('./fixtures/foundry-2026-10-27-call4-interpretation.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  assert.equal(captured[3].claims[0].playerMetric, null)
+  assert.equal(latest.claims[0].playerMetric, 'pass-completions')
+  assert.equal(captured[3].claims[0].playerSubject, null)
+  assert.equal(latest.claims[0].playerSubject, null)
+  let outboundRequests = 0
+  const provider = new FoundryInterpretationProvider(
+    { baseUrl: 'https://example.invalid/openai/v1', apiKey: 'mock-key', deployment: 'mock' },
+    async () => {
+      outboundRequests += 1
+      return new Response(
+        JSON.stringify({
+          choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(latest) } }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    },
+  )
+  const result = await analyzeOpinion(request('How many passes did Bruno complete?', 58), provider)
+  const claim = result.claims[0]
+
+  assert.equal(outboundRequests, 1)
+  assert.equal(result.provider, 'foundry')
+  assert.equal(result.evidenceFoundation.dataset.id, 'northbridge-eastport-analysis-demo')
+  assert.equal(result.evidenceFoundation.dataset.version, '3.0.0')
+  assert.equal(result.selectedTime, '58′')
+  assert.equal(result.selectedPeriodLabel, 'Match so far through 58′')
+  assert.equal(claim.claim.text, latest.claims[0].text)
+  assert.equal(claim.claim.intent, 'statistical-request')
+  assert.equal(claim.claim.playerMetric, 'pass-completions')
+  assert.equal(claim.claim.subject, null)
+  assert.equal(claim.claim.playerSubject, null)
+  assert.equal(claim.assessment, 'clarification needed')
+  assert.deepEqual(claim.statistics, [])
+  assert.deepEqual(claim.playerStatistics, [])
+  assert.deepEqual(claim.calculations, [])
+  assert.deepEqual(claim.evidence, [])
+  assert.match(result.fanReply, /Which Bruno do you mean: Bruno Fernandes \(Eastport\) or Bruno Guimarães \(Northbridge\)\?/)
+  assert.doesNotMatch(result.fanReply, /\d+ (?:completed )?passes?/i)
+})
+
 test('unresolved statistical entity without clarification is still rejected', async () => {
-  const variant = structuredClone(captured[3])
+  const variant = JSON.parse(
+    await readFile(
+      new URL('./fixtures/foundry-2026-10-27-call4-interpretation.json', import.meta.url),
+      'utf8',
+    ),
+  )
   variant.claims[0].clarificationNeeds = []
   await assert.rejects(
     analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(variant)),
+    /needs clarification|intent does not match its evidence request/,
+  )
+})
+
+test('a known requested player metric is not a guessed identity and must match its evidence', async () => {
+  const knownMetric = structuredClone(captured[3])
+  knownMetric.claims[0].playerMetric = 'pass-completions'
+  const result = await analyzeOpinion(
+    request('How many passes did Bruno complete?', 58),
+    replay(knownMetric),
+  )
+  assert.equal(result.claims[0].claim.playerMetric, 'pass-completions')
+  assert.equal(result.claims[0].claim.playerSubject, null)
+  assert.deepEqual(result.claims[0].playerStatistics, [])
+
+  const mismatched = structuredClone(captured[3])
+  mismatched.claims[0].playerMetric = 'pass-completions'
+  mismatched.claims[0].requiredEvidence = ['possession']
+  await assert.rejects(
+    analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(mismatched)),
     /intent does not match its evidence request/,
   )
 })
 
-test('clarification state does not excuse a guessed player metric or mismatched intent', async () => {
-  const guessed = structuredClone(captured[3])
-  guessed.claims[0].playerMetric = 'pass-completions'
+test('clarification rejects contradictory identity and incompatible claim shape', async () => {
+  const contradictoryIdentity = structuredClone(captured[3])
+  contradictoryIdentity.claims[0].playerSubject = {
+    id: 'east-player-08',
+    name: 'Bruno Fernandes',
+    team: 'Eastport',
+  }
+  contradictoryIdentity.claims[0].playerMetric = 'pass-completions'
   await assert.rejects(
-    analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(guessed)),
+    analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(contradictoryIdentity)),
   )
-  const mismatched = structuredClone(captured[3])
-  mismatched.claims[0].requiredEvidence = ['possession']
+
+  const incompatibleIntent = structuredClone(captured[3])
+  incompatibleIntent.claims[0].intent = 'factual-claim'
+  incompatibleIntent.claims[0].playerMetric = 'pass-completions'
   await assert.rejects(
-    analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(mismatched)),
+    analyzeOpinion(request('How many passes did Bruno complete?', 58), replay(incompatibleIntent)),
   )
+})
+
+test('explicitly named Bruno receives only his own completed-pass evidence', async () => {
+  const explicitlyNamed = structuredClone(captured[3])
+  explicitlyNamed.claims[0].subject = 'Eastport'
+  explicitlyNamed.claims[0].playerSubject = {
+    id: 'east-player-08',
+    name: 'Bruno Fernandes',
+    team: 'Eastport',
+  }
+  explicitlyNamed.claims[0].clarificationNeeds = []
+  const result = await analyzeOpinion(
+    request('How many passes did Bruno Fernandes complete?', 58),
+    replay(explicitlyNamed),
+  )
+  const claim = result.claims[0]
+  assert.equal(claim.assessment, 'statistics provided')
+  assert.equal(claim.claim.playerSubject.id, 'east-player-08')
+  assert.ok(claim.playerStatistics.length > 0)
+  assert.ok(claim.playerStatistics.every(({ playerId }) => playerId === 'east-player-08'))
 })
 
 test('call-3 interpretation from the 90b7e97 run quotes the user wording, not the model paraphrase', async () => {

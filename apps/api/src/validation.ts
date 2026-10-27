@@ -632,7 +632,7 @@ export function validateInterpretation(
       !comparison &&
       subject === null &&
       playerSubject === null &&
-      playerMetric === null &&
+      meaning.category === 'other' &&
       Array.isArray(claim.clarificationNeeds) &&
       claim.clarificationNeeds.length > 0
     if (
@@ -644,7 +644,9 @@ export function validateInterpretation(
           !requiredEvidence.some((kind) =>
             ['shots', 'shots-on-target', 'goals', 'passing', 'player-events', 'lineups'].includes(kind),
           ))) ||
-      (playerMetric !== null && playerSubject === null) ||
+      (playerMetric !== null &&
+        playerSubject === null &&
+        !isClarificationState) ||
       (playerMetric !== null &&
         !requiredEvidence.includes(evidenceForMetric[playerMetric])) ||
       (comparison !== null && playerMetric !== null) ||
