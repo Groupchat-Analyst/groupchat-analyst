@@ -1,5 +1,14 @@
 # Next-session handoff
 
+## Final repair patch from the independent Stage 2 review (application `2343167`)
+
+- Patch base `f4eae5c` applied cleanly to the same branch/HEAD, with a clean worktree before application. No newer local edits were present.
+- Fixed foreign-team resolution across all catalog fixtures: fixture aliases are recognized in one non-cascading pass; aliases from other fixtures are preserved individually and rejected, including when either original team name appears in the opinion. Such opinions are not sent to a supplied model provider and return no attributed team statistics/evidence.
+- Unknown explicit comparison opponents now prompt for clarification rather than silently using the current fixture’s other team. Regression coverage checks both team orders, aliases/case, negation, possession and shot comparisons, unsupported teams/players, plus ordinary descriptive and completed-pass comparisons to guard against false positives.
+- Homepage limits copy now refers to every fictional match; the 20-second walkthrough has explicit submission for the Return-match compound example, and the direct `/demo` route is documented as part of the guided flow.
+- Rehearsed the direct route in browser emulation with the local provider: prepared opinion and 57′ scope with 0 analyze calls; explicit submit=1; replay move=0 additional; explicit 58′ recheck=1 additional. Both expected replies and comparison appeared.
+- API build and **308/308 API tests** pass; web typecheck, lint, build and **121/121 web tests** pass. Baseline remains `fb5335ff…1044` (70 passes, 17 turnovers); asserted language matrix remains 42/42 PASS; `git diff --check` clean. No live model call, deployment or Azure change.
+
 ## Final Stage 2 review follow-up (application `36ce40c`)
 
 - Reproduced foreign-team handling on Westhaven/Kingswell and Redmere/Alderwick: names from the original fixtures could be read by the local parser as a current-team subject, and different foreign names collapsed into one placeholder. Foreign-team opinions now bypass any supplied model provider, return an explicit unrecognized limitation, preserve each name separately, and carry no team attribution, statistics or claim evidence.
