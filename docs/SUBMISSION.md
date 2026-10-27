@@ -86,7 +86,7 @@ Dependencies: a new storage resource and a code change in the API; both need exp
 
 ### Proposed fixed live acceptance set (execution NOT authorised)
 
-Candidate commit: the Stage 2 commit recorded in [NEXT_SESSION.md](./NEXT_SESSION.md) (the `git log` SHA of the pushed branch tip that contains this section). Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Do not run it from this document.
+Candidate commit: `d14eb68` (Stage 2 code and fixtures; a docs-only commit that records this SHA follows it). Six calls maximum, one run, no retries, stopping at the first failure or the first schema/validation error, on the current prompt/schema, only after the allowance and approvals above exist. Stop conditions: any failed or invalid response, any call beyond six, any allowance error. Do not run it from this document.
 
 1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
 2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).
