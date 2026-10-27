@@ -213,7 +213,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Inspect a pass': 'Examinar un pase',
     'Completed pass': 'Pase completado',
     'Incomplete pass': 'Pase incompleto',
-    'Technical record · IDs and original wording': 'Registro técnico · identificadores y texto original',
+    'Technical record · IDs and original source wording (English)': 'Registro técnico · identificadores y texto original de origen (inglés)',
+    'The descriptions above are localized. The records below retain original English source wording.': 'Las descripciones anteriores están traducidas. Los registros siguientes conservan la redacción original en inglés.',
+    'Original source wording (English):': 'Redacción original de origen (inglés):',
     'Explore match events': 'Explorar eventos del partido',
     'Ask about a player': 'Preguntar por un jugador',
     'Fictional matchday squad': 'Plantilla ficticia del partido',
@@ -501,7 +503,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Inspect a pass': 'Examiner une passe',
     'Completed pass': 'Passe réussie',
     'Incomplete pass': 'Passe manquée',
-    'Technical record · IDs and original wording': 'Données techniques · identifiants et formulation originale',
+    'Technical record · IDs and original source wording (English)': 'Données techniques · identifiants et texte source original (anglais)',
+    'The descriptions above are localized. The records below retain original English source wording.': 'Les descriptions ci-dessus sont localisées. Les enregistrements ci-dessous conservent le texte source original en anglais.',
+    'Original source wording (English):': 'Texte source original (anglais) :',
     'Explore match events': 'Explorer les événements du match',
     'Ask about a player': 'Interroger sur un joueur',
     'Fictional matchday squad': 'Effectif fictif du match',
@@ -786,7 +790,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Inspect a pass': 'Pass untersuchen',
     'Completed pass': 'Angekommener Pass',
     'Incomplete pass': 'Fehlpass',
-    'Technical record · IDs and original wording': 'Technischer Datensatz · IDs und Originalwortlaut',
+    'Technical record · IDs and original source wording (English)': 'Technischer Datensatz · IDs und ursprünglicher Quelltext (Englisch)',
+    'The descriptions above are localized. The records below retain original English source wording.': 'Die Beschreibungen oben sind übersetzt. Die folgenden Datensätze behalten den englischen Originalquelltext bei.',
+    'Original source wording (English):': 'Ursprünglicher Quelltext (Englisch):',
     'Explore match events': 'Spielereignisse erkunden',
     'Ask about a player': 'Zu einem Spieler fragen',
     'Fictional matchday squad': 'Fiktiver Spieltagskader',
@@ -1071,7 +1077,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Inspect a pass': 'افحص تمريرة',
     'Completed pass': 'تمريرة مكتملة',
     'Incomplete pass': 'تمريرة غير مكتملة',
-    'Technical record · IDs and original wording': 'السجل التقني · المعرّفات والصياغة الأصلية',
+    'Technical record · IDs and original source wording (English)': 'السجل التقني · المعرّفات والنص الأصلي المصدر (بالإنجليزية)',
+    'The descriptions above are localized. The records below retain original English source wording.': 'الأوصاف أعلاه مترجمة. تحتفظ السجلات التالية بالنص الأصلي المصدر باللغة الإنجليزية.',
+    'Original source wording (English):': 'النص الأصلي المصدر (بالإنجليزية):',
     'Explore match events': 'استكشف أحداث المباراة',
     'Ask about a player': 'اسأل عن لاعب',
     'Fictional matchday squad': 'تشكيلة مباراة خيالية',
@@ -1165,6 +1173,8 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
 const evidenceTranslations: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = {
   es: {
     'The synthetic fixture records shots on target events.': 'El partido sintético contiene eventos registrados de tiros a puerta.',
+    'The synthetic fixture records passing events.': 'El partido sintético contiene eventos de pases registrados.',
+    'The synthetic fixture records possession losses events.': 'El partido sintético contiene eventos de pérdidas de posesión registradas.',
     'Each record below is labelled as supporting, challenging, contextual, calculation evidence, or a historical anchor.': 'Cada registro se identifica como prueba a favor, en contra, contextual, de cálculo o como referencia histórica.',
     'Low shot from the edge of the box, saved by the goalkeeper.': 'Disparo raso desde el borde del área, detenido por el portero.',
     'First-time effort from outside the area goes wide.': 'Disparo de primeras desde fuera del área que se va desviado.',
@@ -1234,6 +1244,8 @@ const evidenceTranslations: Record<Exclude<AppLanguage, 'en'>, Record<string, st
   },
   fr: {
     'The synthetic fixture records shots on target events.': 'Le match fictif contient des tirs cadrés enregistrés.',
+    'The synthetic fixture records passing events.': 'Le match fictif contient des passes enregistrées.',
+    'The synthetic fixture records possession losses events.': 'Le match fictif contient des pertes de balle enregistrées.',
     'Each record below is labelled as supporting, challenging, contextual, calculation evidence, or a historical anchor.': 'Chaque entrée est indiquée comme preuve à l’appui, contradictoire, contextuelle, liée au calcul ou comme repère historique.',
     'Low shot from the edge of the box, saved by the goalkeeper.': 'Frappe à ras de terre depuis le bord de la surface, arrêtée par le gardien.',
     'First-time effort from outside the area goes wide.': 'Reprise de l’extérieur de la surface hors cadre.',
@@ -1303,6 +1315,8 @@ const evidenceTranslations: Record<Exclude<AppLanguage, 'en'>, Record<string, st
   },
   de: {
     'The synthetic fixture records shots on target events.': 'Das fiktive Spiel enthält erfasste Schüsse aufs Tor.',
+    'The synthetic fixture records passing events.': 'Das fiktive Spiel enthält erfasste Passereignisse.',
+    'The synthetic fixture records possession losses events.': 'Das fiktive Spiel enthält erfasste Ballverluste.',
     'Each record below is labelled as supporting, challenging, contextual, calculation evidence, or a historical anchor.': 'Jeder Eintrag ist als stützend, widersprechend, kontextuell, Berechnungsbeleg oder historischer Bezug gekennzeichnet.',
     'Low shot from the edge of the box, saved by the goalkeeper.': 'Flacher Schuss vom Strafraumrand, vom Torwart gehalten.',
     'First-time effort from outside the area goes wide.': 'Ein Direktversuch von außerhalb des Strafraums geht vorbei.',
@@ -1372,6 +1386,8 @@ const evidenceTranslations: Record<Exclude<AppLanguage, 'en'>, Record<string, st
   },
   ar: {
     'The synthetic fixture records shots on target events.': 'تتضمن المباراة الخيالية أحداثاً مسجلة للتسديدات على المرمى.',
+    'The synthetic fixture records passing events.': 'تتضمن المباراة الخيالية أحداث تمرير مسجلة.',
+    'The synthetic fixture records possession losses events.': 'تتضمن المباراة الخيالية أحداث فقدان استحواذ مسجلة.',
     'Each record below is labelled as supporting, challenging, contextual, calculation evidence, or a historical anchor.': 'يُصنّف كل سجل أدناه كدليل مؤيد أو معارض أو سياقي أو حسابي أو كمرجع تاريخي.',
     'Low shot from the edge of the box, saved by the goalkeeper.': 'تسديدة أرضية من حافة المنطقة يتصدى لها الحارس.',
     'First-time effort from outside the area goes wide.': 'تسديدة مباشرة من خارج المنطقة تذهب بعيداً عن المرمى.',
@@ -1919,6 +1935,47 @@ export function translateNarrative(text: string, language: AppLanguage): string 
     return `${countedMetric[1]}${countedMetric[2] ?? ''} ${metric[language]}${countedMetric[4]}`
   }
 
+  const passRecord = text.match(/^(Completed|Incomplete|Linked complete|Linked incomplete) pass by (.+?),? intended for (.+?)\.?$/u)
+  if (passRecord) {
+    const [verb, passer, receiver] = passRecord.slice(1)
+    const linked = verb.startsWith('Linked ')
+    const complete = verb === 'Completed' || verb === 'Linked complete'
+    return {
+      es: `${linked ? 'Pase vinculado' : 'Pase'} ${complete ? 'completado' : 'incompleto'} de ${passer}, dirigido a ${receiver}.`,
+      fr: `${linked ? 'Passe liée' : 'Passe'} ${complete ? 'réussie' : 'incomplète'} de ${passer}, destinée à ${receiver}.`,
+      de: `${linked ? 'Verknüpfter Pass' : 'Pass'} ${complete ? 'angekommen' : 'unvollständig'} von ${passer} zu ${receiver}.`,
+      ar: `${linked ? 'التمريرة المرتبطة' : 'تمريرة'} ${complete ? 'مكتملة' : 'غير مكتملة'} من ${passer} إلى ${receiver}.`,
+    }[language]
+  }
+
+  const turnover = text.match(/^Recorded (?:(annotated build-up) )?incomplete-pass turnover by (.+?) in the (defensive|middle|final)-third\.?$/u)
+  if (turnover) {
+    const buildup = turnover[1] !== undefined
+    const area = turnover[3] === 'defensive'
+      ? { es: 'tercio defensivo', fr: 'tiers défensif', de: 'Abwehrdrittel', ar: 'الثلث الدفاعي' }
+      : turnover[3] === 'middle'
+        ? { es: 'tercio medio', fr: 'tiers médian', de: 'Mitteldrittel', ar: 'الثلث الأوسط' }
+        : { es: 'tercio ofensivo', fr: 'tiers offensif', de: 'Angriffsdrittel', ar: 'الثلث الهجومي' }
+    return {
+      es: `Pérdida registrada${buildup ? ' en la muestra anotada de salida' : ''} tras un pase incompleto de ${turnover[2]} en el ${area.es}.`,
+      fr: `Perte de balle enregistrée${buildup ? ' dans l’échantillon annoté de relance' : ''} après une passe incomplète de ${turnover[2]} dans le ${area.fr}.`,
+      de: `Erfasster Ballverlust${buildup ? ' in der annotierten Aufbau-Stichprobe' : ''} nach einem unvollständigen Pass von ${turnover[2]} im ${area.de}.`,
+      ar: `فقدان مسجل للكرة${buildup ? ' ضمن عينة البناء المعلّمة' : ''} بعد تمريرة غير مكتملة من ${turnover[2]} في ${area.ar}.`,
+    }[language]
+  }
+
+  const pressure = text.match(/^Selected (challenge|pressured pass) observation by (.+?); pressure coverage is partial( \(context only\))?\.?$/u)
+  if (pressure) {
+    const contextOnly = pressure[3] !== undefined
+    const event = pressure[1] === 'challenge'
+    return {
+      es: `Observación seleccionada de ${event ? 'desafío' : 'pase bajo presión'} por ${pressure[2]}; la cobertura de presión es parcial${contextOnly ? ' (solo contexto)' : ''}.`,
+      fr: `Observation sélectionnée de ${event ? 'duel' : 'passe sous pression'} par ${pressure[2]} ; la couverture du pressing est partielle${contextOnly ? ' (contexte uniquement)' : ''}.`,
+      de: `Ausgewählte Beobachtung zu ${event ? 'einem Zweikampf' : 'einem Pass unter Druck'} von ${pressure[2]}; die Pressing-Abdeckung ist teilweise${contextOnly ? ' (nur Kontext)' : ''}.`,
+      ar: `ملاحظة مختارة عن ${event ? 'مواجهة' : 'تمريرة تحت الضغط'} بواسطة ${pressure[2]}؛ تغطية الضغط جزئية${contextOnly ? ' (للسياق فقط)' : ''}.`,
+    }[language]
+  }
+
   const evidenceRole = text.match(/^(.+?) · (supporting|challenging|context|calculation|anchor)$/u)
   if (evidenceRole) {
     return `${evidenceRole[1]} · ${translateText(evidenceRole[2], language)}`
@@ -1951,6 +2008,8 @@ export function translateNarrative(text: string, language: AppLanguage): string 
         : ''
       return `${teamEvent[1]}: ${translatedDescription}${translatedActor}`
     }
+    const translatedEvent = translateNarrative(teamEvent[2], language)
+    if (translatedEvent !== teamEvent[2]) return `${teamEvent[1]}: ${translatedEvent}`
   }
 
   const eventActor = text.match(/^(.+?) (Shooter|Scorer): (.+?)(\.)?$/u)

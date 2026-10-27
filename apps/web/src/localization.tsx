@@ -85,6 +85,7 @@ function translateNode(
     children?: ReactNode
     className?: string
     'data-original-opinion'?: string
+    'data-original-source'?: string
     placeholder?: string
     title?: string
     'aria-label'?: string
@@ -93,7 +94,10 @@ function translateNode(
     return node
   }
   const props = node.props
-  const preserveOriginal = inheritedIgnore || props['data-original-opinion'] === 'true'
+  const preserveOriginal =
+    inheritedIgnore ||
+    props['data-original-opinion'] === 'true' ||
+    props['data-original-source'] === 'true'
   const preserveBrand = (props.className ?? '').split(/\s+/).some((name) =>
     name === 'brand' || name === 'brand-light' || name === 'brand-mark')
   const ignoreChildren =

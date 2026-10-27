@@ -6,7 +6,25 @@ import {
   localizedExample,
   translateNarrative,
 } from '../../shared/src/localization.ts'
+import { DATASET_CATALOG } from '../../shared/src/datasetCatalog.ts'
+import { SYNTHETIC_MATCH_EVIDENCE } from '../../shared/src/evidence.ts'
+import { SYNTHETIC_MATCH_EVENTS } from '../../shared/src/match.ts'
+import { REDMERE_MATCH_EVIDENCE, REDMERE_MATCH_EVENTS } from '../../shared/src/redmereAlderwick.ts'
+import { RETURN_MATCH_EVIDENCE, RETURN_MATCH_EVENTS } from '../../shared/src/returnMatch.ts'
+import { WESTHAVEN_MATCH_EVIDENCE, WESTHAVEN_MATCH_EVENTS } from '../../shared/src/westhavenKingswell.ts'
+import { formatMatchClock } from '../../shared/src/matchClock.ts'
+import { blocksToText, describeEvidence } from './presentation.ts'
 import { createBlocksImage } from './shareCardImage.ts'
+
+const fixtureRecords = [
+  { id: 'northbridge-eastport-analysis-demo', events: SYNTHETIC_MATCH_EVENTS, evidence: SYNTHETIC_MATCH_EVIDENCE },
+  { id: 'northbridge-eastport-return-demo', events: RETURN_MATCH_EVENTS, evidence: RETURN_MATCH_EVIDENCE },
+  { id: 'westhaven-kingswell-demo', events: WESTHAVEN_MATCH_EVENTS, evidence: WESTHAVEN_MATCH_EVIDENCE },
+  { id: 'redmere-alderwick-demo', events: REDMERE_MATCH_EVENTS, evidence: REDMERE_MATCH_EVIDENCE },
+].map((fixture) => ({
+  ...fixture,
+  displayTeams: DATASET_CATALOG.find(({ id }) => id === fixture.id).teams,
+}))
 
 const acceptance = [
   {
@@ -51,6 +69,41 @@ test('all five locales have explicit label, native name, and direction metadata'
   assert.deepEqual(APP_LANGUAGES.map(({ code }) => code), ['en', 'es', 'fr', 'de', 'ar'])
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'ar').direction, 'rtl')
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'es').nativeLabel, 'Español')
+})
+
+test('expanded source records identify preserved English wording in the selected language', () => {
+  const expected = {
+    es: ['Registro técnico · identificadores y texto original de origen (inglés)', 'Redacción original de origen (inglés):'],
+    fr: ['Données techniques · identifiants et texte source original (anglais)', 'Texte source original (anglais) :'],
+    de: ['Technischer Datensatz · IDs und ursprünglicher Quelltext (Englisch)', 'Ursprünglicher Quelltext (Englisch):'],
+    ar: ['السجل التقني · المعرّفات والنص الأصلي المصدر (بالإنجليزية)', 'النص الأصلي المصدر (بالإنجليزية):'],
+  }
+  for (const [language, [summary, sourceLabel]] of Object.entries(expected)) {
+    assert.equal(translateNarrative('Technical record · IDs and original source wording (English)', language), summary)
+    assert.equal(translateNarrative('Original source wording (English):', language), sourceLabel)
+    assert.notEqual(
+      translateNarrative('The descriptions above are localized. The records below retain original English source wording.', language),
+      'The descriptions above are localized. The records below retain original English source wording.',
+    )
+  }
+})
+
+test('pass and turnover evidence-coverage details are localized', () => {
+  const details = {
+    es: ['El partido sintético contiene eventos de pases registrados.', 'El partido sintético contiene eventos de pérdidas de posesión registradas.'],
+    fr: ['Le match fictif contient des passes enregistrées.', 'Le match fictif contient des pertes de balle enregistrées.'],
+    de: ['Das fiktive Spiel enthält erfasste Passereignisse.', 'Das fiktive Spiel enthält erfasste Ballverluste.'],
+    ar: ['تتضمن المباراة الخيالية أحداث تمرير مسجلة.', 'تتضمن المباراة الخيالية أحداث فقدان استحواذ مسجلة.'],
+  }
+  for (const [language, expected] of Object.entries(details)) {
+    assert.deepEqual(
+      [
+        translateNarrative('The synthetic fixture records passing events.', language),
+        translateNarrative('The synthetic fixture records possession losses events.', language),
+      ],
+      expected,
+    )
+  }
 })
 
 test('the homepage guided opinion is localized in the selected language', () => {
@@ -190,6 +243,125 @@ test('analyst presentation localizes dynamic result labels and attributed metric
     assert.equal(translateNarrative('substitute', language), substituteLabels[language])
     assert.equal(translateNarrative('Yes', language), yesNoLabels[language][0])
     assert.equal(translateNarrative('No', language), yesNoLabels[language][1])
+  }
+})
+
+test('fixture event details localize from structured records in every non-English presentation surface', () => {
+  const wording = {
+    es: { complete: /completado/u, incomplete: /incompleto/u, pressure: /parcial/u, turnover: /Pérdida registrada/u },
+    fr: { complete: /réussie/u, incomplete: /incomplète/u, pressure: /partielle/u, turnover: /Perte de balle enregistrée/u },
+    de: { complete: /angekommen/u, incomplete: /unvollständig/u, pressure: /teilweise/u, turnover: /Erfasster Ballverlust/u },
+    ar: { complete: /مكتملة/u, incomplete: /غير مكتملة/u, pressure: /جزئية/u, turnover: /فقدان مسجل/u },
+  }
+
+  for (const fixture of fixtureRecords) {
+    const roster = fixture.evidence.players
+    const playerName = (id) => roster.find(({ id: playerId }) => playerId === id)?.name
+    const teamFor = (slot) => fixture.displayTeams[slot === 'Northbridge' ? 0 : 1]
+
+    for (const event of fixture.events) {
+      const shooter = event.playerId ? playerName(event.playerId) : null
+      const raw = `${event.description}${shooter ? ` Shooter: ${shooter} (${event.playerId}).` : ''}`
+      const described = describeEvidence(raw, roster)
+      assert.doesNotMatch(described, /\b(?:north|east)-player-\d+\b/u)
+
+      for (const language of Object.keys(wording)) {
+        const eventLine = `${formatMatchClock(event.clock)} · ${teamFor(event.team)}: ${described}`
+        const localized = translateNarrative(eventLine, language)
+        assert.notEqual(localized, eventLine, `${fixture.id} ${event.id} ${language}`)
+        assert.ok(localized.includes(formatMatchClock(event.clock)), localized)
+        assert.ok(localized.includes(teamFor(event.team)), localized)
+        if (shooter) assert.ok(localized.includes(shooter), localized)
+        assert.doesNotMatch(localized, /Shooter:/u)
+      }
+    }
+
+    for (const outcome of ['complete', 'incomplete']) {
+      const pass = fixture.evidence.passes.find(({ outcome: result }) => result === outcome)
+      const verb = outcome === 'complete' ? 'Completed' : 'Incomplete'
+      const rawVariants = [
+        { description: `${verb} pass by ${pass.playerId} intended for ${pass.receiverId}.`, linked: false },
+        { description: `${verb} pass by ${pass.playerId}, intended for ${pass.receiverId}.`, linked: false },
+        {
+          description: `Linked ${outcome} pass by ${pass.playerId} intended for ${pass.receiverId}, from (${pass.start.x}, ${pass.start.y}) to (${pass.end.x}, ${pass.end.y}).`,
+          linked: true,
+        },
+      ]
+      const passer = playerName(pass.playerId)
+      const receiver = playerName(pass.receiverId)
+
+      for (const variant of rawVariants) {
+        const described = describeEvidence(variant.description, roster)
+        for (const language of Object.keys(wording)) {
+          const line = `${formatMatchClock(pass.clock)} · ${teamFor(pass.team)}: ${described}`
+          const localized = translateNarrative(line, language)
+          assert.match(localized, wording[language][outcome], `${fixture.id} ${outcome} ${language}`)
+          assert.ok(localized.includes(passer) && localized.includes(receiver), localized)
+          assert.ok(localized.includes(formatMatchClock(pass.clock)), localized)
+          assert.ok(localized.includes(teamFor(pass.team)), localized)
+          assert.doesNotMatch(localized, /intended for|pass by/u)
+          if (variant.linked) {
+            assert.match(localized, /vinculado|liée|Verknüpfter|المرتبطة/u)
+          }
+
+          const comparisonEvent = translateNarrative(`New in the records: ${line}`, language)
+          assert.ok(comparisonEvent.includes(formatMatchClock(pass.clock)), comparisonEvent)
+          assert.ok(comparisonEvent.includes(passer) && comparisonEvent.includes(receiver), comparisonEvent)
+          assert.doesNotMatch(comparisonEvent, /intended for|pass by/u)
+
+          const copied = blocksToText([{ kind: 'bullet', text: localized }])
+          assert.equal(copied, `• ${localized}`)
+          const image = createBlocksImage([{ kind: 'bullet', text: localized }], language)
+          const imageText = image.svg.replace(/<[^>]*>/gu, '').replace(/\s+/gu, ' ')
+          assert.ok(imageText.includes(passer) && imageText.includes(receiver), imageText)
+          assert.match(image.svg, wording[language][outcome])
+        }
+      }
+    }
+
+    const turnover = fixture.evidence.turnovers[0]
+    const area = turnover.location.x < 33.3
+      ? 'defensive-third'
+      : turnover.location.x < 66.7 ? 'middle-third' : 'final-third'
+    const turnoverRawVariants = [
+      `Recorded incomplete-pass turnover by ${turnover.playerId} in the ${area} at (${turnover.location.x}, ${turnover.location.y}); linked pass ${turnover.lostPassId}.`,
+      `Recorded annotated build-up incomplete-pass turnover by ${turnover.playerId} in the ${area} at (${turnover.location.x}, ${turnover.location.y}); linked pass ${turnover.lostPassId}.`,
+    ]
+    const turnoverPlayer = playerName(turnover.playerId)
+
+    for (const [index, raw] of turnoverRawVariants.entries()) {
+      const description = describeEvidence(raw, roster)
+      for (const language of Object.keys(wording)) {
+        const localized = translateNarrative(description, language)
+        assert.match(localized, wording[language].turnover, `${fixture.id} turnover ${language}`)
+        assert.ok(localized.includes(turnoverPlayer), localized)
+        assert.doesNotMatch(localized, /defensive-third|middle-third|final-third|linked pass|turnover by/u)
+        if (index === 1) {
+          assert.match(localized, /muestra anotada de salida|échantillon annoté de relance|annotierten Aufbau-Stichprobe|عينة البناء المعلّمة/u)
+        }
+      }
+    }
+
+    const pressure = fixture.evidence.pressures[0]
+    const pressureType = pressure.type.replaceAll('-', ' ')
+    const pressureRawVariants = [
+      `Selected ${pressureType} observation by ${pressure.playerId}; pressure coverage is partial.`,
+      `Selected ${pressureType} observation by ${pressure.playerId}; pressure coverage is partial (context only).`,
+    ]
+    const pressurePlayer = playerName(pressure.playerId)
+
+    for (const [index, raw] of pressureRawVariants.entries()) {
+      const description = describeEvidence(raw, roster)
+      for (const language of Object.keys(wording)) {
+        const localized = translateNarrative(description, language)
+        assert.match(localized, wording[language].pressure, `${fixture.id} pressure ${language}`)
+        assert.ok(localized.includes(pressurePlayer), localized)
+        assert.doesNotMatch(localized, /Selected|observation by|pressure coverage/u)
+        if (index === 1) {
+          assert.match(localized, /solo contexto|contexte uniquement|nur Kontext|للسياق فقط/u)
+        }
+      }
+    }
   }
 })
 

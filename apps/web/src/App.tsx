@@ -182,19 +182,33 @@ function referenceList(references: EvidenceReference[], roster: Roster) {
           </li>
         ))}
       </ul>
-      <TechnicalRecord references={references} />
+      <TechnicalRecord references={references} roster={roster} />
     </>
   )
 }
 
-function TechnicalRecord({ references }: { references: EvidenceReference[] }) {
+function TechnicalRecord({
+  references,
+  roster,
+}: {
+  references: EvidenceReference[]
+  roster: Roster
+}) {
   return (
     <LocalizedMarkup>
       <details className="technical-record">
-        <summary>Technical record · IDs and original wording</summary>
+        <summary>Technical record · IDs and original source wording (English)</summary>
+        <p>The descriptions above are localized. The records below retain original English source wording.</p>
         <ul>
           {references.map((reference) => (
-            <li key={reference.id}><code>{reference.id}</code> · {reference.time} · {reference.team} · {reference.description}</li>
+            <li key={reference.id}>
+              <code>{reference.id}</code> · {reference.time} · {reference.team}
+              <p>{describeEvidence(reference.description, roster)}</p>
+              <p>
+                <strong>Original source wording (English):</strong>{' '}
+                <span data-original-source="true">{reference.description}</span>
+              </p>
+            </li>
           ))}
         </ul>
       </details>
@@ -378,7 +392,10 @@ function ClaimCard({
                   </li>
                 ))}
               </ul>
-              <TechnicalRecord references={result.evidence.map(({ reference }) => reference)} />
+              <TechnicalRecord
+                references={result.evidence.map(({ reference }) => reference)}
+                roster={roster}
+              />
             </section>
           {result.calculations.length > 0 || result.playerCalculations.length > 0 ? (
             <details className="calculation-traces">
