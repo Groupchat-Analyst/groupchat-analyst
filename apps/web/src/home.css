@@ -1,4 +1,4 @@
-.site-nav a { color: inherit; font-size: 0.9rem; }
+.site-nav a { color: inherit; font-size: 0.9rem; display: inline-flex; align-items: center; min-height: 44px; }
 .home-page { display: grid; gap: 1rem; max-width: 40rem; padding: 1.5rem 0; }
 .home-page h1 { margin: 0; font-size: clamp(1.9rem, 6vw, 2.8rem); line-height: 1.1; }
 .home-page h1 span { color: var(--accent, #0b7a4b); }

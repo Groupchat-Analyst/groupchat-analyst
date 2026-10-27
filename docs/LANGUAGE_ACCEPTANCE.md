@@ -49,22 +49,29 @@ Match key: **B** = Original match (`…-analysis-demo` 3.0.0, 57′ unless state
 | 26 | Eastport have the momentum | B 57′ | Momentum | Recent-window context, no verdict | Subjective judgement, insufficient evidence | PASS |
 | 27 | Northbridge had more possession than Eastport | R 88′, last 10 min | Rolling window | Window figures that differ from the whole match | Factual claim, supported (88.9% in the window; 42.4% cumulative) | PASS |
 | 28 | Eastport scored before half-time | B 57′ | Goal chronology | Factual verdict | Factual claim, contradicted | PASS |
-| 29 | Northbridge did not score in the first half | B 57′ | Negated goal claim | Factual verdict | “Couldn’t match that to something I can check” | **FAIL** |
-| 30 | Northbridge had more shots on target than Eastport before the goal | B 57′ | Pre-goal chronology | Verdict on the period before the anchor event | Generic refusal | **FAIL** |
-| 31 | Both teams had the same number of shots | B 57′ | Equality | Verdict | Clarification needed; no evidence retrieved | PARTIAL |
-| 32 | Every Eastport shot was on target | B 57′ | “Every” quantifier | Verdict with counts | Generic refusal | **FAIL** |
-| 33 | Northbridge had no shots on target | B 57′ | Zero attempts | Verdict on a count of zero | Answered with a general shots/goals summary; the shots-on-target question is not addressed | **FAIL** |
+| 29 | Northbridge did not score in the first half | B 57′ | Negated goal claim | Factual verdict | Factual claim, contradicted: Northbridge’s goal is recorded at 45+3′ | PASS (repaired) |
+| 30 | Northbridge had more shots on target than Eastport before the goal | B 57′ | Pre-goal chronology | Verdict on the period before the anchor event | Resolves the one goal recorded by 57′ (45+3′), counts strictly before it; contradicted (1 on target each) | PASS (repaired) |
+| 31 | Both teams had the same number of shots | B 57′ | Equality | Verdict | Equality comparison on shots; supported (4 each) | PASS (repaired) |
+| 32 | Every Eastport shot was on target | B 57′ | “Every” quantifier | Verdict with counts | Universal claim against Eastport’s shots; contradicted (2 of 4); zero attempts gives insufficient evidence | PASS (repaired) |
+| 33 | Northbridge had no shots on target | B 57′ | Zero attempts | Verdict on a count of zero | Zero assertion on shots on target; contradicted (2 on target of 4 shots) | PASS (repaired) |
 | 34 | Eastport had more shots on target than Northbridge but Northbridge had more possession | B 57′ | Two claims, “but” | Two assessed claims | Two claims: contradicted; supported | PASS |
 | 35 | How many passes did Bruno complete? | B 58′ | Ambiguous first name | Ask Fernandes or Guimarães; no count | Clarification needed; also covered by captured Foundry replay | PASS |
 | 36 | How did Saka perform? | B 57′ | Open player question | Recorded contributions, no rating | Same evidence as case 1 | PASS |
 | 37 | How did he play? | B 57′ | Unclear pronoun | Ask who | Clarification needed | PASS |
-| 38 | Saka and Rice have been poor | B 57′ | Two players, one judgement | Both players’ records | A “Which player do you mean?” clarification, although both were named | PARTIAL |
+| 38 | Saka and Rice have been poor | B 57′ | Two players, one judgement | Both players’ records | Two separate claims, one per player, each with its own records and a “no overall rating” limitation | PASS (repaired) |
 | 39 | Northbridge covered more distance than Eastport | B 57′ | Running distance | Unavailable data, no substitute metric | Unavailable metric, “unavailable data” | PASS |
 | 40 | Rice is injured | B 57′ | Injury judgement | Unavailable data | Unavailable metric | PASS |
 | 41 | Eastport will win | B 57′ | Prediction | Explicit limitation | “That’s a prediction about what happens next, and the records only cover play up to 57′.” | PASS |
-| 42 | Eastport had a shot from outside the box | B 57′ | Shot location | Unavailable or checked against recorded positions | Generic refusal | **FAIL** |
+| 42 | Eastport had a shot from outside the box | B 57′ | Shot location | Unavailable or checked against recorded positions | Unavailable data: shot records hold no coordinates or zone, free-text descriptions are not location data, and no other shot count is substituted | PASS (repaired) |
 
-Totals: 42 inputs, 35 PASS, 2 PARTIAL (31, 38), 5 FAIL (29, 30, 32, 33, 42). The failures and partials are open defects, not exclusions. Cases 29, 30, 32 and 33 map to the “negation”, “pre-goal chronology”, “every/none” and “zero attempts” classes: the local rules do not yet interpret those quantified or negated factual forms, and a Foundry interpretation for them is **unverified**.
+Totals after the repair (local-rule execution, re-run through the real analysis path): 42 inputs, 42 PASS, 0 PARTIAL, 0 FAIL. Cases 29–33, 38 and 42 were repaired through shared semantics (count assertions, strict goal anchors, multi-player expansion) and are covered by `apps/api/tests/semantic-assertions.test.mjs`.
+
+Limits of that result:
+- These are **local-rule** results only. Foundry interpretation of these forms is **unverified**; the Foundry schema and prompt are unchanged and cannot emit the local-only `shot-location` evidence kind.
+- “Before the goal” counts strictly before the resolved goal, computed over all recorded events up to the selected time, not the Last-10-minutes window.
+- A bare “the goal” resolves only when exactly one goal is recorded by the selected time; otherwise the app asks which goal.
+- Case 35 (“How many passes did Bruno complete?”) remains a clarification by design (two players share that first name).
+- Offline Foundry-path checks: `foundry-offline-fixtures.test.mjs` holds a **captured replay** of the genuine baseline shots pair (omitted and explicit `datasetId`) and, separately, a **constructed stub** on the Return fixture. Neither is live Foundry verification.
 
 ## Verified second-fixture calculations (Return match, local-rule execution)
 

@@ -25,7 +25,7 @@ Open the home page, choose **Try it out**, then pick a match. The app has hash r
 
 Each match offers key-moment chips and five example opinions. Examples only fill the box, time and period; nothing is sent until you press **Check this moment**. Both fixtures are illustrative event samples, not complete tracking data: no xG, running distance, video or continuous defensive shape.
 
-Classes of opinion the local rules handle: factual comparisons (shots, shots on target, possession, passes, goals, with an omitted opponent such as "Eastport had more shots on target."), single statistics, "X but Y" multiple claims, player statistics, broad player and team judgements (performance, involvement, passing, possession losses, attacking output, finishing, defensive approach, pressure, momentum), clarification for ambiguous names, and explicit limits for physical data, injuries and predictions. See [docs/LANGUAGE_ACCEPTANCE.md](./docs/LANGUAGE_ACCEPTANCE.md) for the 42-input matrix, including five open failures (negated goals, pre-goal chronology, "every", zero counts, shot location).
+Classes of opinion the local rules handle: factual comparisons (shots, shots on target, possession, passes, goals, with an omitted opponent such as "Eastport had more shots on target."), single statistics, "X but Y" multiple claims, player statistics, broad player and team judgements (performance, involvement, passing, possession losses, attacking output, finishing, defensive approach, pressure, momentum), negated goals and "not every" forms, zero counts, "every/none" quantifiers, "both teams" equality, "before the goal" chronology (strict cutoff at a recorded goal), several players in one judgement, clarification for ambiguous names, and explicit limits for physical data, shot location, injuries and predictions. See [docs/LANGUAGE_ACCEPTANCE.md](./docs/LANGUAGE_ACCEPTANCE.md) for the 42-input matrix (42 pass under local rules; Foundry interpretation of the newer forms is unverified).
 
 ## Quick start (Windows or any OS with Node.js ≥ 22.12)
 
@@ -70,7 +70,7 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (desktop and 390 px emulation, local stack): home, match list, both matches, guided demo, failure path (aborted request shows an error and no stale answer), match switch during a pending request (no answer or error carried over), native share with a **stubbed** `navigator.share` (one PNG file, zero extra `/api/analyze` calls). Native sharing on a real phone is **unverified**.
 
-Automated tests: API 207, web 113. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated tests: API 221, web 113. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
 Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to the earlier prompt/schema, which is unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 

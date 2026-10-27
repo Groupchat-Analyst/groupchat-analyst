@@ -28,15 +28,15 @@ Everything is synthetic: two fictional Northbridge v Eastport matches with inven
 | Web tests | 113 pass |
 | Baseline fixture hash | Unchanged (`fb5335ff…`) |
 | Browser (desktop + 390 px emulation, local stack) | Guided 57′→58′ journey, match switching, failure path, pending-request switch, stubbed native share |
-| Language matrix | 42 inputs: 35 pass, 2 partial, 5 fail ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)) |
+| Language matrix | 42 inputs: 42 pass under local rules ([docs/LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md)); Foundry interpretation of the repaired forms unverified |
 | Native share on a real phone | **Unverified** |
 | Live Foundry for the current work | **None** |
 
-Browser interaction note: the automation harness’s native clicks were intercepted on the answer region, so several clicks used DOM `element.click()`. This was a harness limitation, not a demonstrated user-facing block (element-from-point resolved to the intended button), but it is not proof of ordinary-pointer behaviour on every control. Keyboard and screen-reader paths were not re-tested.
+Browser interaction note: ordinary Playwright pointer clicks (with actionability checks) worked on desktop and 390 px emulation for home, match selection, example, submit, replay controls, Move to 58′, Check again and evidence expansion. The earlier interception was not reproduced; no DOM `click()` was used. Not verified: screen readers, real devices, a full keyboard audit.
 
 ## Limitations
 
-- Bounded local wording; open failures are negated goals, “before the goal”, “every”, zero counts and shot location.
+- Bounded local wording; shot location is reported as unavailable (shots carry no coordinates). “Before the goal” counts strictly before the resolved goal over all events up to the selected time, not the Last-10-minutes window.
 - Sampled fixtures: no tracking, video, xG, running distance or continuous defensive shape.
 - Answers live in browser memory; refreshing loses them.
 - There is no public URL in the repository; the hosted candidate address is to be added after deployment approval.
@@ -50,7 +50,7 @@ A WhatsApp companion that checks a take from a group chat. No messaging, account
 1. Open the PR to `main`, review, merge (not done here).
 2. Deploy per [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) and record the public URL.
 3. Real-iPhone check of “Share the receipts” on the hosted build.
-4. Decide on the open language failures or keep them documented.
+4. Decide whether the Foundry schema should gain the repaired forms (count assertions, shot location); today they are local-rules only.
 5. Decide whether to pursue judge-accessible Foundry (below).
 
 ## Foundry access recommendation (judge-accessible, enforced allowance)
@@ -73,8 +73,8 @@ Six calls, one run, no retries, stopping at the first failure, on the current pr
 
 1. “Saka has had a horrible game” — Original, 57′ (player-aware broad opinion).
 2. “Saka’s passing has been poor” — Return, 70′ (no-benchmark passing).
-3. “Northbridge did not score in the first half” — Original, 57′ (negation; highest-risk local failure).
-4. “Every Eastport shot was on target” — Original, 57′ (quantifier).
+3. “Northbridge did not score in the first half” — Original, 57′ (negation). Note: the Foundry schema is unchanged, so this tests how the model expresses it, not the local count-assertion path.
+4. “Every Eastport shot was on target” — Original, 57′ (quantifier; same note).
 5. “Eastport had more possession than Northbridge but Northbridge had more shots” — Return, 90+4′ (multiple claims, differing metrics).
 6. “How many passes did Bruno complete?” — Original, 58′ (clarification regression).
 

@@ -27,7 +27,7 @@ The hosted hackathon candidate is public and read-only. It uses the **local rule
 ## Limits to state honestly
 
 - All data is synthetic and sampled: no real performances, video, tracking or xG.
-- Local rules, not a language model. Open failures include negated goals, “before the goal”, “every”, zero counts and shot location.
+- Local rules, not a language model. Shot location is reported as unavailable; “before the goal” is strictly before the resolved goal.
 - Snapshots live in browser memory and vanish on refresh.
 - Native sharing is unverified on a real device. Foundry has had only small bounded live runs on an earlier prompt/schema and is not part of this deployment.
 
