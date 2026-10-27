@@ -20,6 +20,10 @@ export type DatasetCatalogEntry = {
   id: string
   version: string
   name: string
+  /** Home and away display names, in that order. */
+  teams: readonly [string, string]
+  /** Short, human description of what the match is like to explore. */
+  scenario: string
   description: string
   fictional: true
   moments: DatasetMoment[]
@@ -38,6 +42,8 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
     id: BASELINE_DATASET_ID,
     version: '3.0.0',
     name: 'Original match',
+    teams: ['Northbridge', 'Eastport'],
+    scenario: 'An equaliser at 58′ and a late Eastport lead. Try the shots-on-target opinion at 57′, then 58′.',
     description: 'Northbridge v Eastport — the verified demonstration fixture.',
     fictional: true,
     moments: [
@@ -59,6 +65,8 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
     id: RETURN_DATASET_ID_PUBLIC,
     version: '1.0.0',
     name: 'Return match',
+    teams: ['Northbridge', 'Eastport'],
+    scenario: 'Eastport keep the ball, Northbridge take the shots, and a stoppage-time Northbridge goal settles it.',
     description: 'Northbridge v Eastport — Eastport keep the ball, Northbridge take the shots.',
     fictional: true,
     moments: [

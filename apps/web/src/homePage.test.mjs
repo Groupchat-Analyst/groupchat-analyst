@@ -11,10 +11,14 @@ test('the homepage never requests analysis and its preview is a static model', a
   assert.match(source, /HOME_PREVIEW/)
 })
 
-test('the homepage actions reuse the guided-demo and match-list routes', async () => {
+test('the only primary action is Try it Out and it opens match selection, not the walkthrough', async () => {
   const source = await readFile(new URL('./HomePage.tsx', import.meta.url), 'utf8')
-  assert.match(source, /matchHash\(BASELINE_DATASET_ID, true\)/)
-  assert.match(source, /href="#\/matches"/)
+  assert.match(source, /MATCHES_HASH = '#\/matches'/)
+  assert.match(source, /className="lp-primary" href=\{MATCHES_HASH\}>Try it Out</)
+  assert.equal((source.match(/lp-primary/g) ?? []).length, 1)
+  assert.doesNotMatch(source, /matchHash|\/demo|Try the 57/)
+  assert.match(source, /Your mate’s football opinion\./)
+  assert.match(source, /Pick a match\. Check the moment\. Bring the evidence back to the chat\./)
   assert.equal(matchHash(BASELINE_DATASET_ID, true), '#/match/northbridge-eastport-analysis-demo/demo')
 })
 

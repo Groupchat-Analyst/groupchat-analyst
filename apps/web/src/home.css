@@ -3,17 +3,20 @@
   .site-header { flex-wrap: wrap; row-gap: 0; }
   .demo-label { order: 3; width: 100%; padding-bottom: 8px; }
 }
-.home-page { display: grid; gap: 1rem; max-width: 40rem; padding: 1.5rem 0; }
+.home-page { display: grid; gap: 1rem; max-width: 56rem; padding: 1.5rem 0; }
 .home-page h1 { margin: 0; font-size: clamp(1.9rem, 6vw, 2.8rem); line-height: 1.1; }
 .home-page h1 span { color: var(--accent, #0b7a4b); }
+.matches-lede { margin: 0; color: var(--muted); }
 .home-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .home-actions a { text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
 .home-notes { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; font-size: 0.92rem; }
-.match-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
-.match-card { display: grid; gap: 0.25rem; padding: 1rem; border: 1px solid currentColor; border-radius: 12px; text-decoration: none; color: inherit; min-height: 44px; }
-.match-card:focus-visible, .home-actions a:focus-visible, .site-nav a:focus-visible { outline: 3px solid #0b7a4b; outline-offset: 2px; }
-.match-meta { font-size: 0.82rem; opacity: 0.75; }
-.claim-assessments .checked-question {
-  justify-self: end; margin-left: auto; max-width: 85%; padding: 0.6rem 0.9rem;
-  border-radius: 16px 16px 4px 16px; background: rgba(11, 122, 75, 0.14);
-}
+.match-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); }
+.match-card { display: grid; gap: 0.4rem; align-content: start; height: 100%; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none; color: inherit; min-height: 44px; }
+.match-card:hover { border-color: var(--accent); }
+.match-card strong { font-size: 1.15rem; letter-spacing: -0.02em; }
+.match-fixture { display: flex; align-items: center; gap: 8px; }
+.monogram { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--accent); color: #0c110f; font-weight: 800; font-size: 0.9rem; }
+.monogram.away { background: transparent; color: var(--text); border: 2px solid var(--accent); }
+.match-v { color: var(--muted); font-weight: 700; }
+.match-card:focus-visible, .home-actions a:focus-visible, .site-nav a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.match-meta { font-size: 0.82rem; color: var(--muted); }

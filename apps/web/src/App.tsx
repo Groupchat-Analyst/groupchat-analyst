@@ -5,6 +5,7 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type RefObject,
 } from 'react'
 import type {
   AnalysisResponse,
@@ -639,6 +640,65 @@ function WhatChanged({
   )
 }
 
+function scopePeriod(period: AnalysisPeriod): string {
+  return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+}
+
+// One question and its reply, frozen at the minute and period it was asked.
+function TurnMessages({
+  turn,
+  view,
+  messageRef,
+}: {
+  turn: AnswerSnapshot
+  view: 'fan' | 'analyst'
+  messageRef?: RefObject<HTMLDivElement | null>
+}) {
+  const { analysis, context } = turn
+  const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
+  const checked = checkedAgainst(analysis)
+  const notes = analysis.claims.flatMap((result) => [
+    ...result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' })),
+    ...(isRoutineLimitation(result) ? [] : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
+  ])
+  return (
+    <>
+      <div className="msg msg-user">
+        <p className="msg-label">You · {scope}</p>
+        <p className="msg-text">{context.opinion}</p>
+      </div>
+      <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
+        <p className="msg-label">Groupchat Analyst · {scope}</p>
+        <p className="msg-text">{canonicalReply(analysis)}</p>
+        {analysis.claims.length > 1 && (
+          <ul className="msg-claims" aria-label="Claims in this opinion">
+            {analysis.claims.map((result, index) => (
+              <li key={result.claim.id}>
+                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}>{result.assessment}</span>
+                <span>Claim {index + 1}: {result.claim.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join('; ')}</p>}
+        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
+        {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
+        {analysis.claims.length > 0 && (
+          <details className="msg-evidence" key={view} open={view === 'analyst'}>
+            <summary>How this was checked</summary>
+            <div className="claim-result-list">
+              {analysis.claims.map((result, index) => (
+                <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} />
+              ))}
+            </div>
+          </details>
+        )}
+        <p className="msg-attribution">Fictional match · {analysis.provider === 'local' ? 'Local rules, no model connected' : 'Foundry · server-side interpretation'}</p>
+      </div>
+    </>
+  )
+}
+
 export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; autoDemo?: boolean }) {
   const dataset = findCatalogEntry(datasetId)!
   const KEY_MOMENTS: KeyMoment[] = dataset.moments
@@ -666,8 +726,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     context: SubmissionContext
     baseline: AnswerSnapshot | null
   } | null>(null)
-  // The last successful answer is an immutable snapshot; failed requests never replace it.
-  const [shown, setShown] = useState<AnswerSnapshot | null>(null)
+  // Successful turns are immutable snapshots in order; failed requests never replace or reorder them.
+  const [transcript, setTranscript] = useState<AnswerSnapshot[]>([])
+  const shown = transcript.length > 0 ? transcript[transcript.length - 1] : null
   const [comparisonState, setComparisonState] = useState<{
     earlier: AnswerSnapshot
     later: AnswerSnapshot
@@ -681,7 +742,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
   const [view, setView] = useState<'fan' | 'analyst'>('fan')
   const analysisRequestId = useRef(0)
-  const answerRef = useRef<HTMLElement>(null)
+  const answerRef = useRef<HTMLDivElement>(null)
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
   const submittedOpinion = submittedContext?.opinion ?? ''
@@ -764,7 +825,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         if (isLatestRequest(requestId, analysisRequestId.current)) {
           const snapshot = createSnapshot(requestId, active.context, payload)
           const baseline = active.baseline
-          setShown(snapshot)
+          setTranscript((turns) => [...turns, snapshot])
           setComparisonState(
             baseline ? { earlier: baseline, later: snapshot, result: compareSnapshots(baseline, snapshot) } : null,
           )
@@ -869,8 +930,6 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     const trimmedOpinion = opinion.trim()
     if (!trimmedOpinion) return
     const id = ++analysisRequestId.current
-    setShown(null)
-    setComparisonState(null)
     setRequestError('')
     setSubmittedRequest({
       id,
@@ -959,11 +1018,47 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     if (changeCard) void downloadImage(createBlocksImage(changeCard.blocks), changeCard.extended, 'groupchat-analyst-what-changed')
   }
 
-  const claimBreakdown = analysis && (
-    <div className="claim-result-list">
-      {analysis.claims.map((result, index) => <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? submittedOpinion || undefined : undefined} />)}
+  const latestActions = analysis && submittedContext && shown ? (
+    <div className="turn-actions">
+      {demo === 'step-to-next-minute' && (
+        <div className="demo-note" role="status">
+          <span>Same opinion, one minute later in the fictional replay.</span>
+          <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
+        </div>
+      )}
+      {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
+      {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
+      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
+      {opinion.trim() !== submittedOpinion && <p className="draft-notice">The latest reply is for the saved opinion above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
+      {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">The latest reply is for {formatMatchClock(submittedContext.selectedClock)} · {scopePeriod(submittedContext.period)}. The replay is now at {formatMatchClock(selectedClock)}; that answer has not been recalculated.</p>}
+      {canCheckAgain && displayedClock && (
+        <div className="check-again">
+          <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
+          <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.</span>
+        </div>
+      )}
+      <div className="share-row">
+        {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
+        <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
+        <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
+        <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
+        <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
+      </div>
+      {shareModel && (
+        <details className="share-preview">
+          <summary>Preview share card</summary>
+          <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
+            {shareCardBlocks(shareModel).map((block, index) => (
+              <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+            ))}
+          </section>
+        </details>
+      )}
     </div>
-  )
+  ) : null
+
+  const pending = submittedRequest && (isLoading || requestError !== '') ? submittedRequest : null
+  const pendingScope = pending ? `${formatMatchClock(pending.context.selectedClock)} · ${scopePeriod(pending.context.period)}` : ''
 
   return (
     <main className="page-shell analyst-shell" id="main-content">
@@ -979,8 +1074,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
 
       <section className="analysis-page" aria-labelledby="page-title">
         <div className="page-intro">
-          <h1 id="page-title">{dataset.name}<span> · Northbridge v Eastport</span></h1>
-          <p className="intro-description">Fictional replay. {dataset.description} Check an opinion against the recorded evidence, then move the clock and check again.</p>
+          <h1 id="page-title">{dataset.teams[0]} v {dataset.teams[1]}<span> · {dataset.name}</span></h1>
+          <p className="intro-description">{dataset.scenario}</p>
           {demo === 'offer' && isBaseline && (
             <button className="demo-entry" type="button" onClick={startDemo}>{DEMO_ENTRY_LABEL}</button>
           )}
@@ -1001,11 +1096,58 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
             />
           </div>
           <div className="conversation-column">
+            <section className="conversation" aria-labelledby="conversation-title">
+              <div className="conversation-head">
+                <h2 id="conversation-title">Conversation</h2>
+                {transcript.length > 0 && (
+                  <div className="segmented-control view-control" role="group" aria-label="Answer detail">
+                    <button type="button" aria-pressed={view === 'fan'} onClick={() => setView('fan')}>Fan</button>
+                    <button type="button" aria-pressed={view === 'analyst'} onClick={() => setView('analyst')}>Analyst</button>
+                  </div>
+                )}
+              </div>
+              <div className="chat-log" role="log" aria-label="Opinions and answers" aria-busy={isLoadingSubmit}>
+                {transcript.length === 0 && !pending && (
+                  <div className="msg msg-bot">
+                    <p className="msg-label">Groupchat Analyst</p>
+                    <p className="msg-text">Pick an example or type an opinion. I’ll check it against this match at the minute you choose.</p>
+                  </div>
+                )}
+                {transcript.map((turn, index) => (
+                  <div className="chat-turn" key={turn.id}>
+                    <TurnMessages turn={turn} view={view} messageRef={index === transcript.length - 1 ? answerRef : undefined} />
+                    {index === transcript.length - 1 && latestActions}
+                  </div>
+                ))}
+                {pending && (
+                  <div className="chat-turn">
+                    <div className="msg msg-user">
+                      <p className="msg-label">You · {pendingScope}</p>
+                      <p className="msg-text">{pending.context.opinion}</p>
+                    </div>
+                    {isLoadingSubmit && (
+                      <div className="msg msg-bot" role="status">
+                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />Checking the match…</p>
+                      </div>
+                    )}
+                    {requestError && !isLoadingSubmit && (
+                      <div className="msg msg-bot msg-error" role="alert">
+                        <p className="msg-text">That check didn’t finish. Please try again.</p>
+                        {transcript.length > 0 && <p className="msg-note">Your earlier answer is still above.</p>}
+                        <details className="msg-evidence"><summary>Details</summary><p className="msg-note">{requestError}</p></details>
+                        <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+
             <form className="opinion-form" onSubmit={submitOpinion}>
-              <label className="opinion-label" htmlFor="opinion-input">What’s your opinion?</label>
+              <label className="opinion-label" htmlFor="opinion-input">Your opinion</label>
               <textarea
                 id="opinion-input" value={opinion} onChange={(event) => setOpinion(event.currentTarget.value)}
-                placeholder="Ask about this moment, e.g. How many shots did Eastport have?"
+                placeholder={`Type an opinion, e.g. How many shots did ${dataset.teams[1]} have?`}
                 rows={3} required aria-describedby="input-hint"
               />
               <div className="composer-bottom">
@@ -1036,100 +1178,15 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                 </button>
               </div>
               <div className="suggestions" role="group" aria-label="Example opinions">
-                <span>Example opinions (fill the box; nothing is sent until you check)</span>
+                <span>Examples (these fill the box; nothing is sent until you check)</span>
                 {examples.map((example) => (
                   <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${example.shows} · ${formatMatchClock(example.clock)}`}>{example.text}</button>
                 ))}
               </div>
-              <p className="input-hint" id="input-hint">Synthetic match: every performance and result is invented.</p>
+              <p className="input-hint" id="input-hint">Fictional match: every performance and result is invented.</p>
               {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
             </form>
 
-            <div className="answer-region" aria-live="polite" aria-busy={isLoadingSubmit}>
-              {isLoadingSubmit && submittedRequest && <p className="loading-state"><span className="loading-dot" aria-hidden="true" />{submittedRequest.baseline ? `Checking the same opinion again at ${formatMatchClock(submittedRequest.context.selectedClock)}…` : 'Checking the submitted match moment…'}</p>}
-              {requestError && (
-                <div className="api-error" role="alert">
-                  <strong>We couldn’t check that opinion.</strong><p>{requestError}</p>
-                  <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
-                </div>
-              )}
-              {analysis && submittedContext && (
-                <section className="claim-assessments" aria-labelledby="result-title" ref={answerRef} tabIndex={-1}>
-                  <div className="result-title-row">
-                    <h2 id="result-title">The answer</h2>
-                    <div className="segmented-control view-control" role="group" aria-label="Answer detail" aria-describedby="detail-help">
-                      <button type="button" aria-pressed={view === 'fan'} onClick={() => setView('fan')}>Fan</button>
-                      <button type="button" aria-pressed={view === 'analyst'} onClick={() => setView('analyst')}>Analyst</button>
-                    </div>
-                  </div>
-                  <p className="detail-help" id="detail-help">
-                    {view === 'fan'
-                      ? 'Fan view keeps the reasoning folded away. Analyst view opens it. The answer, verdict and limitations are the same in both.'
-                      : 'Analyst view opens the reasoning and evidence' + (needsPassMap(analysis) ? ', plus a pass map' : '') + '. The answer, verdict and limitations are the same as in Fan view.'}
-                  </p>
-                  {demo === 'step-to-next-minute' && (
-                    <div className="demo-note" role="status">
-                      <span>Same opinion, one minute later in the fictional replay.</span>
-                      <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
-                    </div>
-                  )}
-                  {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
-                  {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
-                  {comparison && <WhatChanged comparison={comparison} view={view} changeCard={changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={canNativeShare ? () => void shareCard('change') : null} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
-                  <p className="checked-question">{submittedOpinion}</p>
-                  {opinion.trim() !== submittedOpinion && <p className="draft-notice">This reply is for the saved opinion above{opinion.trim() ? ', not the wording now in the box. “Check this moment” submits the edited wording instead' : ''}.</p>}
-                  {hasMovedSinceAnswer && <p className="stale-answer-notice" role="status">This reply is for {formatMatchClock(submittedContext.selectedClock)} · {submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}. The replay is now at {formatMatchClock(selectedClock)}; this earlier answer has not been recalculated for the current moment.</p>}
-                  {canCheckAgain && displayedClock && (
-                    <div className="check-again">
-                      <button className="secondary-button" type="button" onClick={checkAgain}>Check again at {formatMatchClock(displayedClock)}<ArrowIcon /></button>
-                      <span>Same wording, same {submittedContext.period === 'match-so-far' ? 'match-so-far' : 'last-10-minutes'} option{opinion.trim() !== submittedOpinion ? ' — this checks the saved opinion, not your edit' : ''}.</span>
-                    </div>
-                  )}
-                  <p className="server-summary">{canonicalReply(analysis)}</p>
-                  {checkedAgainst(analysis).length > 0 && (
-                    <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(analysis).join('; ')}</p>
-                  )}
-                  <div className="answer-attribution"><span>Synthetic match</span><span>Submitted at {formatMatchClock(submittedContext.selectedClock)}</span><span>{submittedContext.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}</span><span>{analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'}</span></div>
-                  <div className="visible-limitations">
-                    {analysis.claims.flatMap((result) => [
-                      ...result.claim.clarificationNeeds.map((need) => ({
-                        key: `${result.claim.id}-${need}`,
-                        text: need,
-                        title: 'Clarification',
-                      })),
-                      ...(isRoutineLimitation(result)
-                        ? []
-                        : [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]),
-                    ])
-                      .map((item) => <p key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
-                    {analysis.claims.length === 0 && (
-                      <p><strong>Limitation:</strong> The request was not interpreted as a supported claim.</p>
-                    )}
-                  </div>
-                  <div className="share-row">
-                    {canNativeShare && <button className="secondary-button share-native" type="button" disabled={!(preparedSingle && singleShare && preparedSingle.key === singleShare.key)} onClick={() => void shareCard('single')}>{preparedSingle && singleShare && preparedSingle.key === singleShare.key ? 'Share the receipts' : 'Preparing image…'}</button>}
-                    <button className="copy-button" type="button" onClick={copyAssessment}>Copy reply <ArrowIcon /></button>
-                    <button className="secondary-button" type="button" onClick={copyShareCard}>Copy card text</button>
-                    <button className="secondary-button" type="button" onClick={downloadShareCard}>{shareModel?.extended ? 'Download extended card' : 'Download card image'}</button>
-                    <span role="status">{[copyMessage, shareMessage].filter(Boolean).join(' ')}</span>
-                  </div>
-                  {shareModel && (
-                    <details className="share-preview">
-                      <summary>Preview share card</summary>
-                      <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
-                        {shareCardBlocks(shareModel).map((block, index) => (
-                          <p key={index} className={`share-block share-${block.kind}`}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
-                        ))}
-                      </section>
-                    </details>
-                  )}
-                  {analysis.claims.length > 0 ? view === 'fan' ? (
-                    <details className="answer-breakdown"><summary>Check the reasoning <span>{analysis.claims.length} {analysis.claims.length === 1 ? 'claim' : 'claims'}</span></summary>{claimBreakdown}</details>
-                  ) : <div className="analyst-breakdown"><p className="section-label">CLAIMS & EVIDENCE</p>{claimBreakdown}</div>
-                  : <p className="empty-evidence">Try naming a team or player and the part of the match you mean.</p>}
-                </section>
-              )}
-            </div>
 
             {analysis && view === 'analyst' && !hasUnresolvedSubject && needsPassMap(analysis) && <PassMap key={`${clockKey(submittedContext?.selectedClock ?? selectedClock)}-${submittedContext?.period ?? period}`} foundation={analysis.evidenceFoundation} />}
             {analysis && !hasUnresolvedSubject && <EvidenceFoundationPanel foundation={analysis.evidenceFoundation} />}
@@ -1157,7 +1214,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         <details className="about-demo">
           <summary>About this demo & its data</summary>
           <div>
-            <p>Northbridge and Eastport are fictional teams using real-player names. Every performance and result is invented.</p>
+            <p>{dataset.teams[0]} and {dataset.teams[1]} are fictional teams using real-player names. Every performance and result is invented.</p>
             <p>{analysis?.provider === 'foundry' ? `${analysis.providerLabel}. Statistics are still calculated by the application, not by AI.` : analysis?.provider === 'local' ? 'This server is using limited local rules to read questions, with no model connection. It understands a small set of football phrasings.' : 'The analysis service has not yet reported how it reads questions.'}</p>
             <p>The guided demonstration only prepares a fictional 57′ replay and its opinion; nothing is checked until you press the submit button, and the 58′ re-check is also your choice. Local-rules reading is limited to a small set of phrasings, so unfamiliar wording may be declined.</p>
             <p>“Share the receipts” appears only where your browser can share image files. It hands the card image to your device’s share sheet and cannot tell whether anything was sent. Copy and download are always available.</p>

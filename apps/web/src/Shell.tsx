@@ -43,19 +43,29 @@ function Home() {
   )
 }
 
+function monogram(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase()
+}
+
 function Matches({ unknownId }: { unknownId?: string }) {
   return (
     <Chrome>
       <section className="home-page" aria-labelledby="page-title">
         <h1 id="page-title">Choose a match</h1>
+        <p className="matches-lede">Fictional matches, each with its own story. Pick one to start.</p>
         {unknownId !== undefined && <p className="api-error" role="alert">That match isn’t available. Choose one below.</p>}
         <ul className="match-list">
           {DATASET_CATALOG.map((entry) => (
             <li key={entry.id}>
               <a className="match-card" href={matchHash(entry.id)}>
-                <strong>{entry.name}</strong>
-                <span>{entry.description}</span>
-                <span className="match-meta">Fictional · v{entry.version} · {entry.moments.length} key moments · {entry.examples.length} example opinions</span>
+                <span className="match-fixture" aria-hidden="true">
+                  <span className="monogram">{monogram(entry.teams[0])}</span>
+                  <span className="match-v">v</span>
+                  <span className="monogram away">{monogram(entry.teams[1])}</span>
+                </span>
+                <strong>{entry.teams[0]} v {entry.teams[1]}</strong>
+                <span>{entry.scenario}</span>
+                <span className="match-meta">{entry.name} · fictional · {entry.examples.length} example opinions</span>
               </a>
             </li>
           ))}

@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { BASELINE_DATASET_ID } from '../../shared/src/datasetCatalog.ts'
 import { HOME_PREVIEW } from '../../shared/src/homePreview.ts'
-import { matchHash } from './routes.ts'
 import './landing.css'
 
-const JOURNEY = ['Choose a match', 'Enter an opinion', 'Check a moment', 'Recheck and share']
+const MATCHES_HASH = '#/matches'
+const JOURNEY = ['Choose a match', 'Enter an opinion', 'Check a moment', 'Check again and share']
 
 // Static, illustrative model: switching minutes never calls the analysis service.
 function PreviewSwitch() {
@@ -83,14 +82,14 @@ export function HomePage() {
   return (
     <div className="lp">
       <section className="lp-hero" aria-labelledby="page-title">
-        <p className="lp-eyebrow">Football opinions. Checked minute by minute.</p>
-        <h1 id="page-title">Your mate’s got an opinion. <span>Bring the receipts.</span></h1>
+        <p className="lp-eyebrow">Football opinions. Checked.</p>
+        <h1 id="page-title">Your mate’s football opinion. <span>Checked.</span></h1>
         <p className="lp-lede">
-          Check a football opinion against the match at a specific minute. Check again as the game changes—and share the evidence.
+          Pick a match. Check the moment. Bring the evidence back to the chat.
         </p>
+        <p className="lp-note">The answer can change as the match goes on, so check the same opinion again a minute later.</p>
         <div className="lp-actions">
-          <a className="lp-primary" href={matchHash(BASELINE_DATASET_ID, true)}>Try the 57′ → 58′ demo</a>
-          <a className="lp-secondary" href="#/matches">Explore both matches</a>
+          <a className="lp-primary" href={MATCHES_HASH}>Try it Out</a>
         </div>
         <p className="lp-disclosure">Fictional matches · Local rules · No AI model connected</p>
       </section>
@@ -102,14 +101,14 @@ export function HomePage() {
         <ol>
           {JOURNEY.map((step) => <li key={step}>{step}</li>)}
         </ol>
-        <p>The demo starts with nothing sent: it prepares the opinion and the minute, and you press the check button yourself.</p>
+        <p>Nothing is checked until you press the check button.</p>
       </section>
 
       <section className="lp-future" aria-labelledby="lp-future-title">
-        <h2 id="lp-future-title">Built for the arguments happening in your group chat.</h2>
+        <h2 id="lp-future-title">Built for your group chat.</h2>
         <p>
-          The web demo works today. A WhatsApp companion is planned, but it does not exist yet: nothing here connects to messaging,
-          reads a chat or monitors one automatically.
+          The web demo works today. A WhatsApp companion is planned, with no launch date. Nothing here connects to messaging,
+          reads a chat or monitors one.
         </p>
       </section>
 

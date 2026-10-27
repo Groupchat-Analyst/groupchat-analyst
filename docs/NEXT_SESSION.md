@@ -1,5 +1,13 @@
 # Next-session handoff
 
+## Corrected submission brief: Stage 1 (entry flow and conversation)
+
+- Home: headline “Your mate’s football opinion. Checked.”, one primary action **Try it Out** to `#/matches` (the secondary button and demo shortcut were removed; the `/demo` route still exists). Match tiles show monograms, `Team v Team`, a scenario line and example count.
+- Match page is a chat: opinions right, answers left, each labelled with minute and period; “How this was checked” holds the evidence (open in Analyst view); turns accumulate. A failed check adds an error bubble “That check didn’t finish. Please try again.” with **Try again**; earlier turns, comparison and the edited draft stay. Pending text: “Checking the match…”.
+- Copy sample (before → after): “Your mate’s got an opinion. Bring the receipts.” → “Your mate’s football opinion. Checked.”; “Try the 57′ → 58′ demo / Explore both matches” → “Try it Out”; “Built for the arguments happening in your group chat.” → “Built for your group chat.”; step 4 “Recheck and share” → “Check again and share”; answer card → conversation.
+- Local verification (Playwright emulation, ordinary mouse events, local-rules stack): home, tile, example, replay movement and preview switching made 0 `/api/analyze` calls; submit, recheck and retry made one each. Failed recheck kept turn 1 and the edited draft; retry added exactly one turn (no duplicate). A→B with late success and A→B→A with late failure left a fresh draft untouched and added no turn or error. No horizontal overflow at 1280, 390 or 320 px; “Try it Out” is above the fold at 390 and 320; focus outline 3 px on every tab stop; lowest measured text contrast 6.6:1 (computed on flat backgrounds; gradients not covered).
+- Harness limitation found: this browser pane's mouse coordinates are scaled by (set viewport width ÷ `innerWidth`), so Playwright's native `click()` hits the wrong element after `setViewportSize`. Pointer events were sent with coordinates corrected by that factor. Not a product defect. No real device or screen reader; native share still unverified on a real phone.
+
 ## Homepage polish (from `b98ac41`)
 
 Scope: homepage only (`HomePage.tsx`, `landing.css`, `Shell.tsx` wiring, small header/nav fixes in `home.css`). Match selector, conversation, analysis, replay, sharing and language behaviour are untouched.
