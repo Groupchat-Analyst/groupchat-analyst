@@ -31,6 +31,7 @@ import {
 } from '../../shared/src/match.js'
 import { resolveDataset } from './datasets.js'
 import {
+  BEFORE_GOAL_PHRASE,
   parseCountAssertion,
   type CountAssertion,
 } from '../../shared/src/countAssertions.js'
@@ -220,13 +221,15 @@ function countAssertionFor(claim: InterpretedClaim): CountAssertion | undefined 
   if (
     claim.intent !== 'factual-claim' ||
     !claim.subject ||
-    claim.playerSubject ||
     claim.meaning.comparison ||
     claim.clarificationNeeds.length > 0
   ) {
     return undefined
   }
-  const assertion = parseCountAssertion(claim.text)
+  const assertion = parseCountAssertion(
+    claim.timePeriod.kind === 'before-event' ? claim.text.replace(BEFORE_GOAL_PHRASE, '').trim() : claim.text,
+    claim.playerSubject,
+  )
   return assertion?.team === claim.subject ? assertion : undefined
 }
 
@@ -236,9 +239,10 @@ function assertionCounts(
   events: MatchEvent[],
 ): { numerator: MatchEvent[]; denominator: MatchEvent[] } {
   const shots = events.filter(
-    (event) => event.type === 'shot' && event.team === assertion.team,
+    (event) => event.type === 'shot' && event.team === assertion.team &&
+      (!assertion.player || event.playerId === assertion.player.id),
   )
-  const metric = assertion.kind === 'none' ? assertion.metric : 'shots-on-target'
+  const metric = assertion.kind !== 'universal' ? assertion.metric : 'shots-on-target'
   return {
     numerator: shots.filter((event) => matchesMetric(event, metric)),
     denominator: shots,
@@ -251,8 +255,9 @@ function assertionVerdict(
 ): ClaimResult['assessment'] {
   const numerator = counts.numerator.length
   const denominator = counts.denominator.length
-  if (assertion.kind === 'none') {
-    return numerator === 0 ? 'supported' : 'contradicted'
+  if (assertion.kind !== 'universal') {
+    const holds = assertion.kind === 'none' ? numerator === 0 : numerator > 0
+    return holds ? 'supported' : 'contradicted'
   }
   // A universal claim over zero recorded attempts is not settled by the data.
   if (denominator === 0) return 'insufficient evidence for a firm conclusion'
@@ -272,8 +277,11 @@ function countAssertionAnswer(
   assertion: CountAssertion,
   fan: boolean,
 ): string {
-  const trace = result.calculations[0]
-  const team = assertion.team
+  const metric = assertion.kind !== 'universal' ? assertion.metric : 'shots-on-target'
+  const trace = assertion.player
+    ? result.playerCalculations.find((item) => item.playerId === assertion.player!.id && item.metric === metric)
+    : result.calculations[0]
+  const team = assertion.player?.name ?? assertion.team
   const n = trace?.numerator ?? 0
   const d = trace?.denominator ?? 0
   const lead =
@@ -285,11 +293,12 @@ function countAssertionAnswer(
           ? "The records can't settle this one: "
           : 'The records cannot settle this: '
   let body: string
-  if (assertion.kind === 'none') {
-    const label = assertionMetricLabel(assertion.metric)
+  if (assertion.kind !== 'universal') {
+    const label = metricName(assertion.metric, n)
+    const verb = assertion.player ? 'has' : 'have'
     body = n === 0
-      ? `${team} have no recorded ${label} (0 of ${d} recorded shots).`
-      : `${team} have ${n} recorded ${label}${assertion.metric === 'shots' ? '' : ` from ${d} recorded shots`}.`
+      ? `${team} ${verb} no recorded ${label}${assertion.player ? '' : ` (0 of ${d} recorded shots)`}.`
+      : `${team} ${verb} ${n} recorded ${label}${assertion.metric === 'shots' || assertion.player ? '' : ` from ${d} recorded shots`}.`
   } else if (d === 0) {
     body = `${team} have no recorded shots, so there is nothing to test “${assertion.quantifier === 'every' ? 'every' : 'none'} shot on target” against.`
   } else {
@@ -307,7 +316,11 @@ function countAssertionAnswer(
         : `${rate}.`
   }
   const sentence = `${lead}${body}`
-  return `${sentence} This counts recorded shot events over ${result.periodLabel}; it says nothing about chance quality.`
+  const anchor = result.evidence.find((item) => item.role === 'anchor')?.reference
+  const scope = anchor
+    ? `recorded play strictly before ${anchor.team}'s goal at ${anchor.time}`
+    : result.periodLabel
+  return `${sentence} This counts recorded shot events over ${scope}; it says nothing about chance quality.`
 }
 
 function selectedPlayerEntities(claim: InterpretedClaim): PlayerEntityReference[] {
@@ -593,17 +606,18 @@ function evidenceForClaim(
     const counts = assertionCounts(countAssertion, events)
     const numeratorIds = new Set(counts.numerator.map(({ id }) => id))
     const numeratorSupports =
-      countAssertion.kind === 'none'
-        ? false
+      countAssertion.kind !== 'universal'
+        ? countAssertion.kind === 'some'
         : countAssertion.quantifier === 'every' && !countAssertion.negated
     for (const event of counts.denominator) {
       const inNumerator = numeratorIds.has(event.id)
       const role: ClaimEvidence['role'] =
-        countAssertion.kind === 'none'
-          ? inNumerator ? 'challenging' : 'context'
+        countAssertion.kind !== 'universal'
+          ? inNumerator ? numeratorSupports ? 'supporting' : 'challenging' : 'context'
           : inNumerator === numeratorSupports ? 'supporting' : 'challenging'
       evidence.set(event.id, { role, reference: reference(event, roster) })
     }
+    if (anchorEvent) evidence.set(anchorEvent.id, { role: 'anchor', reference: reference(anchorEvent, roster) })
     return [...evidence.values()]
   }
 
@@ -936,9 +950,9 @@ function calculationTraces(
   events: MatchEvent[] = [],
 ): CalculationTrace[] {
   const countAssertion = countAssertionFor(claim)
-  if (countAssertion) {
+  if (countAssertion && !countAssertion.player) {
     const counts = assertionCounts(countAssertion, events)
-    const metric = countAssertion.kind === 'none' ? countAssertion.metric : 'shots-on-target'
+    const metric = countAssertion.kind !== 'universal' ? countAssertion.metric : 'shots-on-target'
     return [
       {
         team: countAssertion.team,

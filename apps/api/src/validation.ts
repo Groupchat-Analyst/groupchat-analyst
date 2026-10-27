@@ -219,11 +219,11 @@ export type GoalBeforeHalfTimeAssertion = 'scored' | 'did-not-score'
 const halfTimePhrase =
   '(?:before\\s+half[- ]time|by\\s+half[- ]time|(?:in|during)\\s+the\\s+first\\s+half)'
 const halfTimeAssertionPattern = new RegExp(
-  `^(Northbridge|Eastport)\\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?|scored)\\s+${halfTimePhrase}[.!?]?$`,
+  `^(.+?)\\s+(?:(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?|(?:(?:has|have|had)\\s+)?scored)\\s+${halfTimePhrase}[.!?]?$`,
   'i',
 )
 const halfTimeNegatedPattern = new RegExp(
-  `^(?:Northbridge|Eastport)\\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?\\s+${halfTimePhrase}[.!?]?$`,
+  `^.+?\\s+(?:did not|didn['’]t|never|has not|hasn['’]t|have not|haven['’]t|had not|hadn['’]t)\\s+score(?:d)?(?:\\s+(?:any\\s+)?goals?)?\\s+${halfTimePhrase}[.!?]?$`,
   'i',
 )
 const halfTimeScoringContext = new RegExp(
@@ -240,12 +240,19 @@ export function goalBeforeHalfTimeAssertion(
   if (
     !match ||
     typeof value.subject !== 'string' ||
-    value.subject.toLowerCase() !== match[1].toLowerCase()
+    (value.playerSubject !== null &&
+      (!isRecord(value.playerSubject) || typeof value.playerSubject.name !== 'string' ||
+        value.playerSubject.team !== value.subject))
   ) {
     return undefined
   }
+  const normalize = (name: string) => name.replace(/[Øø]/g, 'o').normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const name = isRecord(value.playerSubject) ? normalize(value.playerSubject.name as string) : normalize(value.subject)
+  const parts = name.split(/\s+/)
+  const aliases = value.playerSubject === null ? [name] : [name, parts[0], parts.at(-1)]
+  if (!aliases.includes(normalize(match[1]))) return undefined
   if (
-    value.playerSubject !== null ||
     value.playerMetric !== null ||
     !Array.isArray(value.clarificationNeeds) ||
     value.clarificationNeeds.length !== 0 ||

@@ -1,5 +1,19 @@
 # Next-session handoff
 
+## Independent offline follow-up (27 October 2026; review base `b7f40e4`)
+
+The uploaded source archive identifies `b7f40e441ac915ca43b9ea69731aca229b7e5d29`, later than `01f9c25`. The following is a review patch against that snapshot, not a new upstream commit.
+
+- Fixed additional semantic composition failures: ordinary player goal/no-goal assertions, player first-half scoring validation, and zero/universal shot assertions combined with a strict before-goal scope. Player goal assertions keep only that player's goal metric; a teammate's goal cannot establish the assertion.
+- Distinguished “not every shot was on target” from “every shot was not on target”. An ambiguous “Bruno has been poor” now asks which Bruno, while separately named players still receive separate assessments.
+- Before-goal count replies keep the exclusive goal anchor and omit internal event IDs from their prose. No interface, fixture, catalog, Foundry prompt/schema or model setting changed.
+- Added `apps/api/tests/semantic-composition.test.mjs`: nine regression tests with positive, negative, temporal, entity and ambiguity variants.
+- Independent Node **22.23.3** verification: API **230/230**, web **113/113**, typechecking, lint and production build pass. The 42 documented language inputs pass through the real local service path. Genuine baseline Foundry captures were replayed through the current API and actual web snapshot/comparison/share functions: direct contradicted→supported comparison, correct Foundry footer. The second fixture's separately labelled constructed-stub tests also pass. None of these are live model calls.
+- The complete baseline evidence object was compared with the uploaded snapshot and is unchanged (70 passes, 17 turnovers). The original fixture, catalog, Foundry adapter and historical ledgers were preserved.
+- Local follow-up after applying the patch to `b7f40e4` (local-provider stack, desktop viewport, ordinary Playwright pointer clicks, no DOM `click()` fallback needed): API 230/230, web 113/113, build, lint, `git diff --check` and the baseline hash pass. In the browser, “Saka has not scored” (57′, Original) answers “No — Bukayo Saka has 1 recorded goal”; “Northbridge had no shots on target before the goal” counts strictly before the 45+3′ goal (1 on target of 2); “Saka scored in the first half” answers Yes at 45+3′; “Bruno has been poor” asks which Bruno; on the Return match “Saka has not scored” answers from that fixture. The 57′→58′ walkthrough still compares (didn't hold → holds; Eastport 3 shots on target to 2), the share footer reads “Original match v3.0.0 · read by local rules”, and `/api/analyze` was called only on explicit submit and recheck. Not repeated: 390 px mobile emulation, keyboard audit, PNG download. Real-iPhone native sharing stays unverified.
+- Browser verification limitation (review runtime): its cloud browser could not reach localhost, so the independent review claimed no rendered checks; the local follow-up above covers the affected replies only.
+- No live calls, merges, deployments or Azure changes. The review environment has no authenticated GitHub checkout, so the patch must be applied, committed and pushed from the existing `feature/explore-more-matches` checkout, preserving any newer work.
+
 ## 0. Latest: `feature/explore-more-matches` (read this first)
 
 Branch from `main` (after PR #7). Commits: `68f98bd` Saka/player-language repair; `fb523a2` second synthetic fixture and integrity validator; `9ba9e25` dataset catalog + API allowlist + `datasetId`; `d59bc27` omitted-opponent and distance phrasing, catalog moments and verified examples; then the web commit (home, match selector, dataset-aware match view, opinion wording, fixture-named share footer) and docs.
@@ -10,7 +24,7 @@ Branch from `main` (after PR #7). Commits: `68f98bd` Saka/player-language repair
 - **Language:** [LANGUAGE_ACCEPTANCE.md](./LANGUAGE_ACCEPTANCE.md): 42 inputs, 42 pass, 0 partial, 0 fail under local rules. Foundry interpretation of the repaired forms is unverified.
 - **Not verified:** native share on a real phone; any live Foundry call for the current work (prompt and schema unchanged; earlier live ledgers belong to the earlier version); screen-reader use and real devices. Keyboard Tab order was exercised only through the ordinary browser journey, not a full audit.
 - **Foundry access recommendation and proposed (unauthorised) live set:** [SUBMISSION.md](./SUBMISSION.md).
-- **Known gaps:** the captured Foundry replay tests were not extended to the new fixture; no automated component tests for `MatchView`/`Shell`; the home page and match list were not given a separate accessibility audit.
+- **Known gaps:** the Return fixture has constructed offline transport-stub coverage, not genuine Foundry captures from that fixture; no automated component tests for `MatchView`/`Shell`; the home page and match list were not given a separate accessibility audit.
 
 The sections below are the earlier handoff, kept for history.
 

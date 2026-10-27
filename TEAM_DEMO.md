@@ -1,6 +1,6 @@
 # Groupchat Analyst demo guide
 
-The hosted hackathon candidate is public and read-only. It uses the **local rules interpreter** (no model, no Foundry, no credentials), **fictional** matches, and server-side calculations. Do not describe it as AI-powered.
+This guide describes the public, read-only local-provider candidate. Deployment of this branch must be confirmed separately. It uses the **local rules interpreter** (no model, no Foundry, no credentials), **fictional** matches, and server-side calculations. Do not describe it as AI-powered.
 
 > Local rules understand a bounded set of phrasings. The example opinions on each match page are verified; other wording may be declined with a clarification or limitation. See [docs/LANGUAGE_ACCEPTANCE.md](./docs/LANGUAGE_ACCEPTANCE.md).
 
@@ -29,7 +29,7 @@ The hosted hackathon candidate is public and read-only. It uses the **local rule
 - All data is synthetic and sampled: no real performances, video, tracking or xG.
 - Local rules, not a language model. Shot location is reported as unavailable; “before the goal” is strictly before the resolved goal.
 - Snapshots live in browser memory and vanish on refresh.
-- Native sharing is unverified on a real device. Foundry has had only small bounded live runs on an earlier prompt/schema and is not part of this deployment.
+- Native sharing is unverified on a real device. Foundry has had only small bounded live runs on an earlier application version and is not part of this deployment.
 
 ## Reporting a problem
 

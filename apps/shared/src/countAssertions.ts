@@ -1,20 +1,22 @@
 import type { MatchTeam } from './match.ts'
+import type { PlayerEntityReference } from './apiContracts.ts'
 
 export type CountMetric = 'shots' | 'shots-on-target' | 'goals'
 
 /**
- * Single-team count assertions that the comparison grammar cannot express.
- * `none` asserts a zero count of a named metric; `universal` quantifies over a
+ * Entity count assertions that the comparison grammar cannot express.
+ * `none` asserts zero; `some` asserts a recorded goal; `universal` quantifies over a
  * team's recorded shots ("every shot was on target", "none ... on target").
  */
-export type CountAssertion =
-  | { kind: 'none'; team: MatchTeam; metric: CountMetric }
+export type CountAssertion = (
+  | { kind: 'none' | 'some'; team: MatchTeam; metric: CountMetric }
   | {
       kind: 'universal'
       team: MatchTeam
       quantifier: 'every' | 'none'
       negated: boolean
     }
+) & { player?: PlayerEntityReference }
 
 const team = '(?<team>Northbridge|Eastport)'
 const metricWord = '(?<metric>shots?\\s+on\\s+target|shots?|goals?)'
@@ -28,10 +30,19 @@ const zeroPatterns = [
     'i',
   ),
   new RegExp(
-    `^${team}\\s+(?:did|do|does|has|have|had)\\s+not\\s+(?<goal>score)(?:d)?(?:\\s+(?:any\\s+)?goals?)?${tail}`,
+    `^${team}\\s+(?:did|do|does|has|have|had)\\s+not\\s+(?<goal>score)(?:d)?(?:\\s+(?:(?:any|a|a\\s+single)\\s+)?goals?)?${tail}`,
     'i',
   ),
+  new RegExp(`^${team}\\s+(?:(?:has|have|had)\\s+)?never\\s+(?<goal>score)d?${tail}`, 'i'),
 ]
+
+const scoringPattern = new RegExp(
+  `^${team}\\s+(?:(?:has|have|had)\\s+)?scored(?:\\s+(?:a\\s+)?goal)?${tail}`,
+  'i',
+)
+
+export const BEFORE_GOAL_PHRASE =
+  /\s*\b(?:just\s+)?before\s+(?:the|that)\s+(?<which>first|opening|last|latest|most\s+recent)?\s*(?<noun>goal|opener|equali[sz]er)\b/i
 
 const everyPatterns = [
   new RegExp(
@@ -45,6 +56,10 @@ const everyPatterns = [
 ]
 
 const nonePatterns = [
+  new RegExp(
+    `^(?:every|each|all)(?:\\s+of)?\\s+${team}(?:['’]s)?\\s+shots?\\s+(?:was|were|has\\s+been|have\\s+been|had\\s+been)\\s+not\\s+on\\s+target\\s*[.!?]*$`,
+    'i',
+  ),
   new RegExp(
     `^(?:none|not\\s+one|not\\s+a\\s+single\\s+one)\\s+of\\s+${team}(?:['’]s)?\\s+shots\\s+(?:was|were|has\\s+been|have\\s+been)\\s+on\\s+target\\s*[.!?]*$`,
     'i',
@@ -65,8 +80,25 @@ function normalizeMetric(value: string): CountMetric {
   return word.includes('on target') ? 'shots-on-target' : 'shots'
 }
 
-export function parseCountAssertion(input: string): CountAssertion | undefined {
-  const text = input.trim().replace(/n['’]t\b/gi, ' not').replace(/\s+/g, ' ')
+export function parseCountAssertion(
+  input: string,
+  resolvedPlayer?: PlayerEntityReference | null,
+): CountAssertion | undefined {
+  const normalize = (value: string) => value.replace(/[Øø]/g, 'o')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  let text = normalize(input.trim()).replace(/n['’]t\b/gi, ' not').replace(/\s+/g, ' ')
+  let player: PlayerEntityReference | undefined
+  if (resolvedPlayer) {
+    const name = normalize(resolvedPlayer.name)
+    const parts = name.split(/\s+/)
+    for (const alias of [name, parts.at(-1)!, parts[0]]) {
+      if (text.toLowerCase().startsWith(`${alias.toLowerCase()} `)) {
+        text = resolvedPlayer.team + text.slice(alias.length)
+        player = resolvedPlayer
+        break
+      }
+    }
+  }
   for (const pattern of zeroPatterns) {
     const groups = pattern.exec(text)?.groups
     if (!groups) continue
@@ -74,7 +106,12 @@ export function parseCountAssertion(input: string): CountAssertion | undefined {
       kind: 'none',
       team: resolveTeam(groups.team),
       metric: groups.goal ? 'goals' : normalizeMetric(groups.metric),
+      ...(player ? { player } : {}),
     }
+  }
+  const scored = scoringPattern.exec(text)?.groups
+  if (scored) {
+    return { kind: 'some', team: resolveTeam(scored.team), metric: 'goals', ...(player ? { player } : {}) }
   }
   for (const pattern of everyPatterns) {
     const groups = pattern.exec(text)?.groups

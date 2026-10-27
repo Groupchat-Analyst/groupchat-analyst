@@ -14,6 +14,7 @@ import type {
 import type { PlayerEntityReference } from '../../../shared/src/apiContracts.js'
 import { interpretClaim } from '../../../shared/src/interpretClaim.js'
 import {
+  BEFORE_GOAL_PHRASE as GOAL_PHRASE,
   mentionsShotLocation,
   parseCountAssertion,
   type CountAssertion,
@@ -183,7 +184,9 @@ function playerMentionPosition(text: string, player: PlayerEntityReference): num
   const positions = names
     .map((name) => normalizedText.search(new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)))
     .filter((position) => position >= 0)
-  return positions.length ? Math.min(...positions) : Number.POSITIVE_INFINITY
+  if (positions.length) return Math.min(...positions)
+  const firstName = normalizeName(player.name).split(/\s+/)[0]
+  return normalizedText.search(new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
 }
 
 function parsePlayerComparison(
@@ -194,6 +197,9 @@ function parsePlayerComparison(
   opponentPlayer: PlayerEntityReference
 } | undefined {
   if (mentions.length !== 2) {
+    return undefined
+  }
+  if (playerMentionPosition(text, mentions[0]) === playerMentionPosition(text, mentions[1])) {
     return undefined
   }
 
@@ -466,9 +472,6 @@ function clarificationQuestion(text: string): string {
   return 'Which team is this claim about?'
 }
 
-const GOAL_PHRASE =
-  /\s*\b(?:just\s+)?before\s+(?:the|that)\s+(?<which>first|opening|last|latest|most\s+recent)?\s*(?<noun>goal|opener|equali[sz]er)\b/i
-
 type GoalReference =
   | { goal: MatchEvent }
   | { goal?: undefined; clarification: string }
@@ -533,8 +536,9 @@ const COUNT_EVIDENCE: Record<'shots' | 'shots-on-target' | 'goals', EvidenceKind
 }
 
 function describeAssertion(assertion: CountAssertion): string {
-  if (assertion.kind === 'none') {
-    return `Whether ${assertion.team} recorded no ${assertion.metric.replaceAll('-', ' ')} in the selected period (a zero count of ${assertion.metric.replaceAll('-', ' ')}).`
+  if (assertion.kind !== 'universal') {
+    const who = assertion.player?.name ?? assertion.team
+    return `Whether ${who}'s recorded ${assertion.metric.replaceAll('-', ' ')} count is ${assertion.kind === 'none' ? 'zero' : 'greater than zero'} in the claim's evidence window.`
   }
   const quantifier = assertion.quantifier === 'every'
     ? assertion.negated
@@ -555,7 +559,9 @@ function assertionClaimFromText(
   context: InterpretationContext,
   forcedPlayer?: PlayerEntityReference,
 ): InterpretedClaim | undefined {
-  const assertion = parseCountAssertion(text)
+  const players = forcedPlayer ? [forcedPlayer] : mentionedPlayers(text, context.players)
+  const player = players.length === 1 ? players[0] : null
+  const assertion = parseCountAssertion(text, player)
   const base = {
     id: `claim-${index + 1}`,
     playerSubject: null,
@@ -568,6 +574,8 @@ function assertionClaimFromText(
     return {
       ...base,
       subject: assertion.team,
+      playerSubject: assertion.player ?? null,
+      playerMetric: assertion.player && assertion.kind !== 'universal' ? assertion.metric : null,
       intent: 'factual-claim',
       meaning: {
         category: 'other',
@@ -575,15 +583,13 @@ function assertionClaimFromText(
         comparison: null,
       },
       requiredEvidence:
-        assertion.kind === 'none'
+        assertion.kind !== 'universal'
           ? [COUNT_EVIDENCE[assertion.metric]]
           : ['shots', 'shots-on-target'],
       clarificationNeeds: [],
     }
   }
   if (!mentionsShotLocation(text)) return undefined
-  const players = forcedPlayer ? [forcedPlayer] : mentionedPlayers(text, context.players)
-  const player = players.length === 1 ? players[0] : null
   const teams = TEAMS.filter((team) =>
     new RegExp(`\\b${team}\\b`, 'i').test(text),
   )
@@ -609,8 +615,26 @@ function claimFromText(
   context: InterpretationContext,
   forcedPlayer?: PlayerEntityReference,
 ): InterpretedClaim {
-  const assertionClaim = assertionClaimFromText(text, index, context, forcedPlayer)
-  if (assertionClaim) return assertionClaim
+  const referencedGoal = resolveReferencedGoal(text, context.events)
+  const assertionClaim = assertionClaimFromText(
+    referencedGoal ? text.replace(GOAL_PHRASE, '').trim() : text,
+    index,
+    context,
+    forcedPlayer,
+  )
+  if (assertionClaim) {
+    return {
+      ...assertionClaim,
+      text,
+      ...(referencedGoal?.goal ? {
+        timePeriod: { kind: 'before-event', eventId: referencedGoal.goal.id },
+        historicalEventAnchor: {
+          eventId: referencedGoal.goal.id,
+          relationship: `Goal by ${referencedGoal.goal.team} at ${formatMatchClock(referencedGoal.goal.clock)}`,
+        },
+      } : referencedGoal ? { clarificationNeeds: [referencedGoal.clarification] } : {}),
+    }
+  }
   const playerMentions = forcedPlayer
     ? [forcedPlayer]
     : mentionedPlayers(text, context.players)
@@ -620,7 +644,6 @@ function claimFromText(
   const runningDistance = parseRunningDistanceComparison(text)
   const singleStatistic = parseSingleStatisticRequest(text)
   const metricComparison = passRequest ?? passAssertion ?? runningDistance
-  const referencedGoal = resolveReferencedGoal(text, context.events)
   const parsedClaim = metricComparison || singleStatistic
     ? undefined
     : interpretClaim(text.replace(GOAL_PHRASE, '')).claims[0]
@@ -901,6 +924,7 @@ export class LocalInterpretationProvider implements InterpretationProvider {
       const sharedJudgement =
         mentions.length >= 2 &&
         mentions.length <= 4 &&
+        new Set(mentions.map((player) => playerMentionPosition(text, player))).size === mentions.length &&
         !/\b(?:compare|comparison|than|versus|vs\.?)\b/i.test(text) &&
         !parseCountAssertion(text) &&
         !mentionsShotLocation(text) &&

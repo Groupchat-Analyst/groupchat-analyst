@@ -2,7 +2,7 @@
 
 Check a football take against the match. Type an opinion, replay a fictional match to a chosen minute, and get a plain-language answer with the evidence, what it can and cannot establish, and a shareable receipt. Replay to a later minute and press **Check again** to see exactly what changed.
 
-> **Synthetic data.** Every match, player action and result is invented. Real-player names are fictionalized identities only; nothing here reflects real performances. There is no video, tracking, xG or injury data.
+> **Synthetic data.** Every match, player action and result is invented. Real-player names are used in invented scenarios; nothing here reflects real performances. There is no video, tracking, xG or injury data.
 
 ## What it does
 
@@ -59,7 +59,7 @@ Local rules understand a bounded set of phrasings by meaning class. Both "Eastpo
 
 ## Verified demonstration
 
-All of these were exercised against the **local** provider (real local API, browser, synthetic data), plus offline replay of previously captured Foundry outputs through the real service path. **No live Foundry call was made for the current prompt/schema work.**
+All of these were exercised against the **local** provider (real local API, browser, synthetic data), plus offline replay of previously captured Foundry outputs through the real service path. **No live Foundry call was made for the current application changes; the Foundry prompt and schema are unchanged.**
 
 - Statistics: "How many shots did Eastport have?" at 90+4′ → 8 shots with records.
 - Broad player opinion: "Saka has had a horrible game" at 57′ → his recorded contributions (1 goal, 2 shots on target, 1 of 2 passes, 1 recovery), no rating.
@@ -70,9 +70,9 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (desktop and 390 px emulation, local stack): home, match list, both matches, guided demo, failure path (aborted request shows an error and no stale answer), match switch during a pending request (no answer or error carried over), native share with a **stubbed** `navigator.share` (one PNG file, zero extra `/api/analyze` calls). Native sharing on a real phone is **unverified**.
 
-Automated tests: API 221, web 113. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated tests: API 230, web 113 (independently rerun on Node 22.23.3). The full 42-input local corpus and nine additional semantic-composition regressions pass. The baseline evidence is unchanged. The independent review also replays the genuine captured shots pair through the actual web comparison/share functions offline; it could not repeat rendered browser checks in its runtime. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
-Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to the earlier prompt/schema, which is unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
+Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 
 ## Limitations
 

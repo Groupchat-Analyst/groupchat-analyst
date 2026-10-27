@@ -1,6 +1,6 @@
 # Language acceptance matrix
 
-Fictional data only. This records what the **local rule-based interpreter** actually returned for representative football opinions, produced by `analyzeOpinion` with `CLAIM_INTERPRETER_PROVIDER=local` on `feature/explore-more-matches` (probe: 41 inputs, run offline, no model calls).
+Fictional data only. This records what the **local rule-based interpreter** actually returned for representative football opinions, produced by `analyzeOpinion` with `CLAIM_INTERPRETER_PROVIDER=local` on `feature/explore-more-matches` (probe: 42 inputs, run offline, no model calls).
 
 ## How to read this document
 
@@ -9,7 +9,7 @@ Fictional data only. This records what the **local rule-based interpreter** actu
 | **Local-rule execution** | The input was run through the real service path with the local interpreter. | Every row below. |
 | **Captured Foundry replay** | A genuinely captured Foundry interpretation replayed through real validation with stubbed transport (`apps/api/tests/foundry-captured-replay.test.mjs`, `apps/api/src/testdata`). Offline; not live verification. | Only the four earlier captured cases: shots 57′ and 58′, “parked the bus”, “How many passes did Bruno complete?”. |
 | **Manually constructed / stubbed** | Interpretations written by hand in tests to exercise validation. | Existing unit tests only; none of the rows below. |
-| **Live Foundry verification** | Real model calls. | **None for this work.** The earlier live ledgers belong to the earlier prompt/schema. The prompt and schema are unchanged here, so the local-rule results below say nothing about Foundry behaviour. |
+| **Live Foundry verification** | Real model calls. | **None for this work.** The earlier live ledgers describe earlier application versions. The prompt and schema are unchanged here, so the local-rule results below say nothing about Foundry behaviour. |
 
 Untested wording is not claimed as Foundry-supported.
 
@@ -85,3 +85,15 @@ These are covered by `apps/api/tests/dataset-selection.test.mjs`, `return-fixtur
 ## Coverage statement
 
 The local interpreter reads a bounded set of patterns by *meaning class* (a shared opinion-topic classifier, a comparison parser and a player-metric parser). It is not an open language model and will decline wording outside those classes. Foundry interpretation for these classes has not been verified on the current prompt and schema.
+
+## Additional composition regressions (independent offline review)
+
+The original 42 rows above still pass on Node 22.23.3. They are a bounded acceptance corpus, not a claim that every football phrasing works. A further nine regression tests in `semantic-composition.test.mjs` cover failures found beyond that list:
+
+- Player goal statements and their negations, including “Saka has not scored”, distinguish Saka from Rice and respect the selected window.
+- Player first-half scoring statements preserve scorer identity, exclude future goals, and do not fail semantic validation.
+- Zero and universal shot assertions composed with “before the goal” use the strict historical denominator and clarify absent or ambiguous goals.
+- “Not every shot was on target” and “every shot was not on target” retain different meanings.
+- An ambiguous first name in “Bruno has been poor” produces a clarification, not two invented player opinions. Explicitly named players and unique first names still work.
+
+These repairs are locally executed and regression-tested only. No new Foundry interpretation or real-device claim is made.
