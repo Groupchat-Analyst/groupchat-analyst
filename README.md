@@ -6,7 +6,7 @@ Check a football take against the match. Type an opinion, replay a fictional mat
 
 ## What it does
 
-1. **Interprets** an opinion into separate claims and shows how each was understood. Ambiguous wording gets a clarification (for example, "Bruno" asks Bruno Fernandes or Bruno Guimarães).
+1. **Interprets** an opinion into separate claims and shows how each was understood. Ambiguous wording gets a clarification (for example, "Bruno" asks Bruno Fernandes or Bruno Guimarães); choosing a full-name/team option continues the saved request without another model call.
 2. **Retrieves evidence for and against** each claim from the selected fixture, restricted to the selected match time and period. Event IDs and match times are cited.
 3. **Assesses** the claim with server-side calculations. Statistical requests return figures without a verdict; broad judgements such as "parked the bus", "dominated" or "Saka has had a horrible game" are labelled "insufficient evidence for a firm conclusion" and never reduced to one statistic or an invented rating.
 4. **Explains** in a Fan view (short reply) or Analyst view (calculation traces, records, coverage), with copyable card text, a downloadable PNG card and, where the browser supports it, "Share the receipts". Cards name the fixture, its version and how the opinion was read.
@@ -73,7 +73,7 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (local rules): home, four-match selection and conversation at 1280 px and 390 px; 320 px has no horizontal overflow. Keyboard navigation visibly focuses the language selector. The 57′ submit and 58′ explicit recheck made exactly two analyze requests; replay movement, language changes, navigation, copy and PNG generation made none. Switching through all five locales retained the exact draft, clock and two-turn comparison. An actual downloaded Arabic receipt PNG (2160×2420) was decoded and visually inspected; its copied text and image retain the submitted opinion, 58′ scope, fixture/version, figures, event times and local-provider label. Other-language receipt strings and SVGs have automated regressions. Native sharing on a real phone is **unverified**.
 
-Automated checks: **346/346 API tests** and **136/136 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. The baseline fixture hash is unchanged (`fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`, 70 passes, 17 turnovers). Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated checks: **352/352 API tests** and **137/137 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. The baseline fixture source is unchanged (70 passes, 17 turnovers; existing baseline hash `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`). Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
 Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
 
@@ -86,6 +86,7 @@ Foundry (not used by the hosted candidate): earlier small, bounded live runs are
 - Snapshots are in browser memory and are lost on refresh. Analysis requests have a 45 s client deadline; an abort does not guarantee server work stopped.
 - No real-device, screen-reader or load testing. Real-phone native sharing is unverified. There is no durable total-request allowance or judge-accessible hosted AI route; the public candidate remains on local rules.
 - No messaging, accounts, publishing or chat ingestion exist. A messaging companion is a future idea only.
+- Production player-clarification continuation requires a stable `PLAYER_RESOLUTION_SIGNING_KEY` shared across API instances and restarts; development uses an ephemeral process-local key.
 
 ## Deployment and further reading
 

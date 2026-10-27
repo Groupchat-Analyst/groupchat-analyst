@@ -26,14 +26,14 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 
 | Check | Result |
 | --- | --- |
-| API tests | 346 pass, including captured-call replay, fixture, duration and language regressions |
-| Web tests | 136 pass |
+| API tests | 352 pass, including captured-call replay, fixture, duration, player-resolution and language regressions |
+| Web tests | 137 pass |
 | API/web typecheck, web lint and production build | Pass |
 | `git diff --check` | Pass |
-| Baseline fixture hash | Unchanged (`fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`, 70 passes, 17 turnovers) |
+| Baseline fixture verification | Six fixture/canonical-source Git blobs match the starting commit; 70 passes and 17 turnovers. The previously recorded baseline digest is `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044`. |
 | Language matrices | English corpus: 42/42 PASS. Five languages: 30/30 PASS (six asserted behavior classes per language). Broader non-English rule coverage and all live Foundry interpretation are unverified. |
-| Browser (local rules) | Submit at 57′: 1 analyze call; replay move: 0; explicit 58′ recheck: 1; locale switching, navigation, copy and download: 0 extra. Five-language switching preserved the exact draft, clock, period, conversation and comparison. Desktop/390 px/320 px emulation; no horizontal overflow; keyboard-focus indicator visible. |
-| Arabic receipt | Actual downloaded PNG decoded at 2160×2420 and visually inspected. Original opinion, scope, identity/version, figures, event times and local-provider label also verified in copied text. Actual PNGs in other languages were not inspected. |
+| Browser (local rules) | Existing walkthrough checks remain; all five player-selection flows passed with pointer and keyboard choice, preserving original opinion, language, draft, scope and one conversation turn. Five analysis and five explicit selection API requests; no interpreter call during selection. Explicit retry after an injected failure made no automatic retry or duplicate turn. A→B late success and A→B→A late failure did not alter the new draft, conversation or error state. |
+| Arabic receipt | Earlier actual downloaded PNG inspection remains recorded above. For player selection, the UI reported a successful download; the harness did not expose a download event. The same application rasterizer generated a 2160×1340 PNG from the rendered Arabic receipt blocks and that image was visually inspected. Original opinion, selected player, 57′ scope, Original match v3.0.0, local-provider disclosure and selection provenance are present; downloaded file bytes could not be independently retrieved. |
 | Native share on a real phone | **Unverified** |
 | Live multilingual Foundry | **Not run**. Language acceptance used local rules only; no prompt/schema/credential changes. |
 | Live Foundry for application `2343167` | 3 requests; calls 1–2 met expectations; stopped after call 3 ambiguously labeled 62 minutes at 60′. Offline replay later confirmed the value as elapsed participation in recorded coverage, not future play. Calls 4–6 not run; no broad reliability claim. |
@@ -46,6 +46,16 @@ Four fictional matches (Northbridge v Eastport ×2, Westhaven FC v Kingswell Cit
 English, Spanish, French, German and Arabic now have reusable interface/receipt resources and a bounded local interpretation matrix. Each language passed the same six behavior classes; English additionally passed the 42-case local acceptance corpus. The UI test suite covers translated comparison and receipt content, clarification/errors, provider disclosures, mixed-script Arabic SVG and preserved opinion text. The local browser run confirmed the persisted language preference, RTL direction, state preservation across locale changes, no extra analysis calls, 1280/390/320 px layouts, and visible keyboard focus. Only the Arabic PNG was actually downloaded, decoded and visually inspected.
 
 This is not multilingual Foundry verification. The wider local rule corpus is English-only; non-English interpretation is limited to the documented six cases. Translations have not received independent native-speaker review. No live model calls or external translation services were used.
+
+## Player clarification selection flow (`485440e`)
+
+Ambiguous player claims now receive server-generated full-name/team choices backed by canonical IDs and the selected fixture identity. A signed continuation binds the original opinion, input language, dataset, clock, period, validated claim and candidate set. Selecting a candidate uses the existing validated evidence/statistics path and updates the same conversation turn without another interpreter call. Explicit rechecks retain the chosen identity.
+
+Offline regressions cover both Bruno choices and attributed records, unrelated/foreign/tampered player IDs, scope preservation, mixed answered/unresolved claims, and zero additional provider calls during resolution. The Arabic Bruno opinion is canonicalized only for candidate discovery; the saved user wording remains exact. Player completion replies and the zero-attempt limitation are translated in all four non-English receipt languages.
+
+Browser verification used the local provider only. Each of the five language flows preserved its original input and selected identity; language changes before and during resolution did not submit another request. A simulated 503 required one explicit retry. Delayed late success/failure were tested across A→B and A→B→A navigation. No live Foundry, external translation, Azure or credential changes occurred. A stable `PLAYER_RESOLUTION_SIGNING_KEY` must be configured for production and shared across API instances/restarts; no key is included here.
+
+The actual download event was unavailable to the browser automation harness, so retrieved download bytes remain unverified. The same `svgToPngBlob` export function produced a 2160×1340 Arabic player-selection receipt that was inspected; native sharing on a real device remains unverified. Broader non-English wording, independent native-speaker review, screen readers and real-device testing remain open.
 
 ### Separate deployment gates (not implemented)
 
