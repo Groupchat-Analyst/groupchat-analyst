@@ -1,32 +1,44 @@
-## Consolidated hackathon candidate: take investigation, matchday replay, Foundry safeguards and public local-provider hosting config
+# Public local-rules football evidence experience
 
-Base: `main` (9d81c6b). Head: `feature/take-investigation`. **Merge nothing else first; this branch already contains the earlier work.**
+## Summary
 
-### What this contains
-- Matchday replay, scoped answers, shareable evidence cards, take investigation ("Check again", deterministic comparison, "Share what changed"), conversational `fanReply`, 45 s client deadline.
-- Foundry adapter safeguards (8192 completion-token ceiling, 30 s timeout, no retries, validated output, clarification-only unresolved entities), disabled by default. Captured-output offline replay regressions.
-- Hosting: `.github/workflows/shared-preview.yml` (manual, `main` only), `apps/web/public/staticwebapp.config.json` now **public** (invited-role gate removed), landing `README.md`, `TEAM_DEMO.md`, `docs/DEPLOYMENT_RUNBOOK.md`.
-- Docs moved, not deleted: old README → `docs/IMPLEMENTATION_NOTES.md`; superseded private-preview plan → `docs/PRIVATE_PREVIEW_PLAN_SUPERSEDED.md`.
+This PR brings the `feature/explore-more-matches` candidate into `main`. It provides a match replay and evidence workflow across four fictional fixtures: a user enters an opinion, selects a match time and evidence period, receives a validated interpretation and application-calculated supporting/counter evidence, and can compare a later recheck or share a receipt.
 
-### Relationship to existing PRs (none closed or merged)
-| PR | Relationship |
-| --- | --- |
-| #1 interpreter prep (→ main) | Its single commit is not an ancestor, but `git cherry` shows an equivalent patch is already in this branch. |
-| #2 GPT-5-mini integration (→ #3 branch) | Stacked; its branch is an ancestor of this one. |
-| #3 conversational summaries (→ fan-experience-v1) | Stacked; ancestor of this branch. |
-| #4 consolidated fan experience (→ main) | Earlier consolidation; its head `65cc0f5` is an ancestor of this branch. |
-| #5 matchday replay (draft, → shared-preview-preparation) | Ancestor of this branch (as is its base). |
+The public release is intentionally local-rules-only. Foundry remains disabled and no model call is made by this candidate.
 
-If this PR is accepted, #1–#5 become redundant; the owner decides whether to close them afterwards.
+## Included functionality
 
-### Checks
-API 172/172, web 95/95, `tsc`, lint, web build, `git diff --check` (local provider). Hosted behaviour is not verified: no Azure resource exists.
+- Four selectable synthetic fixtures with server-owned replay frames, fixture identity/version, selected-time filtering and player attribution.
+- Bounded claim interpretation that separates statistical requests, factual claims, subjective judgments, unavailable metrics and clarification. Statistics are calculated in application code.
+- Fan and Analyst presentations, evidence and limitations, deterministic rechecks/comparisons, copied receipts and generated PNG receipts.
+- English, Spanish, French, German and Arabic presentation, including Arabic identity aliases, RTL layout and mixed-script isolation. Changing language does not submit analysis or clear the current match/conversation/draft.
+- Signed server-side player clarification and no-extra-interpreter-call selection, with original request scope preserved.
+- 1′ ordinary replay entry without future outcome spoilers; explicit 57′→58′ guided comparison; ordered/cancelled replay requests, playback lifecycle handling, localized loading errors and explicit retry.
+- Manual Static Web Apps deployment from `main`, pinned to the exact workflow-dispatch SHA.
 
-### Not changed
-No application logic, prompts, model settings or calculations changed in this preparation; only hosting config, tests for that config, and documentation.
+## Verification
 
-### Security notes
-Tracked files and all 57 reachable commits were scanned: no credentials, endpoints, headers or capture files found (test keys are fake literals; GUIDs are function invocation IDs; `local.settings.json` and `.local-captures/` are git-ignored and never committed). Public hosting means anonymous, unrate-limited API access; see the runbook's exposure section. Repository visibility is unchanged.
+- API: 363/363 tests passed.
+- Web: 151/151 tests passed.
+- Web TypeScript build, production build and lint passed.
+- `git diff --check` passed.
+- Local browser acceptance covered all four fixtures at 1′ in five languages, replay ordering and retry, and the guided 57′→58′ comparison. The guided answers were 2–2 at 57′ and Eastport 3–Northbridge 2 at 58′.
+- Built frontend smoke used a local API proxy. It was not hosted verification.
 
-### Remaining actions before deployment
-See the approval checklist in `docs/DEPLOYMENT_RUNBOOK.md`.
+All current acceptance and build verification used the local provider. Prior live Foundry records are for earlier commits and do not verify this candidate.
+
+## Deployment and configuration
+
+See [the release runbook](./DEPLOYMENT_RUNBOOK.md) for backend application settings, signing-key format and rotation behavior, exact manual deployment sequence, and hosted acceptance.
+
+The production backend must set `NODE_ENV=production`, `CLAIM_INTERPRETER_PROVIDER=local`, and `PLAYER_RESOLUTION_SIGNING_KEY` (32 random bytes, canonical unpadded base64url). Keep the key server-only and identical across all API instances. The workflow consumes only the repository Actions secret `AZURE_STATIC_WEB_APPS_API_TOKEN`. Do not configure Foundry settings.
+
+The workflow runs only when manually dispatched from `main`; it checks out `${{ github.sha }}` so the deployed source is the exact selected commit. The deployed frontend calls same-origin `/api`, not localhost.
+
+## Limitations and release gates
+
+- Hosted Azure acceptance and actual iPhone native sharing remain unverified.
+- The public API routes are anonymous and there is no durable enforced request allowance. The release owner must accept this exposure or block public release pending shared, atomic allowance enforcement and tests.
+- No judge-accessible Foundry route or durable AI allowance is implemented. Do not enable Foundry. A separately authorized, commit-pinned live verification remains outstanding.
+- Independent native-speaker/screen-reader review and load testing remain outstanding.
+- No merge, deployment, Azure resource change, credential change or live model call was made in this preparation.
