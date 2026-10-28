@@ -11,18 +11,20 @@ The public release is intentionally local-rules-only. Foundry remains disabled a
 - Four selectable synthetic fixtures with server-owned replay frames, fixture identity/version, selected-time filtering and player attribution.
 - Bounded claim interpretation that separates statistical requests, factual claims, subjective judgments, unavailable metrics and clarification. Statistics are calculated in application code.
 - Fan and Analyst presentations, evidence and limitations, deterministic rechecks/comparisons, copied receipts and generated PNG receipts.
-- English, Spanish, French, German and Arabic presentation, including Arabic identity aliases, RTL layout and mixed-script isolation. Changing language does not submit analysis or clear the current match/conversation/draft.
+- English, Spanish, French, German and Arabic presentation, including Arabic identity aliases, RTL layout and mixed-script isolation. Structured claim meanings, evidence coverage, event descriptions and earlier comparison answers render from validated data in the selected language. Changing language does not submit analysis or clear the current match/conversation/draft.
 - Signed server-side player clarification and no-extra-interpreter-call selection, with original request scope preserved.
 - 1′ ordinary replay entry without future outcome spoilers; explicit 57′→58′ guided comparison; ordered/cancelled replay requests, playback lifecycle handling, localized loading errors and explicit retry.
 - Manual Static Web Apps deployment from `main`, pinned to the exact workflow-dispatch SHA.
 
 ## Verification
 
-- API: 363/363 tests passed.
-- Web: 151/151 tests passed.
+- API: 366/366 tests passed.
+- Web: 157/157 tests passed.
 - Web TypeScript build, production build and lint passed.
 - `git diff --check` passed.
 - Local browser acceptance covered all four fixtures at 1′ in five languages, replay ordering and retry, and the guided 57′→58′ comparison. The guided answers were 2–2 at 57′ and Eastport 3–Northbridge 2 at 58′.
+- After the final localization changes, a local Arabic clarification was resolved to Bruno Guimarães; the 58′ answer, draft and original question persisted through all five display languages with no non-GET requests. A current Arabic PNG was generated and visually inspected.
+- The complete populated-state localization matrix (all fixtures, views, evidence states, comparisons, copy/export and keyboard paths in every language) was not rerun after the final changes. Unreviewed app-generated English in those untested states remains unverified; do not treat this PR as proof of application-wide localization completeness.
 - Built frontend smoke used a local API proxy. It was not hosted verification.
 
 All current acceptance and build verification used the local provider. Prior live Foundry records are for earlier commits and do not verify this candidate.
