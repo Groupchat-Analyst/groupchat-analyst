@@ -1,46 +1,43 @@
-# Public local-rules football evidence experience
+# Add controlled Foundry judge access with durable request limits
 
 ## Summary
 
-This PR brings the `feature/explore-more-matches` candidate into `main`. It provides a match replay and evidence workflow across four fictional fixtures: a user enters an opinion, selects a match time and evidence period, receives a validated interpretation and application-calculated supporting/counter evidence, and can compare a later recheck or share a receipt.
-
-The public release is intentionally local-rules-only. Foundry remains disabled and no model call is made by this candidate.
+This PR adds a bounded, access-code-protected Foundry path for an explicitly authorized judging session while preserving the public football evidence demo on local rules. The feature fails closed unless the backend enables it and supplies valid Foundry configuration, a separate judge access code, and a pre-provisioned shared Azure Table allowance.
 
 ## Included functionality
 
-- Four selectable synthetic fixtures with server-owned replay frames, fixture identity/version, selected-time filtering and player attribution.
-- Bounded claim interpretation that separates statistical requests, factual claims, subjective judgments, unavailable metrics and clarification. Statistics are calculated in application code.
-- Fan and Analyst presentations, evidence and limitations, deterministic rechecks/comparisons, copied receipts and generated PNG receipts.
-- English, Spanish, French, German and Arabic presentation, including Arabic identity aliases, RTL layout and mixed-script isolation. Structured claim meanings, evidence coverage, event descriptions and earlier comparison answers render from validated data in the selected language. Changing language does not submit analysis or clear the current match/conversation/draft.
-- Signed server-side player clarification and no-extra-interpreter-call selection, with original request scope preserved.
-- 1′ ordinary replay entry without future outcome spoilers; explicit 57′→58′ guided comparison; ordered/cancelled replay requests, playback lifecycle handling, localized loading errors and explicit retry.
-- Manual Static Web Apps deployment from `main`, pinned to the exact workflow-dispatch SHA.
+- Preserve the public local-rules provider; the public provider factory rejects a Foundry override, and only a server-validated judge request can select the Foundry adapter.
+- Validate the judge code server-side in constant time. The web entry is localized in English, Spanish, French, German and Arabic; the code stays in page memory and travels in the request header, not the URL or analysis body.
+- Reserve the shared total and per-client allowance using an Azure Table ETag-conditional update before each outbound Foundry attempt. Failed/time-out attempts count; concurrent requests, API instances and restarts share the stored ceiling. Missing, invalid, exhausted or unavailable configuration/storage fails closed with a localized state and local-rules alternative.
+- Keep Foundry credentials server-side and independent from `PLAYER_RESOLUTION_SIGNING_KEY`. No production credentials are included or generated.
+- Reuse existing structured Foundry interpretation, evidence calculation, validation, signed player continuation, fixture data and interface. Player resolution makes no additional interpreter request.
+- Preserve the four synthetic fixtures, 1′ ordinary replay, explicit 57′→58′ guided comparison, five presentation languages, Arabic identity/RTL support, Fan/Analyst evidence and receipts.
 
 ## Verification
 
-- API: 366/366 tests passed.
-- Web: 157/157 tests passed.
-- Web TypeScript build, production build and lint passed.
-- `git diff --check` passed.
-- Local browser acceptance covered all four fixtures at 1′ in five languages, replay ordering and retry, and the guided 57′→58′ comparison. The guided answers were 2–2 at 57′ and Eastport 3–Northbridge 2 at 58′.
-- After the final localization changes, a local Arabic clarification was resolved to Bruno Guimarães; the 58′ answer, draft and original question persisted through all five display languages with no non-GET requests. A current Arabic PNG was generated and visually inspected.
-- The complete populated-state localization matrix (all fixtures, views, evidence states, comparisons, copy/export and keyboard paths in every language) was not rerun after the final changes. Unreviewed app-generated English in those untested states remains unverified; do not treat this PR as proof of application-wide localization completeness.
-- Built frontend smoke used a local API proxy. It was not hosted verification.
+- API: 379/379 tests passed, including invalid access (zero calls), exactly one authorized call, failed-attempt reservation/no retry, shared/per-client concurrency, shared-state persistence across store instances, restart simulation, rollover, exhaustion/storage/configuration failures, no-call player continuation, and all four fixture contexts.
+- Web: 160/160 tests passed, including access-code request transport, no code in the analysis body, and localization-key coverage.
+- API TypeScript build, web TypeScript/production build, web lint and `git diff --check` passed.
+- Bruno/Martin player-judgement clarification, both candidate selections and pre-question squads were exercised locally with the local-rules provider. The original questions remained verbatim; selected identities had attributed synthetic records and explicit no-overall-rating limitations.
+- Local provider behavior and offline transport/storage stubs are not live Foundry verification. The allowance was tested with an in-memory ETag-enforcing fake, not Azurite or Azure Table Storage.
 
-All current acceptance and build verification used the local provider. Prior live Foundry records are for earlier commits and do not verify this candidate.
+## Required server configuration and infrastructure
 
-## Deployment and configuration
+The public deployment must keep `CLAIM_INTERPRETER_PROVIDER=local`, `NODE_ENV=production` and a production `PLAYER_RESOLUTION_SIGNING_KEY`. The controlled judge route additionally requires `FOUNDRY_JUDGE_ENABLED=true`, a separate `FOUNDRY_JUDGE_ACCESS_CODE`, `FOUNDRY_OPENAI_BASE_URL`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL_DEPLOYMENT`, `AzureWebJobsStorage`, and positive `FOUNDRY_ALLOWANCE_MAX_REQUESTS`, `FOUNDRY_ALLOWANCE_MAX_PER_CLIENT` and `FOUNDRY_ALLOWANCE_WINDOW_HOURS`. `FOUNDRY_ALLOWANCE_TABLE_NAME` is optional and defaults to `FoundryRequestAllowance`.
 
-See [the release runbook](./DEPLOYMENT_RUNBOOK.md) for backend application settings, signing-key format and rotation behavior, exact manual deployment sequence, and hosted acceptance.
+An authorized owner must provision the Azure Storage account/table and configure server-only settings before enabling judging. The code does not create Azure resources or tables. The proposed small judging allowance is six total attempts, three per forwarded client address and 24 hours. Per-client enforcement is IP-derived and supplementary; NAT/dynamic-IP and forwarded-header limitations apply. The shared table count is authoritative.
 
-The production backend must set `NODE_ENV=production`, `CLAIM_INTERPRETER_PROVIDER=local`, and `PLAYER_RESOLUTION_SIGNING_KEY` (32 random bytes, canonical unpadded base64url). Keep the key server-only and identical across all API instances. The workflow consumes only the repository Actions secret `AZURE_STATIC_WEB_APPS_API_TOKEN`. Do not configure Foundry settings.
-
-The workflow runs only when manually dispatched from `main`; it checks out `${{ github.sha }}` so the deployed source is the exact selected commit. The deployed frontend calls same-origin `/api`, not localhost.
+See [the deployment runbook](./DEPLOYMENT_RUNBOOK.md) for setting formats, signing-key requirements, infrastructure, deployment sequence and the proposed six-call acceptance. Neither Foundry nor Azure Table has been configured or provisioned for this PR.
 
 ## Limitations and release gates
 
-- Hosted Azure acceptance and actual iPhone native sharing remain unverified.
-- The public API routes are anonymous and there is no durable enforced request allowance. The release owner must accept this exposure or block public release pending shared, atomic allowance enforcement and tests.
-- No judge-accessible Foundry route or durable AI allowance is implemented. Do not enable Foundry. A separately authorized, commit-pinned live verification remains outstanding.
-- Independent native-speaker/screen-reader review and load testing remain outstanding.
-- No merge, deployment, Azure resource change, credential change or live model call was made in this preparation.
+- No live Foundry call, hosted Foundry test, Azure Table emulator/integration test, Azure provisioning, deployment or merge was performed.
+- A judge access code is a shared gate, not individual judge identity. An approved judge roster and out-of-band code distribution remain operational dependencies.
+- A fresh, commit-pinned live acceptance of at most six outbound attempts remains outstanding; no live set is run by this PR preparation.
+- The public API remains anonymous and has no public local-rules traffic allowance. The judge-only allowance does not mitigate public traffic/availability exposure.
+- Hosted acceptance, real-iPhone sharing, independent native-speaker/screen-reader review and load testing remain outstanding.
+- No production signing key, Foundry key or judge access code was generated or changed.
+
+## Deployment
+
+The existing workflow is manual from `main` and checks out the selected `${{ github.sha }}`. The deployed frontend calls same-origin `/api`, not localhost. This PR must not be merged or deployed without explicit release-owner approval. Keep the public provider local; do not enable Foundry until its infrastructure and acceptance gates are approved.

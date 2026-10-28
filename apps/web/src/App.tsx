@@ -22,7 +22,7 @@ import {
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
-import { requestAnalysis } from './analysisClient'
+import { requestAnalysis, requestFoundryAccess } from './analysisClient'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -95,6 +95,7 @@ type SubmittedRequest = {
   id: number
   context: SubmissionContext
   baseline: AnswerSnapshot | null
+  accessCode: string
   operation: RequestOperation
 }
 
@@ -1538,6 +1539,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
+  const [foundryAccessDraft, setFoundryAccessDraft] = useState('')
+  const [foundryAccessCode, setFoundryAccessCode] = useState('')
+  const [foundryAccessError, setFoundryAccessError] = useState('')
+  const [isCheckingFoundryAccess, setIsCheckingFoundryAccess] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -1669,7 +1674,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       setCopyMessage('')
       setShareMessage('')
       try {
-        const payload = await requestAnalysis(request, { signal: controller.signal })
+        const payload = await requestAnalysis(request, {
+          signal: controller.signal,
+          accessCode: active.accessCode || undefined,
+        })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
         if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
@@ -1814,6 +1822,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId, language),
       baseline: null,
+      accessCode: foundryAccessCode,
       operation: { kind: 'analysis' },
     })
   }
@@ -1833,6 +1842,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         shown.context.inputLanguage,
       ),
       baseline: shown,
+      accessCode: foundryAccessCode,
       operation: shown.analysis.playerResolutionContinuation
         ? {
             kind: 'recheck-resolved-player',
@@ -1855,6 +1865,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: shown.context,
       baseline: shown,
+      accessCode: foundryAccessCode,
       operation: {
         kind: 'resolve-player',
         continuation,
@@ -1874,6 +1885,32 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     }
     setRequestError('')
     setSubmittedRequest({ ...submittedRequest, id })
+  }
+
+  async function enableFoundryAccess() {
+    const candidate = foundryAccessDraft
+    if (!candidate || isCheckingFoundryAccess) return
+    setIsCheckingFoundryAccess(true)
+    setFoundryAccessError('')
+    try {
+      await requestFoundryAccess(candidate)
+      setFoundryAccessCode(candidate)
+      setFoundryAccessDraft('')
+    } catch (error) {
+      setFoundryAccessError(
+        error instanceof Error
+          ? error.message
+          : 'Judge AI access could not be verified. Use local rules instead.',
+      )
+    } finally {
+      setIsCheckingFoundryAccess(false)
+    }
+  }
+
+  function useLocalRules() {
+    setFoundryAccessCode('')
+    setFoundryAccessDraft('')
+    setFoundryAccessError('')
   }
 
   async function copyAssessment() {
@@ -2063,6 +2100,42 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
             />
           </div>
           <div className="conversation-column">
+            <section className="judge-access" aria-label="Judge AI access">
+              {!foundryAccessCode ? (
+                <details>
+                  <summary>Judge AI access (controlled)</summary>
+                  <form onSubmit={(event) => {
+                    event.preventDefault()
+                    void enableFoundryAccess()
+                  }}>
+                    <label htmlFor="foundry-access-code">Judge access code</label>
+                    <input
+                      id="foundry-access-code"
+                      type="password"
+                      autoComplete="off"
+                      value={foundryAccessDraft}
+                      onChange={(event) => setFoundryAccessDraft(event.currentTarget.value)}
+                    />
+                    <button
+                      className="secondary-button"
+                      type="submit"
+                      disabled={!foundryAccessDraft || isCheckingFoundryAccess}
+                    >
+                      {isCheckingFoundryAccess ? 'Checking access…' : 'Enable judge AI'}
+                    </button>
+                  </form>
+                  {foundryAccessError && <p role="alert">{foundryAccessError}</p>}
+                  <p>Public analysis remains on local rules. The code stays in this page’s memory only.</p>
+                </details>
+              ) : (
+                <div role="group" aria-label="Judge AI is enabled">
+                  <p role="status">Judge AI is enabled for this page only.</p>
+                  <button className="secondary-button" type="button" onClick={useLocalRules}>
+                    Use local rules instead
+                  </button>
+                </div>
+              )}
+            </section>
             <section className="conversation" aria-labelledby="conversation-title">
               <div className="conversation-head">
                 <h2 id="conversation-title">Conversation</h2>

@@ -352,6 +352,31 @@ test('pre-question squad labels have explicit translations in every display lang
   }
 })
 
+test('controlled judge AI labels and failure states have explicit translations', () => {
+  const messages = [
+    'Judge AI access (controlled)',
+    'Judge access code',
+    'Enable judge AI',
+    'Checking access…',
+    'Judge AI is enabled for this page only.',
+    'Use local rules instead',
+    'Public analysis remains on local rules. The code stays in this page’s memory only.',
+    'The judge access code was not accepted.',
+    'Judge AI is not configured on this server. Use local rules instead.',
+    'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
+    'The shared judge AI request allowance is exhausted. Use local rules or contact the judge.',
+    'Your judge AI request allowance is exhausted. Use local rules or try again later.',
+    'Judge AI access could not be verified. Use local rules instead.',
+  ]
+  for (const { code } of APP_LANGUAGES) {
+    for (const message of messages) {
+      const localized = translateText(message, code)
+      assert.ok(localized.trim().length > 0, `${code}: ${message}`)
+      if (code !== 'en') assert.notEqual(localized, message, `${code}: ${message}`)
+    }
+  }
+})
+
 test('structured player-performance messages have translation keys and preserve parameters', () => {
   const templates = [
     'Recorded shots: {value}',

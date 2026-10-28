@@ -57,8 +57,8 @@ Checks: `cd apps\api; npm test` (compiles, then runs all API tests) and `cd apps
 
 | Mode | Setting | Notes |
 | --- | --- | --- |
-| **Local rules (default)** | `CLAIM_INTERPRETER_PROVIDER=local` or unset | Deterministic, bounded phrasing, no model connection, no credentials. The interface labels answers "Local rules · no model connection". **This is the only mode intended for the hosted hackathon deployment.** |
-| Microsoft Foundry (optional, off by default) | `CLAIM_INTERPRETER_PROVIDER=foundry` plus `FOUNDRY_OPENAI_BASE_URL`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL_DEPLOYMENT` | Server-side only, structured-output interpretation of language. 8192 completion-token ceiling, 30 s timeout, no retries, output validated before use. Keep credentials in git-ignored `apps/api/local.settings.json` or server environment variables; never in source. |
+| **Public analysis** | `CLAIM_INTERPRETER_PROVIDER=local` or unset | Deterministic, bounded phrasing, no model connection. The public route rejects a Foundry provider override and labels answers "Local rules · no model connection". |
+| **Controlled judge AI** | Explicit server opt-in, a separately configured judge access code, Foundry credentials, and the shared request allowance in [the deployment runbook](./docs/DEPLOYMENT_RUNBOOK.md) | The browser keeps the code in page memory and the API validates it before selecting Foundry. Azure Table conditional updates reserve a shared total and per-client allowance before each outbound attempt. The existing 8192 completion-token ceiling, 30 s timeout, no-retry behavior, and structured validation remain in force. This route is not enabled or hosted by this change. |
 
 Local rules understand a bounded set of phrasings by meaning class. Both "Eastport had more shots on target than Northbridge." and the shorter "Eastport had more shots on target." work locally. Wording outside the covered classes gets clarification or an explicit limitation.
 
@@ -75,9 +75,9 @@ All of these were exercised against the **local** provider (real local API, brow
 
 Browser checks (local rules): home, four-match selection and conversation at 1280 px and 390 px; 320 px has no horizontal overflow. Keyboard navigation visibly focuses the language selector. The 57′ submit and 58′ explicit recheck made exactly two analyze requests; replay movement, language changes, navigation, copy and PNG generation made none. Switching through all five locales retained the exact draft, clock and two-turn comparison. An actual downloaded Arabic receipt PNG (2160×2420) was decoded and visually inspected; its copied text and image retain the submitted opinion, 58′ scope, fixture/version, figures, event times and local-provider label. Other-language receipt strings and SVGs have automated regressions. Native sharing on a real phone is **unverified**.
 
-Automated checks: **363/363 API tests** and **151/151 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
+Automated checks: **379/379 API tests** and **160/160 web tests** pass; API and web typechecks, lint and production build pass. The 42-input English matrix and 30-case five-language matrix are asserted per case. Baseline fixture source remains unchanged (70 passes, 17 turnovers). The historical semantic digest `fb5335ff63f326246b93182dda7adb4462d8b67efd4ce8133ae575f989ee1044` was not recomputed for this release. Walkthrough script: [TEAM_DEMO.md](./TEAM_DEMO.md).
 
-Foundry (not used by the hosted candidate): earlier small, bounded live runs are in `docs/*ledger.json`. They belong to earlier application versions; the prompt and schema are unchanged but not re-verified for the new wording classes. They do **not** establish production reliability.
+Historical Foundry captures in `docs/*ledger.json` belong to earlier application revisions and are not live verification of this controlled route. The new access gate and allowance use offline provider/storage stubs only; no live Foundry request was made for this work.
 
 ## Limitations
 
@@ -86,7 +86,7 @@ Foundry (not used by the hosted candidate): earlier small, bounded live runs are
 - Translations have not received independent native-speaker review.
 - The fixture is partial: build-up annotations cover only a sample, pressure observations are selected moments, there is no continuous tracking, so defensive shape, territorial control, chance quality and tactical causes cannot be established.
 - Snapshots are in browser memory and are lost on refresh. Analysis requests have a 45 s client deadline; an abort does not guarantee server work stopped.
-- No real-device, screen-reader or load testing. Real-phone native sharing is unverified. There is no durable total-request allowance or judge-accessible hosted AI route; the public candidate remains on local rules.
+- No real-device, screen-reader or load testing. Real-phone native sharing is unverified. The controlled judge route and durable Azure Table allowance are implemented and covered offline, but no production settings/table have been configured and no hosted Foundry request has been made. Public analysis remains on local rules.
 - No messaging, accounts, publishing or chat ingestion exist. A messaging companion is a future idea only.
 - Production player-clarification continuation requires `PLAYER_RESOLUTION_SIGNING_KEY`: exactly 32 cryptographically random bytes encoded as unpadded base64url (43 characters), shared across API instances and restarts. Configure it only in the API server's environment settings; never in browser/Vite settings or source control. With `NODE_ENV=production`, a missing or malformed key fails the request explicitly (HTTP 502), with no ephemeral fallback. Development without the variable uses a process-local random key. Tokens have no expiry: rotating the key immediately invalidates outstanding clarification/recheck continuations; there is no previous-key verification ring.
 

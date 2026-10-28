@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ANALYSIS_TIMEOUT_MS, AnalysisTimeoutError, requestAnalysis } from './analysisClient.ts'
+import { ANALYSIS_TIMEOUT_MS, AnalysisTimeoutError, requestAnalysis, requestFoundryAccess } from './analysisClient.ts'
 
 function fakeTimers() {
   const timers = new Map()
@@ -95,6 +95,44 @@ test('success and server errors clear the timer', async () => {
     /unreadable/,
   )
   assert.equal(clock.timers.size, 0)
+})
+
+test('judge access code is sent only in the protected request header', async () => {
+  const requests = []
+  await requestAnalysis(
+    { opinion: 'test' },
+    {
+      accessCode: 'test-code-held-in-memory',
+      fetchImpl: async (url, init) => {
+        requests.push({ url, init })
+        return jsonResponse({ ok: true })
+      },
+    },
+  )
+  await requestAnalysis(
+    { opinion: 'public' },
+    {
+      fetchImpl: async (url, init) => {
+        requests.push({ url, init })
+        return jsonResponse({ ok: true })
+      },
+    },
+  )
+  assert.equal(requests[0].url, '/api/analyze')
+  assert.equal(requests[0].init.headers['x-foundry-judge-code'], 'test-code-held-in-memory')
+  assert.equal(requests[0].init.body.includes('test-code-held-in-memory'), false)
+  assert.equal(requests[1].init.headers['x-foundry-judge-code'], undefined)
+})
+
+test('judge access validation posts the code to the server without a model request', async () => {
+  let captured
+  await requestFoundryAccess('test-code-held-in-memory', async (url, init) => {
+    captured = { url, init }
+    return jsonResponse({ enabled: true })
+  })
+  assert.equal(captured.url, '/api/foundry-access')
+  assert.deepEqual(JSON.parse(captured.init.body), { code: 'test-code-held-in-memory' })
+  assert.equal(captured.init.headers['content-type'], 'application/json')
 })
 
 test('a superseding abort cancels the fetch and clears the timer without a timeout error', async () => {
