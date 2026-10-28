@@ -64,12 +64,20 @@ test('the workflow carries no Foundry credentials or provider override', async (
   assert.equal([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]).join(), 'AZURE_STATIC_WEB_APPS_API_TOKEN')
 })
 
-test('public analysis stays local and the controlled judge-access route is registered', async () => {
+test('public Foundry access is server-gated and the judge-code route is absent', async () => {
   const index = await readFile(new URL('../../api/src/index.ts', import.meta.url), 'utf8')
+  const analysis = await readFile(new URL('../../api/src/functions/analyze.ts', import.meta.url), 'utf8')
   const providers = await readFile(new URL('../../api/src/providers/index.ts', import.meta.url), 'utf8')
+  const app = await readFile(new URL('./App.tsx', import.meta.url), 'utf8')
 
-  assert.equal([...index.matchAll(/authLevel: 'anonymous'/g)].length, 3)
-  assert.match(index, /route: 'foundry-access'/)
+  assert.equal([...index.matchAll(/authLevel: 'anonymous'/g)].length, 2)
+  assert.doesNotMatch(index, /foundry-access/)
   assert.match(providers, /CLAIM_INTERPRETER_PROVIDER\?\.trim\(\) \|\| 'local'/)
   assert.doesNotMatch(providers, /createFoundryProvider/)
+  assert.match(analysis, /FOUNDRY_PUBLIC_ENABLED/)
+  assert.match(analysis, /createAllowance\(environment\)\.reserve/)
+  assert.doesNotMatch(analysis, /x-foundry-judge-code|FOUNDRY_JUDGE_ACCESS_CODE/)
+  assert.doesNotMatch(app, /foundry-access-code|judge-access/)
+  assert.match(app, /AI is used by default when enabled on the server/)
+  assert.match(app, /Use local rules instead/)
 })

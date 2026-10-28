@@ -17,7 +17,6 @@ import {
   foundryClientIdentity,
 } from '../dist/api/src/foundryAllowance.js'
 import { createAnalyzeHandler } from '../dist/api/src/functions/analyze.js'
-import { createFoundryAccessHandler } from '../dist/api/src/functions/foundryAccess.js'
 import { FoundryInterpretationProvider } from '../dist/api/src/providers/foundry.js'
 import { LocalInterpretationProvider } from '../dist/api/src/providers/local.js'
 
@@ -59,8 +58,7 @@ async function unusedPort() {
 
 function allowanceEnvironment(connectionString, tableName, limits = {}) {
   return {
-    FOUNDRY_JUDGE_ENABLED: 'true',
-    FOUNDRY_JUDGE_ACCESS_CODE: randomBytes(32).toString('base64url'),
+    FOUNDRY_PUBLIC_ENABLED: 'true',
     FOUNDRY_OPENAI_BASE_URL: 'https://foundry.example.test/openai/v1',
     FOUNDRY_API_KEY: randomBytes(32).toString('base64url'),
     FOUNDRY_MODEL_DEPLOYMENT: 'offline-azurite-stub',
@@ -72,11 +70,10 @@ function allowanceEnvironment(connectionString, tableName, limits = {}) {
   }
 }
 
-function request(body, code, forwardedFor = '192.0.2.77') {
+function request(body, forwardedFor = '192.0.2.77') {
   return {
     headers: {
       get(name) {
-        if (name === 'x-foundry-judge-code') return code ?? null
         if (name === 'x-forwarded-for') return forwardedFor
         return null
       },
@@ -158,7 +155,6 @@ function startAzurite(location, port, accountName, accountKey) {
     process.execPath,
     [
       azuriteEntry,
-      '--silent',
       '--disableTelemetry',
       '--location',
       location,
@@ -179,26 +175,37 @@ function startAzurite(location, port, accountName, accountKey) {
   child.stdout.setEncoding('utf8').on('data', (chunk) => { output += chunk })
   child.stderr.setEncoding('utf8').on('data', (chunk) => { output += chunk })
   const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Azurite Table did not start: ${output}`)),
-      15_000,
-    )
-    child.on('error', (error) => {
+    let settled = false
+    const fail = (error) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
       reject(error)
-    })
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      reject(new Error(`Azurite Table exited (${code}): ${output}`))
-    })
+    }
+    const timer = setTimeout(
+      () => fail(new Error(`Azurite Table did not start: ${output}`)),
+      45_000,
+    )
+    child.once('error', fail)
+    child.once('close', (code) =>
+      fail(new Error(`Azurite Table exited (${code}): ${output}`)),
+    )
     const check = () => {
-      if (output.includes('successfully started')) {
+      if (settled) return
+      const socket = net.createConnection({ host: '127.0.0.1', port })
+      socket.once('connect', () => {
+        socket.destroy()
+        if (settled) return
+        settled = true
         clearTimeout(timer)
         resolve()
-      }
+      })
+      socket.once('error', () => {
+        socket.destroy()
+        if (!settled) setTimeout(check, 100)
+      })
     }
-    child.stdout.on('data', check)
-    child.stderr.on('data', check)
+    check()
   })
   return { child, ready }
 }
@@ -391,14 +398,14 @@ test('real Azure Table adapter preserves and enforces the allowance on Azurite',
       })
       const handler = analyzeHandler(environment, provider)
       const exhausted = await handler(
-        request(analysisBody, environment.FOUNDRY_JUDGE_ACCESS_CODE),
+        request(analysisBody),
         { error() {} },
       )
       assert.equal(exhausted.status, 429)
       assert.equal(modelAttempts, 0)
     })
 
-    await t.test('invalid credentials, missing table and storage outage make no model attempts', async () => {
+    await t.test('missing table and storage outage make no model attempts', async () => {
       let modelAttempts = 0
       const provider = judgeProvider(
         allowanceEnvironment(connectionString, tableName()),
@@ -408,46 +415,14 @@ test('real Azure Table adapter preserves and enforces the allowance on Azurite',
         },
       )
 
-      const invalidName = tableName()
-      await tableService.createTable(invalidName)
-      const invalidEnvironment = allowanceEnvironment(
-        connectionString,
-        invalidName,
-      )
-      const invalidHandler = analyzeHandler(invalidEnvironment, provider)
-      const invalid = await invalidHandler(
-        request(analysisBody, 'invalid-process-only-judge-code'),
-        { error() {} },
-      )
-      assert.equal(invalid.status, 401)
-      const invalidTable = TableClient.fromConnectionString(
-        connectionString,
-        invalidName,
-        emulatorClientOptions,
-      )
-      await assert.rejects(
-        invalidTable.getEntity('foundry-judge', 'allowance'),
-        (error) => error.statusCode === 404,
-      )
-
       const missingName = tableName()
       const missingEnvironment = allowanceEnvironment(
         connectionString,
         missingName,
       )
-      const access = await createFoundryAccessHandler(
-        missingEnvironment,
-        (settings) =>
-          createAzureTableFoundryAllowance(settings, emulatorClientOptions),
-      )(
-        { async json() { return { code: missingEnvironment.FOUNDRY_JUDGE_ACCESS_CODE } } },
-        { error() {} },
-      )
-      assert.equal(access.status, 503)
-      assert.equal(access.jsonBody.errorCode, 'foundry_allowance_unavailable')
       const missingTableHandler = analyzeHandler(missingEnvironment, provider)
       const missingTable = await missingTableHandler(
-        request(analysisBody, missingEnvironment.FOUNDRY_JUDGE_ACCESS_CODE),
+        request(analysisBody),
         { error() {} },
       )
       assert.equal(missingTable.status, 503)
@@ -462,10 +437,7 @@ test('real Azure Table adapter preserves and enforces the allowance on Azurite',
       )
       const unavailableHandler = analyzeHandler(unavailableEnvironment, provider)
       const unavailable = await unavailableHandler(
-        request(
-          analysisBody,
-          unavailableEnvironment.FOUNDRY_JUDGE_ACCESS_CODE,
-        ),
+        request(analysisBody),
         { error() {} },
       )
       assert.equal(unavailable.status, 503)
@@ -485,7 +457,7 @@ test('real Azure Table adapter preserves and enforces the allowance on Azurite',
       })
       const handler = analyzeHandler(environment, provider)
       const response = await handler(
-        request(analysisBody, environment.FOUNDRY_JUDGE_ACCESS_CODE),
+        request(analysisBody),
         { error() {} },
       )
       assert.equal(response.status, 502)

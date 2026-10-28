@@ -352,21 +352,18 @@ test('pre-question squad labels have explicit translations in every display lang
   }
 })
 
-test('controlled judge AI labels and failure states have explicit translations', () => {
+test('public AI and local-rules labels and failure states have explicit translations', () => {
   const messages = [
-    'Judge AI access (controlled)',
-    'Judge access code',
-    'Enable judge AI',
-    'Checking access…',
-    'Judge AI is enabled for this page only.',
+    'AI is used by default when enabled on the server. You can use local rules at any time.',
+    'Use AI when available',
     'Use local rules instead',
-    'Public analysis remains on local rules. The code stays in this page’s memory only.',
-    'The judge access code was not accepted.',
-    'Judge AI is not configured on this server. Use local rules instead.',
-    'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
-    'The shared judge AI request allowance is exhausted. Use local rules or contact the judge.',
-    'Your judge AI request allowance is exhausted. Use local rules or try again later.',
-    'Judge AI access could not be verified. Use local rules instead.',
+    'AI interpretation is unavailable. Use local rules instead.',
+    'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
+    'The shared AI request allowance is exhausted. Use local rules instead.',
+    'The AI request allowance for this network is exhausted. Use local rules instead or try again later.',
+    'AI interpretation failed. This attempt used one allowance. Try again or use local rules instead.',
+    'The check timed out. The request may still be processing. Try again when ready, or use local rules.',
+    'The analysis service could not be reached. You can try again or use local rules.',
   ]
   for (const { code } of APP_LANGUAGES) {
     for (const message of messages) {

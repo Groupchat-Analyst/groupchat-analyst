@@ -22,7 +22,11 @@ import {
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
-import { requestAnalysis, requestFoundryAccess } from './analysisClient'
+import {
+  AnalysisRequestError,
+  AnalysisTimeoutError,
+  requestAnalysis,
+} from './analysisClient'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -66,6 +70,7 @@ import {
   localizedExample,
   translateNarrative,
   translateText,
+  type AppLanguage,
 } from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
 import { LanguageSelector, LocalizedMarkup } from './localization'
@@ -95,8 +100,34 @@ type SubmittedRequest = {
   id: number
   context: SubmissionContext
   baseline: AnswerSnapshot | null
-  accessCode: string
+  localRulesOnly: boolean
   operation: RequestOperation
+}
+
+const publicAiErrorMessages: Readonly<Record<string, string>> = {
+  foundry_not_configured:
+    'AI interpretation is unavailable. Use local rules instead.',
+  foundry_allowance_unavailable:
+    'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
+  foundry_allowance_exhausted:
+    'The shared AI request allowance is exhausted. Use local rules instead.',
+  foundry_client_allowance_exhausted:
+    'The AI request allowance for this network is exhausted. Use local rules instead or try again later.',
+  foundry_interpretation_failed:
+    'AI interpretation failed. This attempt used one allowance. Try again or use local rules instead.',
+  analysis_timeout:
+    'The check timed out. The request may still be processing. Try again when ready, or use local rules.',
+}
+
+function localizeAnalysisError(
+  message: string,
+  code: string,
+  language: AppLanguage,
+): string {
+  return translateNarrative(
+    code ? publicAiErrorMessages[code] ?? message : message,
+    language,
+  )
 }
 
 function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOption {
@@ -1539,10 +1570,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
-  const [foundryAccessDraft, setFoundryAccessDraft] = useState('')
-  const [foundryAccessCode, setFoundryAccessCode] = useState('')
-  const [foundryAccessError, setFoundryAccessError] = useState('')
-  const [isCheckingFoundryAccess, setIsCheckingFoundryAccess] = useState(false)
+  const [requestErrorCode, setRequestErrorCode] = useState('')
+  const [localRulesOnly, setLocalRulesOnly] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -1550,6 +1579,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysisRequestId = useRef(0)
   const resolutionRequestId = useRef<number | null>(null)
   const answerRef = useRef<HTMLDivElement>(null)
+  const localizedRequestError = requestError
+    ? localizeAnalysisError(requestError, requestErrorCode, language)
+    : ''
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
   const submittedOpinion = submittedContext?.opinion ?? ''
@@ -1676,7 +1708,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       try {
         const payload = await requestAnalysis(request, {
           signal: controller.signal,
-          accessCode: active.accessCode || undefined,
+          localRulesOnly: active.localRulesOnly,
         })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
         if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
@@ -1716,7 +1748,22 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           !controller.signal.aborted &&
           isLatestRequest(requestId, analysisRequestId.current)
         ) {
-          setRequestError(error instanceof Error ? error.message : 'The analysis service could not be reached.')
+          setRequestErrorCode(
+            error instanceof AnalysisRequestError
+              ? error.code ?? ''
+              : error instanceof AnalysisTimeoutError
+                ? 'analysis_timeout'
+                : '',
+          )
+          setRequestError(
+            error instanceof AnalysisRequestError
+              ? error.message
+              : error instanceof TypeError
+                ? 'The analysis service could not be reached. You can try again or use local rules.'
+                : error instanceof Error
+                  ? error.message
+                  : 'The analysis service could not be reached. You can try again or use local rules.',
+          )
         }
       } finally {
         if (
@@ -1822,7 +1869,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId, language),
       baseline: null,
-      accessCode: foundryAccessCode,
+      localRulesOnly,
       operation: { kind: 'analysis' },
     })
   }
@@ -1842,7 +1889,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         shown.context.inputLanguage,
       ),
       baseline: shown,
-      accessCode: foundryAccessCode,
+      localRulesOnly,
       operation: shown.analysis.playerResolutionContinuation
         ? {
             kind: 'recheck-resolved-player',
@@ -1865,7 +1912,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: shown.context,
       baseline: shown,
-      accessCode: foundryAccessCode,
+      localRulesOnly,
       operation: {
         kind: 'resolve-player',
         continuation,
@@ -1887,30 +1934,24 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     setSubmittedRequest({ ...submittedRequest, id })
   }
 
-  async function enableFoundryAccess() {
-    const candidate = foundryAccessDraft
-    if (!candidate || isCheckingFoundryAccess) return
-    setIsCheckingFoundryAccess(true)
-    setFoundryAccessError('')
-    try {
-      await requestFoundryAccess(candidate)
-      setFoundryAccessCode(candidate)
-      setFoundryAccessDraft('')
-    } catch (error) {
-      setFoundryAccessError(
-        error instanceof Error
-          ? error.message
-          : 'Judge AI access could not be verified. Use local rules instead.',
-      )
-    } finally {
-      setIsCheckingFoundryAccess(false)
+  function useLocalRules() {
+    setLocalRulesOnly(true)
+    if (!submittedRequest || !requestError || isLoading) return
+    const id = ++analysisRequestId.current
+    if (submittedRequest.operation.kind === 'resolve-player') {
+      if (resolutionRequestId.current !== null) return
+      resolutionRequestId.current = id
     }
+    setRequestError('')
+    setSubmittedRequest({
+      ...submittedRequest,
+      id,
+      localRulesOnly: true,
+    })
   }
 
-  function useLocalRules() {
-    setFoundryAccessCode('')
-    setFoundryAccessDraft('')
-    setFoundryAccessError('')
+  function useAiWhenAvailable() {
+    setLocalRulesOnly(false)
   }
 
   async function copyAssessment() {
@@ -2100,42 +2141,6 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
             />
           </div>
           <div className="conversation-column">
-            <section className="judge-access" aria-label="Judge AI access">
-              {!foundryAccessCode ? (
-                <details>
-                  <summary>Judge AI access (controlled)</summary>
-                  <form onSubmit={(event) => {
-                    event.preventDefault()
-                    void enableFoundryAccess()
-                  }}>
-                    <label htmlFor="foundry-access-code">Judge access code</label>
-                    <input
-                      id="foundry-access-code"
-                      type="password"
-                      autoComplete="off"
-                      value={foundryAccessDraft}
-                      onChange={(event) => setFoundryAccessDraft(event.currentTarget.value)}
-                    />
-                    <button
-                      className="secondary-button"
-                      type="submit"
-                      disabled={!foundryAccessDraft || isCheckingFoundryAccess}
-                    >
-                      {isCheckingFoundryAccess ? 'Checking access…' : 'Enable judge AI'}
-                    </button>
-                  </form>
-                  {foundryAccessError && <p role="alert">{foundryAccessError}</p>}
-                  <p>Public analysis remains on local rules. The code stays in this page’s memory only.</p>
-                </details>
-              ) : (
-                <div role="group" aria-label="Judge AI is enabled">
-                  <p role="status">Judge AI is enabled for this page only.</p>
-                  <button className="secondary-button" type="button" onClick={useLocalRules}>
-                    Use local rules instead
-                  </button>
-                </div>
-              )}
-            </section>
             <section className="conversation" aria-labelledby="conversation-title">
               <div className="conversation-head">
                 <h2 id="conversation-title">Conversation</h2>
@@ -2166,7 +2171,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                       requestError={
                         resolutionOperation?.snapshotId === turn.id &&
                         !isLoading
-                          ? requestError
+                        ? localizedRequestError
                           : ''
                       }
                     />
@@ -2188,8 +2193,13 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                       <div className="msg msg-bot msg-error" role="alert">
                         <p className="msg-text">That check didn’t finish. Please try again.</p>
                         {transcript.length > 0 && <p className="msg-note">Your earlier answer is still above.</p>}
-                        <details className="msg-evidence"><summary>Details</summary><p className="msg-note">{requestError}</p></details>
+                        <details className="msg-evidence"><summary>Details</summary><p className="msg-note">{localizedRequestError}</p></details>
                         <button className="secondary-button" type="button" onClick={retryAnalysis}>Try again</button>
+                        {!submittedRequest?.localRulesOnly && (
+                          <button className="secondary-button" type="button" onClick={useLocalRules}>
+                            {translateText('Use local rules instead', language)}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2204,6 +2214,20 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                 placeholder={`Type an opinion, e.g. How many shots did ${dataset.teams[1]} have?`}
                 rows={3} required aria-describedby="input-hint" dir="auto"
               />
+              <div className="provider-choice">
+                <p>{translateText('AI is used by default when enabled on the server. You can use local rules at any time.', language)}</p>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  aria-pressed={localRulesOnly}
+                  onClick={localRulesOnly ? useAiWhenAvailable : useLocalRules}
+                >
+                  {translateText(
+                    localRulesOnly ? 'Use AI when available' : 'Use local rules instead',
+                    language,
+                  )}
+                </button>
+              </div>
               <div className="composer-bottom">
                 <div className="scope-summary">
                   <span>Asking about <strong>{formatMatchClock(selectedClock)}</strong> · {periodName}</span>

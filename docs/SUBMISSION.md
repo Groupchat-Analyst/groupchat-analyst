@@ -90,10 +90,13 @@ The latest captured Foundry Bruno interpretation was replayed offline through th
 
 The isolated Azure Functions host restarted its worker because local Azure Storage health was unavailable. A recheck with the intentionally ephemeral development key then correctly failed signature validation; a fresh browser journey with a stable process-only test key passed the 58′→83′ resolved-player recheck. This documents the development limitation and is not a production-secret verification. No Azure resource or configuration was changed.
 
-### Separate deployment gates (not implemented)
+### Post-deadline public-AI access repair
 
-- No durable atomic request allowance, per-client cap, cross-instance/restart counter, exhaustion behavior or Foundry kill switch exists.
-- No judge-accessible hosted AI route is implemented. Public configuration remains local rules only.
+The separately scoped repair is based on current `Origin/main` (`0f4eb27`) and is not deployed; the currently hosted version remains unchanged. It removes the judge-code gate and enables anonymous Foundry interpretation only through server-side `FOUNDRY_PUBLIC_ENABLED`. The existing Azure Table allowance is used before every outbound attempt, with the owner-authorized `FoundryJudging` table and limits of 200 shared attempts, 200 per client and an 8,760-hour fixed UTC window. Existing stored counts are preserved; startup does not reset them. Failed attempts count and automatic retries remain disabled.
+
+The ordinary analysis route stays local when the server gate is off. Users can explicitly choose local rules, and disabled/unconfigured AI, allowance exhaustion or storage failure presents a localized explanation and local-rules option. No account, payment or access code is required. Foundry credentials and the player-resolution signing key remain server-only.
+
+This is post-deadline access repair work, not the original deployed submission. No merge, deployment, Azure change, credential change or live model request has occurred for this repair. See [the deployment runbook](./DEPLOYMENT_RUNBOOK.md) for exact server settings and the manual release sequence.
 
 Final Stage 2 follow-up (27 October 2026; application commit `2343167`): catalog foreign-team opponents are preserved distinctly and rejected without team attribution, statistics or evidence, and are not sent to a supplied model provider. Uncatalogued comparison opponents now prompt for clarification rather than inheriting the fixture's second team. Valid fixture aliases and descriptive opinions remain covered. Homepage limitations and the compound demonstration route were corrected; the direct guided route was rehearsed with explicit submit/recheck. API 308/308 and web 121/121 pass; baseline hash remains unchanged.
 
@@ -112,42 +115,20 @@ Browser interaction note: ordinary Playwright pointer clicks (with actionability
 
 A WhatsApp companion that checks a take from a group chat. No messaging, accounts or chat ingestion exist.
 
-## Outstanding actions
+## Outstanding release actions
 
-1. Open the PR to `main`, review, merge (not done here).
-2. Deploy per [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) and record the public URL.
-3. Real-iPhone check of “Share the receipts” on the hosted build.
-4. Decide whether the Foundry schema should gain the repaired forms (count assertions, shot location); today they are local-rules only.
-5. Decide whether to pursue judge-accessible Foundry (below).
+1. Review the separate post-deadline repair PR to `main`; no PR merge has occurred.
+2. Deploy only after owner review and follow [the deployment runbook](./DEPLOYMENT_RUNBOOK.md), including checking the existing `FoundryJudging` counts and backend settings.
+3. Perform hosted anonymous-AI and local-rules acceptance after deployment; do not infer hosted Azure or Foundry behavior from offline tests.
+4. Real-iPhone check of “Share the receipts” on the hosted build.
+5. Continue to describe the previously authorized bounded live runs only by their recorded outcomes below; no live call is authorized by this repair.
 
-## Foundry access recommendation (judge-accessible, enforced allowance)
-
-**Recommendation: do not enable Foundry on the public site as it is.** The existing controls (8192 token ceiling, 30 s timeout, no retries) bound a *single request*, not total spend. Nothing in the repository enforces a global request allowance.
-
-Smallest credible route:
-
-1. Put Foundry behind a **durable server-side allowance**: a small table (for example Azure Table Storage or Cosmos DB) holding a counter updated with optimistic concurrency / conditional writes, checked and incremented *before* the model call. It must work across concurrent requests, instance scale-out and restarts. Fix a daily and a total cap, and decide whether failed provider calls consume allowance (recommended: yes).
-2. Define behaviour at exhaustion: return an explicit “live-AI allowance used up” status and fall back to the local interpreter, labelled as such. Never present a local answer as Foundry.
-3. Add a per-client limit (for example API Management or a hashed-IP key in the same table) so one visitor cannot spend the whole allowance.
-4. Keep a platform **budget alert and a Foundry throughput quota** as backstops. TPM/RPM quotas constrain the rate of requests, not cumulative currency spend; they do not replace the durable allowance. A budget alert, an in-memory counter or a browser-side counter is not a total-spend cap. See [Microsoft quota documentation](https://learn.microsoft.com/azure/foundry/openai/how-to/quota).
-5. Credentials only as server settings, with the provider flag off by default.
-
-Dependencies: a new storage resource and a code change in the API; both need explicit approval. Not implemented.
-
-### Stage 2 audit findings (repository-only, before the authorised 27 October run; no model calls or Azure changes)
+### Historical Stage 2 audit findings (repository-only, before the authorised 27 October run)
 
 - **What Foundry supports today:** the structured-interpretation schema and prompt cover the original two matches’ vocabulary (team enums `Northbridge`/`Eastport`, Bruno example). Count assertions (negation, “every”, zero), shot location and the repaired composition forms are implemented in local rules only.
 - **Captured outputs:** the genuine `cf10c74` captures still replay through the current validator, service, web comparison and share functions with provider `foundry` (offline replay, not new verification). Constructed transport stubs for the Return fixture and for Westhaven FC v Kingswell City check that the selected fixture supplies events, evidence, calculations and metadata. They are not captures and not live results.
 - **Team-name assumptions (Stage 2):** the two new fixtures use internal slot names (`Northbridge` = home, `Eastport` = away) so the schema, prompt, validators and local rules stay unchanged. The API translates the opinion to slot names before interpretation and translates the whole response back to display names. Consequence: a live Foundry call for a new fixture would see slot-named context. That is unverified, and the context/schema would need fixture-specific team names before a live run on those fixtures.
-- **Total request allowance:** none enforced. Token ceiling and timeout are per request only.
-
-### Minimum work for a judge-accessible Foundry experience (PROPOSED, not implemented)
-
-1. A durable counter (for example Azure Table Storage) with conditional writes, checked and incremented *before* each call: total cap and per-client cap, shared across instances and restarts.
-2. Failure behaviour: a failed provider call consumes allowance; storage unavailable ⇒ refuse Foundry and fall back to local rules, labelled.
-3. An off switch (the existing provider flag, default local) and exhausted/fallback labels (“live-AI allowance used up — answered by local rules”).
-4. Fixture-aware team names in the Foundry context/schema for the two new fixtures.
-5. Approvals needed: a storage resource, server settings for credentials/caps, enabling the flag on a hosted instance. None has been requested or performed.
+- **At the time of this audit, total request allowance:** none enforced. This was subsequently implemented and is now described in the post-deadline access repair section above.
 
 ### Bounded live acceptance result (application `2343167`)
 
@@ -226,3 +207,9 @@ The built frontend was served at **http://127.0.0.1:5196/** and browser-tested a
 Final checks for this follow-up: **151/151 web tests**, **363/363 API tests**, web build/typecheck, lint and `git diff --check` passed. Canonical fixture source files were unchanged; the historical semantic digest was not recomputed. Production signing-key configuration, hosted verification, real-phone sharing and remaining Foundry verification are still open. The durable allowance and judge-accessible AI route remain separate, unimplemented work. No live model call, external translation, merge, deployment, Azure change or credential change was made.
 
 Application repair commit: `4d845e3` (`Harden replay navigation and localized recovery`). This documentation update is committed separately for review.
+
+## Post-deadline public-AI access repair (separate branch; not deployed)
+
+The separate `repair/public-ai-access` branch is based directly on fetched `Origin/main` at `0f4eb27`. It removes the judge-code panel and access endpoint; anonymous analysis uses Foundry only when `FOUNDRY_PUBLIC_ENABLED=true` is set in the backend. The user can explicitly select local rules. Exhaustion, unavailable storage and missing Foundry configuration fail closed with localized messaging and a local-rules option. The durable allowance is reserved before each outbound attempt; the existing `FoundryJudging` row/counts are preserved, with the authorized 200 shared / 200 per-client caps and 8,760-hour window. The existing 8,192 completion-token limit, no-retry behavior, server-only credentials and signing key remain.
+
+Checks on this branch: **385/385 API tests**, including **7/7 Azurite assertions**, **160/160 web tests**, API/web builds, web lint and `git diff --check` pass. Tests use stubbed Foundry transport; no new live model request was made. Hosted Azure, hosted Foundry and real-device behavior are not verified. The currently deployed version remains unchanged; no merge, deployment, Azure or credential change has occurred. See [the focused PR description](./PR_DESCRIPTION.md) and [deployment runbook](./DEPLOYMENT_RUNBOOK.md) for backend settings and manual release steps.

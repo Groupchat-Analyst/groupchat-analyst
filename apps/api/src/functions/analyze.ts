@@ -8,7 +8,6 @@ import { InputValidationError, parseAnalysisRequest } from '../validation.js'
 import type { InterpretationProvider } from '../providers/provider.js'
 import { InterpretationProviderError } from '../providers/provider.js'
 import { createFoundryProvider } from '../providers/foundry.js'
-import { authorizeFoundryAccess, FoundryAccessError } from '../foundryAccess.js'
 import {
   createAzureTableFoundryAllowance,
   FoundryAllowanceConfigurationError,
@@ -17,7 +16,7 @@ import {
   foundryClientIdentity,
 } from '../foundryAllowance.js'
 
-export const FOUNDRY_ACCESS_HEADER = 'x-foundry-judge-code'
+export const ANALYSIS_MODE_HEADER = 'x-analysis-mode'
 
 function isContinuationAction(body: unknown): boolean {
   return (
@@ -33,7 +32,7 @@ export function createAnalyzeHandler(
   provider: InterpretationProvider,
   environment: NodeJS.ProcessEnv = process.env,
   createAllowance = createAzureTableFoundryAllowance,
-  createJudgeProvider = createFoundryProvider,
+  createPublicAiProvider = createFoundryProvider,
 ) {
   return async (
     request: HttpRequest,
@@ -50,27 +49,34 @@ export function createAnalyzeHandler(
     }
 
     let activeProvider = provider
-    const accessCode = request.headers?.get(FOUNDRY_ACCESS_HEADER)
-    if (accessCode !== null && accessCode !== undefined &&
-      !isContinuationAction(body)) {
+    let foundryAttemptReserved = false
+    const localRulesOnly =
+      request.headers?.get(ANALYSIS_MODE_HEADER) === 'local'
+    if (
+      !localRulesOnly &&
+      !isContinuationAction(body) &&
+      environment.FOUNDRY_PUBLIC_ENABLED?.trim().toLowerCase() === 'true'
+    ) {
       try {
-        activeProvider = authorizeFoundryAccess(
-          environment,
-          accessCode,
-          createJudgeProvider,
-        )
         parseAnalysisRequest(body)
       } catch (error) {
         if (error instanceof InputValidationError) {
           return { status: 400, jsonBody: { error: error.message } }
         }
-        if (error instanceof FoundryAccessError) {
-          return {
-            status: error.code === 'foundry_access_denied' ? 401 : 503,
-            jsonBody: { error: error.message, errorCode: error.code },
-          }
-        }
         throw error
+      }
+
+      try {
+        activeProvider = createPublicAiProvider(environment)
+      } catch {
+        context.error('Public AI provider is unavailable or unconfigured.')
+        return {
+          status: 503,
+          jsonBody: {
+            error: 'AI interpretation is unavailable. Use local rules instead.',
+            errorCode: 'foundry_not_configured',
+          },
+        }
       }
 
       try {
@@ -79,6 +85,7 @@ export function createAnalyzeHandler(
             request.headers?.get('x-forwarded-for') ?? null,
           ),
         )
+        foundryAttemptReserved = true
       } catch (error) {
         if (error instanceof FoundryAllowanceExceededError) {
           return {
@@ -96,13 +103,13 @@ export function createAnalyzeHandler(
           error instanceof FoundryAllowanceConfigurationError ||
           error instanceof FoundryAllowanceUnavailableError
         ) {
-          context.error('Judge allowance storage is unavailable or unconfigured.')
+          context.error('Public AI allowance storage is unavailable or unconfigured.')
           return {
             status: 503,
             jsonBody: {
               error:
                 error instanceof FoundryAllowanceConfigurationError
-                  ? 'Judge AI is not configured on this server. Use local rules instead.'
+                  ? 'AI interpretation is unavailable. Use local rules instead.'
                   : error.message,
               errorCode:
                 error instanceof FoundryAllowanceConfigurationError
@@ -111,12 +118,12 @@ export function createAnalyzeHandler(
             },
           }
         }
-        context.error('Judge allowance storage request failed.')
+        context.error('Public AI allowance storage request failed.')
         return {
           status: 503,
           jsonBody: {
             error:
-              'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
+              'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
             errorCode: 'foundry_allowance_unavailable',
           },
         }
@@ -134,6 +141,17 @@ export function createAnalyzeHandler(
       }
       context.error('Match analysis request failed.', error)
       if (error instanceof InterpretationProviderError) {
+        if (activeProvider.name === 'foundry' && foundryAttemptReserved) {
+          return {
+            status: 502,
+            jsonBody: {
+              error:
+                'AI interpretation failed. This attempt used one allowance. Try again or use local rules instead.',
+              errorCode: 'foundry_interpretation_failed',
+              failureType: error.category,
+            },
+          }
+        }
         return {
           status: 502,
           jsonBody: {

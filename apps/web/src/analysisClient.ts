@@ -22,30 +22,21 @@ export interface AnalysisFetchOptions {
   timeoutMs?: number
   /** Aborted when the request is superseded or the view goes away. */
   signal?: AbortSignal
-  accessCode?: string
+  localRulesOnly?: boolean
   setTimer?: (callback: () => void, ms: number) => unknown
   clearTimer?: (handle: unknown) => void
 }
 
-export async function requestFoundryAccess(
-  code: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<void> {
-  const response = await fetchImpl('/api/foundry-access', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code }),
-  })
-  const responseText = await response.text()
-  let payload: unknown
-  if (responseText) {
-    try { payload = JSON.parse(responseText) }
-    catch { if (response.ok) throw new Error('The access service returned an unreadable response.') }
-  }
-  if (!response.ok) {
-    const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
-      ? payload.error : `The access service is unavailable (HTTP ${response.status}).`
-    throw new Error(message)
+export class AnalysisRequestError extends Error {
+  readonly code?: string
+
+  constructor(
+    message: string,
+    code?: string,
+  ) {
+    super(message)
+    this.name = 'AnalysisRequestError'
+    this.code = code
   }
 }
 
@@ -74,7 +65,7 @@ export async function requestAnalysis(request: unknown, options: AnalysisFetchOp
 
   async function send(): Promise<unknown> {
     const headers: Record<string, string> = { 'content-type': 'application/json' }
-    if (options.accessCode) headers['x-foundry-judge-code'] = options.accessCode
+    if (options.localRulesOnly) headers['x-analysis-mode'] = 'local'
     const response = await fetchImpl('/api/analyze', {
       method: 'POST',
       headers,
@@ -90,7 +81,12 @@ export async function requestAnalysis(request: unknown, options: AnalysisFetchOp
     if (!response.ok) {
       const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
         ? payload.error : `The analysis service is unavailable (HTTP ${response.status}).`
-      throw new Error(message)
+      const code =
+        typeof payload === 'object' && payload !== null &&
+        'errorCode' in payload && typeof payload.errorCode === 'string'
+          ? payload.errorCode
+          : undefined
+      throw new AnalysisRequestError(message, code)
     }
     return payload
   }
