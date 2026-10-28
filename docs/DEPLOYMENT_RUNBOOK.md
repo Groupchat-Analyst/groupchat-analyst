@@ -44,15 +44,26 @@ When `NODE_ENV=production`, missing or malformed signing-key configuration fails
 | `FOUNDRY_OPENAI_BASE_URL` | HTTPS Foundry OpenAI-compatible endpoint URL | Server-side provider endpoint. |
 | `FOUNDRY_API_KEY` | Credential issued for the approved Foundry deployment | Server-side only; never in browser bundles, URLs, local storage, logs, receipts, screenshots or source archives. |
 | `FOUNDRY_MODEL_DEPLOYMENT` | Exact deployed model/deployment name | Server-side deployment selector. |
-| `AzureWebJobsStorage` | Storage-account connection string accessible to the API | Shared persistent Azure Table Storage used for reservations. Use the same account and table for every API instance. |
+| `FOUNDRY_ALLOWANCE_STORAGE_CONNECTION_STRING` | Azure Storage connection string with Table service access | Dedicated backend-only connection used by the allowance adapter. Use the same account and table for every API instance. |
 | `FOUNDRY_ALLOWANCE_TABLE_NAME` | Existing table name matching `[A-Za-z][A-Za-z0-9]{2,62}`; defaults to `FoundryRequestAllowance` | Names the pre-provisioned allowance table. The application does not create it. |
 | `FOUNDRY_ALLOWANCE_MAX_REQUESTS` | Positive integer | Authoritative shared maximum outbound Foundry attempts in the fixed UTC window. |
 | `FOUNDRY_ALLOWANCE_MAX_PER_CLIENT` | Positive integer no greater than the shared maximum | Additional per-client limit, checked atomically with the shared total. |
 | `FOUNDRY_ALLOWANCE_WINDOW_HOURS` | Positive integer, maximum 8760 | Fixed UTC allowance-window length in hours. |
 
-A suggested small rehearsal configuration is a shared maximum of **6**, per-client maximum of **3**, and **24** hours. The per-client identity is SHA-256 of the first valid address in `X-Forwarded-For`; it is a pseudonymous network-address bucket, not an authenticated user. NAT users share a limit, dynamic IPs may change buckets, and correctness depends on the hosting proxy's forwarded-header behavior. Missing or invalid IP information shares an `unknown` bucket. This limit is supplementary; the shared table total remains authoritative.
+`FOUNDRY_ALLOWANCE_STORAGE_CONNECTION_STRING` is intentionally distinct from `AzureWebJobsStorage`. The allowance adapter reads the former directly to construct its Azure Table client. Microsoft documents `AzureWebJobsStorage` as the connection used by the Functions runtime for normal operations, and documents Static Web Apps API application settings as backend environment variables; setting the former for this application would therefore also configure a Functions host setting, not just the app's Table client. Leave it to the platform/Functions configuration and use the dedicated setting for allowance storage. The separate setting removes that coupling; hosted managed-runtime behavior has not been exercised. See [Functions `AzureWebJobsStorage`](https://learn.microsoft.com/azure/azure-functions/functions-app-settings#azurewebjobsstorage) and [Static Web Apps API application settings](https://learn.microsoft.com/azure/static-web-apps/application-settings).
 
-Before enabling judge access, an authorized owner must provision the Azure Storage account/table and configure its secret connection string. The API only checks the pre-provisioned table and reserves a row with ETag-conditional updates; absent, malformed or unavailable storage blocks model calls. Requests reserve allowance **before** the outbound attempt, so failed and timed-out calls count. There is no automatic model retry. The code/access endpoint itself makes no model call. No Azure provisioning is part of this change.
+The eventual judging allowance is **not yet approved**. Before enabling the judge route, the release owner must decide and record:
+
+- The authoritative shared maximum number of outbound attempts for the judging window.
+- The fixed UTC window length.
+- The supplementary per-client maximum, which cannot exceed the shared maximum.
+- How long the API, Foundry deployment, access code and allowance table must remain available, including setup and contingency time, through the judging period.
+
+Do not substitute the acceptance rehearsal limit below for these decisions, and do not enable Foundry with an unreviewed or unlimited allowance. The per-client identity is a SHA-256 hash of the first valid address in `X-Forwarded-For`; it is a pseudonymous network-address bucket, not an authenticated user. Judges behind NAT share a limit, dynamic IPs may move between buckets, and behavior depends on the hosting proxy's forwarded-header handling. Missing or invalid IP information shares an `unknown` bucket. The shared table total remains authoritative.
+
+An authorized owner must provision the Azure Storage account and table and place its connection string only in backend environment settings. The application does not create Azure resources or tables. The adapter verifies the table and reserves with ETag-conditional updates; absent, malformed or unavailable storage blocks model calls. Reservations occur **before** outbound attempts, so failed and timed-out calls count; there is no automatic model retry. The access-code endpoint itself makes no model call.
+
+The judge-code entry is an expanded, user-visible page control. Its input is `type=password` (characters are masked while entered) and `autocomplete=off`; this is not a private owner-configuration surface or a browser security boundary. A judge entering the shared code controls their own browser and can inspect the page/request. The value is held in page memory and sent in the analysis request header over HTTPS, not placed in the URL or local storage. The owner must configure `FOUNDRY_JUDGE_ACCESS_CODE` server-side and distribute it only through an approved out-of-band channel. Never paste an actual code into a PR, issue, screenshot or source file.
 
 Keep the provider's existing input limits, 8192 completion-token ceiling, 30-second timeout, structured-output validation and no-retry behavior. Do not enable raw-output capture. The ordinary public route remains local even when the judge route is configured.
 
@@ -65,6 +76,31 @@ Keep the provider's existing input limits, 8192 completion-token ceiling, 30-sec
 `API_PROXY_TARGET` is a local Vite development/preview setting only. The deployed frontend calls same-origin `/api`. `FUNCTIONS_WORKER_RUNTIME` appears in local Functions settings; the deployed managed API runtime is selected by `apiRuntime: node:22`.
 
 Microsoft documents that Static Web Apps API application settings are configured per environment in the Azure portal and made available to the backend API as environment variables: [Configure application settings for Azure Static Web Apps](https://learn.microsoft.com/azure/static-web-apps/application-settings).
+
+### Owner setup checklist (placeholders only)
+
+1. Keep the public settings `CLAIM_INTERPRETER_PROVIDER=local` and `NODE_ENV=production`. Configure a production `PLAYER_RESOLUTION_SIGNING_KEY` using the required format above; use the same value on all API instances. Do not reuse it for Foundry access.
+2. Before enabling the judge route, create the Azure Storage account and pre-provision the table `FoundryRequestAllowance` (or the approved value of `FOUNDRY_ALLOWANCE_TABLE_NAME`). Do not use the Functions host's `AzureWebJobsStorage` setting as the allowance connection.
+3. In the Static Web App's **Settings → Environment variables → Production**, put the application settings below in the backend environment only. Keep `FOUNDRY_JUDGE_ENABLED=false` until the owner has approved the allowance, availability period and rehearsal.
+
+   ```text
+   CLAIM_INTERPRETER_PROVIDER=local
+   NODE_ENV=production
+   PLAYER_RESOLUTION_SIGNING_KEY=<43-CHARACTER-UNPADDED-BASE64URL-KEY>
+   FOUNDRY_JUDGE_ENABLED=false
+   FOUNDRY_JUDGE_ACCESS_CODE=<SEPARATE-32-TO-128-CHARACTER-CODE>
+   FOUNDRY_OPENAI_BASE_URL=<HTTPS-FOUNDRY-OPENAI-COMPATIBLE-ENDPOINT>
+   FOUNDRY_API_KEY=<FOUNDRY-DEPLOYMENT-CREDENTIAL>
+   FOUNDRY_MODEL_DEPLOYMENT=<EXACT-DEPLOYMENT-NAME>
+   FOUNDRY_ALLOWANCE_STORAGE_CONNECTION_STRING=<AZURE-STORAGE-TABLE-CONNECTION-STRING>
+   FOUNDRY_ALLOWANCE_TABLE_NAME=FoundryRequestAllowance
+   FOUNDRY_ALLOWANCE_MAX_REQUESTS=<OWNER-APPROVED-POSITIVE-INTEGER>
+   FOUNDRY_ALLOWANCE_MAX_PER_CLIENT=<OWNER-APPROVED-POSITIVE-INTEGER-NO-GREATER-THAN-TOTAL>
+   FOUNDRY_ALLOWANCE_WINDOW_HOURS=<OWNER-APPROVED-POSITIVE-INTEGER-UP-TO-8760>
+   ```
+
+4. Configure and distribute the judge code out-of-band only to authorized participants. Judges enter it in the expanded, visible judge-access panel in the app. It is a masked password input, but it is visible to the person entering it and inspectable in their browser/request; do not treat the page field as a secret storage location.
+5. After changing backend settings, allow the API runtime to restart and verify the names/presence of settings without recording values. Exercise access and storage checks with the offline stub/emulator before any separately approved live rehearsal. Keep Foundry disabled until the owner is ready for that window.
 
 ## Exact public release sequence
 
@@ -86,31 +122,32 @@ Record each result with the deployment URL, workflow run URL, deployed SHA, brow
 6. **Real iPhone:** on an actual iPhone in Safari, repeat the guided comparison and use the native share sheet with the generated PNG. Record separately from desktop/mobile emulation.
 7. **Provider and signing:** confirm analysis responses say local rules, no Foundry label appears, player clarification completes, and no secret values are exposed in logs or evidence. Verify only the names/presence of configured environment settings.
 
-## Optional controlled judge rehearsal (separate authorization)
+## Proposed six-attempt acceptance rehearsal (separate from judging limits)
 
-Do not run this sequence until the authorized owner has provisioned Azure Table Storage, configured the listed server settings and supplied an explicit rehearsal window/code. It is **not** part of the public release or completed verification. Keep the total at no more than six outbound attempts; failed attempts count. Use no more than six submitted analyses, including retries, and stop immediately on unexpected provider, fixture, identity, selected-time, allowance or export behavior.
+This is a proposed, capped acceptance rehearsal, not an approved judging allowance. Do **not** run it until the authorized owner approves it, provisions the required backend resources, supplies the judge code out-of-band and authorizes a temporary test configuration. Use an isolated table with a fresh allowance window, a shared cap no greater than six, and a per-client cap sufficient for the planned requests from the test client. The owner chooses a window long enough to finish. Failed and timed-out outbound attempts count. Never copy these rehearsal limits into the eventual judging configuration.
 
-1. **One baseline request:** valid access code, one prepared opinion on Northbridge–Eastport at 57′. Expect one Foundry interpreter call, correct fixture/time/evidence and Foundry provenance; public local mode must still report local rules.
-2. **One clarification:** ambiguous Bruno judgement at 58′. Expect two player choices; resolving either choice must use the signed continuation, attribute the selected identity's records, retain limitations and make no second interpreter call.
-3. **Three fixture-specific requests:** one prepared opinion each on Westhaven–Kingswell, Redmere–Alderwick, and the fourth fixture selected before the window. Expect each response to use only its fixture context and calculated evidence; stop on cross-fixture leakage or incorrect scope.
-4. **Sixth request:** recheck the prepared 57′ baseline question at 58′. Expect one additional, correctly scoped interpreter call and comparison. This brings the total to six outbound attempts; do not make further successful judge requests.
-5. **No-call checks:** switch language, inspect copied reply/PNG, browse squads and resolve the pending player without additional model calls. Verify output localization, exact identity/scope, limitation and provider; stop on secret leakage or stale/mixed-scope content.
-6. **Exhaustion control:** after six reservations, send one explicit test request and expect a localized allowance denial with zero additional outbound model calls. Exercise concurrency only with the offline stub/emulator, not with excess hosted calls.
+Pin the run to application commit `0bda367ab0d7b9ff3f3da78b9b7c031ac8df1b56`. The proposed maximum set is:
 
-Expected outcomes for each live call must be captured before the rehearsal. If provider output is invalid or disagrees with validated evidence, stop; do not retry unless an explicitly budgeted attempt remains. Record sanitized request counts/statuses, never access codes, keys or raw credentials. This plan is a proposal only; it has not been run.
+1. Submit one prepared Northbridge–Eastport opinion at 57′. Expect one Foundry interpreter call, correct fixture/time/evidence and Foundry provenance; the ordinary public route must still report local rules.
+2. Submit an ambiguous Bruno judgement at 58′. Expect the player choices. Resolve one choice through the signed continuation; expect attributed records and limitations with **no additional interpreter call**.
+3. Submit one prepared opinion for each of the other three fixtures. Expect every response to use only its fixture context and calculated evidence.
+4. Explicitly recheck the prepared 57′ baseline opinion at 58′. Expect one correctly scoped additional call and comparison.
+5. This planned set uses at most six outbound attempts. Do not send an extra request to demonstrate exhaustion; explicit denial-at-exhaustion and concurrent overflow are already tested offline against Azurite. Language changes, player selection, replay movement, squad browsing, copy and PNG inspection must not create additional calls.
+
+Capture expected outcomes before any authorized run. Stop immediately for an unexpected provider, fixture, identity, selected time, evidence, allowance count, secret exposure, invalid output or stale/mixed-scope content. Do not retry unless the retry is part of the six-call budget. Record sanitized request counts/statuses only, never access codes, keys or raw credentials. This plan is a proposal only; it has not been run.
 
 ## Verified versus outstanding
 
-- Offline verification covers the local public path, access-code rejection, shared/per-client limits, concurrency across store instances, restart persistence through shared state, storage/configuration failure, exhausted limits, failed-attempt reservation, continuation without a second interpreter call, and fixture-specific contexts.
-- Azure Table SDK/emulator integration, hosted app settings, hosted Foundry calls and a real iPhone are **not verified**. The allowance behavior was exercised with an in-memory ETag-enforcing fake, not Azure.
+- Offline verification covers the local public path, access-code rejection, shared/per-client limits, concurrency and restart persistence through fakes and the actual Azure Table SDK against Azurite, real ETag conflicts, missing-table/storage failure, exhaustion and failed-attempt reservation, continuation without a second interpreter call, and fixture-specific contexts.
+- Azurite is a local emulator, not Azure. Hosted app settings, Azure-hosted Table Storage, hosted Foundry calls and a real iPhone are **not verified**.
 - Hosted public acceptance, native iPhone sharing, independent native-speaker/screen-reader review and load testing remain outstanding.
 - No merge, deployment, Azure resource change, credential change or live model/translation call was made.
 
 ## Remaining AI release blockers
 
-- **Enforced request allowance:** implemented in code, but requires a pre-provisioned shared Azure Table and production configuration; neither exists in this change's verified environment. Cross-instance guarantees have only been tested with the ETag-enforcing fake, not Azure.
-- **Judge access arrangement:** code-based server validation exists, but an approved judge roster/access-code distribution and operational window have not been established. The access code is a shared gate, not individual judge identity or authorization.
-- **Foundry verification:** no live model call was made. A separately authorized, commit-pinned rehearsal of at most six calls remains outstanding, including expected outputs, observed allowance counts and stop conditions. Historical captures and constructed stubs are offline evidence only.
+- **Enforced request allowance:** implemented and verified locally with Azurite and the actual Azure Table SDK, including independent processes, restart persistence and real ETag conflicts. It still requires a pre-provisioned Azure table and hosted configuration; hosted service compatibility has not been tested.
+- **Judge access arrangement:** code-based server validation exists, but the owner has not approved the eventual total/window/per-client limits, availability period or out-of-band code distribution. The access code is a shared gate, not individual judge identity or authorization; no judge roster is implemented or required.
+- **Foundry verification:** no live model call was made. A fresh, final-commit-pinned rehearsal of at most six calls remains outstanding and requires separate owner authorization; it is not the eventual judging allowance. Historical captures and constructed stubs are offline evidence only.
 - **Public API exposure:** routes are anonymous and public analysis has no request allowance. The judge-only allowance does not mitigate public local-rules traffic. The release owner must accept or mitigate this availability exposure.
 
 ## Rollback
