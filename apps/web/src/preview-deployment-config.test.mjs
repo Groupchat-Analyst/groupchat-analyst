@@ -64,10 +64,12 @@ test('the workflow carries no Foundry credentials or provider override', async (
   assert.equal([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]).join(), 'AZURE_STATIC_WEB_APPS_API_TOKEN')
 })
 
-test('public API routes stay anonymous-level and default to the local interpreter', async () => {
+test('public analysis stays local and the controlled judge-access route is registered', async () => {
   const index = await readFile(new URL('../../api/src/index.ts', import.meta.url), 'utf8')
   const providers = await readFile(new URL('../../api/src/providers/index.ts', import.meta.url), 'utf8')
 
-  assert.equal([...index.matchAll(/authLevel: 'anonymous'/g)].length, 2)
+  assert.equal([...index.matchAll(/authLevel: 'anonymous'/g)].length, 3)
+  assert.match(index, /route: 'foundry-access'/)
   assert.match(providers, /CLAIM_INTERPRETER_PROVIDER\?\.trim\(\) \|\| 'local'/)
+  assert.doesNotMatch(providers, /createFoundryProvider/)
 })

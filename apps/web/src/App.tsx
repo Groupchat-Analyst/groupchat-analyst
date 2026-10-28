@@ -22,7 +22,7 @@ import {
 } from '../../shared/src/matchClock'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
-import { requestAnalysis } from './analysisClient'
+import { requestAnalysis, requestFoundryAccess } from './analysisClient'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -39,13 +39,13 @@ import {
   describePeriodLabel,
   isRoutineLimitation,
   isUnsupportedJudgement,
+  selectRelevantEvidence,
   shareCardBlocks,
   type ShareCardModel,
 } from './presentation'
 import {
   buildChangeCard,
   changeCardText,
-  checkedAgainst,
   compareSnapshots,
   createSnapshot,
   isLaterClock,
@@ -61,7 +61,12 @@ import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from '
 import { fetchReplayFrame } from './replayApi'
 import { clockKey, ReplayController } from './replayController'
 import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../../shared/src/datasetCatalog'
-import { localizedExample, translateNarrative, translateText } from '../../shared/src/localization'
+import {
+  formatLocalizedMessage,
+  localizedExample,
+  translateNarrative,
+  translateText,
+} from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
 import { LanguageSelector, LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
@@ -90,6 +95,7 @@ type SubmittedRequest = {
   id: number
   context: SubmissionContext
   baseline: AnswerSnapshot | null
+  accessCode: string
   operation: RequestOperation
 }
 
@@ -246,14 +252,503 @@ function evidenceLabel(
   return translateText(kind.replaceAll('-', ' '), language)
 }
 
+function localizedEvidenceDetail(
+  item: ClaimResult['evidenceAvailability'][number],
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  switch (item.kind) {
+    case 'player-events':
+      return translateText(
+        'Player actions are sparse synthetic event records; they do not represent a complete performance dataset.',
+        language,
+      )
+    case 'attacking-events':
+      return translateText(
+        'The fixture records a limited set of shots, goals and other match events.',
+        language,
+      )
+    case 'build-up-phase':
+      return translateText(
+        'A versioned sample links selected build-up sequences, passes, turnovers and pressure; it is not complete match-wide coverage.',
+        language,
+      )
+    case 'shot-location':
+      return translateText(
+        'Shot location is not recorded because events have no pitch coordinates or zones; descriptions are not location data and no other count is substituted.',
+        language,
+      )
+    case 'physical-measurements':
+      return translateText(
+        'Running distance and other physical measurements are not recorded; no physical-data or continuous-tracking source exists.',
+        language,
+      )
+    default:
+      return item.available
+        ? formatLocalizedMessage(
+            'Recorded synthetic event types: {evidence}.',
+            { evidence: evidenceLabel(item.kind, language) },
+            language,
+          )
+        : translateNarrative(item.detail, language)
+  }
+}
+
+function localizedPlayerPerformance(
+  result: ClaimResult,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): { answer: string; facts: string[]; limitation: string } | undefined {
+  const { claim } = result
+  if (
+    claim.intent !== 'subjective-judgement' ||
+    claim.meaning.category !== 'performance-judgement' ||
+    !claim.playerSubject
+  ) {
+    return undefined
+  }
+  const valueFor = (metric: ClaimResult['playerStatistics'][number]['metric']) =>
+    result.playerStatistics.find(
+      (statistic) =>
+        statistic.playerId === claim.playerSubject?.id &&
+        statistic.metric === metric,
+    )?.value
+  const displayValue = (value: number | null | undefined) =>
+    value === null || value === undefined
+      ? translateText('Not available', language)
+      : String(value)
+  const durationWindow = result.playerCalculations.find(
+    ({ playerId, metric }) =>
+      playerId === claim.playerSubject?.id && metric === 'minutes-played',
+  )?.durationWindow
+  const playerName = localizedPlayerName(
+    datasetId,
+    claim.playerSubject.id,
+    claim.playerSubject.name,
+    language,
+  )
+  const facts = [
+    formatLocalizedMessage(
+      'Recorded shots: {value}',
+      { value: displayValue(valueFor('shots')) },
+      language,
+    ),
+    formatLocalizedMessage(
+      'Recorded pass completions: {completed}/{attempts}',
+      {
+        completed: displayValue(valueFor('pass-completions')),
+        attempts: displayValue(valueFor('pass-attempts')),
+      },
+      language,
+    ),
+    formatLocalizedMessage(
+      'Recorded recoveries: {value}',
+      { value: displayValue(valueFor('recoveries')) },
+      language,
+    ),
+    formatLocalizedMessage(
+      'Participation minutes: {value}',
+      { value: displayValue(valueFor('minutes-played')) },
+      language,
+    ),
+    formatLocalizedMessage(
+      'Selected recorded window: {start}–{end}',
+      {
+        start: durationWindow?.selectedWindowStart ?? translateText('Not available', language),
+        end: durationWindow?.selectedWindowEnd ?? translateText('Not available', language),
+      },
+      language,
+    ),
+  ]
+  return {
+    answer: `${playerName} · ${facts.join(' · ')}`,
+    facts: [
+      formatLocalizedMessage(
+        'Pass attempts: {value}',
+        { value: displayValue(valueFor('pass-attempts')) },
+        language,
+      ),
+      formatLocalizedMessage(
+        'Pass completions: {value}',
+        { value: displayValue(valueFor('pass-completions')) },
+        language,
+      ),
+      formatLocalizedMessage(
+        'Pass completion rate: {value}',
+        {
+          value: valueFor('pass-completion-percentage') === null ||
+            valueFor('pass-completion-percentage') === undefined
+            ? translateText('Not available', language)
+            : `${valueFor('pass-completion-percentage')}%`,
+        },
+        language,
+      ),
+      ...facts.slice(0, 1),
+      formatLocalizedMessage(
+        'Shots on target: {value}',
+        { value: displayValue(valueFor('shots-on-target')) },
+        language,
+      ),
+      formatLocalizedMessage(
+        'Goals: {value}',
+        { value: displayValue(valueFor('goals')) },
+        language,
+      ),
+      ...facts.slice(2, 4),
+    ],
+    limitation: formatLocalizedMessage(
+      'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.',
+      {},
+      language,
+    ),
+  }
+}
+
+function localizedStatisticValue(
+  value: number | null,
+  metric: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  if (value === null) {
+    return `${translateText('Not available', language)} · ${metricLabel(metric, language)}`
+  }
+  if (metric === 'pass-completion-percentage') {
+    return `${value}% ${translateText('pass completion', language)}`
+  }
+  if (metric === 'possession-percentage') {
+    return `${value}% ${translateText('possession', language)}`
+  }
+  if (metric === 'minutes-played') {
+    return formatLocalizedMessage(
+      'Participation minutes: {value}',
+      { value },
+      language,
+    )
+  }
+  const singularMetricLabels: Record<string, Partial<Record<
+    ReturnType<typeof useLocalization>['language'],
+    string
+  >>> = {
+    shots: { en: 'shot', es: 'tiro', fr: 'tir', de: 'Schuss' },
+    'shots-on-target': {
+      en: 'shot on target',
+      es: 'tiro a puerta',
+      fr: 'tir cadré',
+      de: 'Schuss aufs Tor',
+    },
+    goals: { en: 'goal', es: 'gol', fr: 'but', de: 'Tor' },
+    'pass-attempts': {
+      en: 'pass attempt',
+      es: 'intento de pase',
+      fr: 'tentative de passe',
+      de: 'Passversuch',
+    },
+    'pass-completions': {
+      en: 'completed pass',
+      es: 'pase completado',
+      fr: 'passe réussie',
+      de: 'vollständiger Pass',
+    },
+    recoveries: {
+      en: 'recovery',
+      es: 'recuperación',
+      fr: 'récupération',
+      de: 'Balleroberung',
+    },
+    'pressure-observations': {
+      en: 'pressure observation',
+      es: 'observación de presión',
+      fr: 'observation de pressing',
+      de: 'Pressing-Beobachtung',
+    },
+  }
+  const singular = value === 1 ? singularMetricLabels[metric]?.[language] : undefined
+  const label = singular ?? metricLabel(metric, language, value)
+  return `${value} ${label}`
+}
+
+function localizedStatistics(
+  result: ClaimResult,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): { answer: string; facts: string[]; limitation: string } | undefined {
+  if (
+    result.claim.intent !== 'statistical-request' ||
+    result.assessment !== 'statistics provided'
+  ) {
+    return undefined
+  }
+  const facts = [
+    ...result.statistics.map((statistic) => ({
+      entity: localizeMatchText(statistic.team, datasetId, language),
+      value: statistic.value,
+      metric: statistic.metric,
+    })),
+    ...result.playerStatistics.map((statistic) => ({
+      entity: localizedPlayerName(
+        datasetId,
+        statistic.playerId,
+        statistic.playerName,
+        language,
+      ),
+      value: statistic.value,
+      metric: statistic.metric,
+    })),
+  ].map(({ entity, value, metric }) =>
+    `${entity} · ${localizedStatisticValue(value, metric, language)}`,
+  )
+  if (facts.length === 0) return undefined
+  return {
+    answer: formatLocalizedMessage(
+      'Statistics provided: {figures}',
+      { figures: facts.join(language === 'ar' ? '؛ ' : '; ') },
+      language,
+    ),
+    facts,
+    limitation: translateText('Statistics only, no verdict', language),
+  }
+}
+
+function localizedCheckedAgainst(
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string[] {
+  return analysis.claims
+    .filter(
+      ({ assessment }) =>
+        assessment !== 'clarification needed' &&
+        assessment !== 'unavailable data' &&
+        assessment !== 'unrecognized language',
+    )
+    .map((result) => {
+      const { claim } = result
+      const comparison = claim.meaning.comparison
+      const entityName = (
+        entity: { id: string; name: string; team: string } | string | null,
+      ) => {
+        if (!entity) return null
+        return typeof entity === 'string'
+          ? localizeMatchText(entity, datasetId, language)
+          : localizedPlayerName(datasetId, entity.id, entity.name, language)
+      }
+      const subject = entityName(claim.playerSubject ?? claim.subject)
+      const target = entityName(
+        comparison?.opponentPlayer ?? comparison?.opponent ?? null,
+      )
+      const who = subject
+        ? target && comparison?.operator !== undefined
+          ? formatLocalizedMessage(
+              '{subject} {versus} {target}',
+              { subject, versus: translateText('vs', language), target },
+              language,
+            )
+          : subject
+        : translateText('Both teams', language)
+      if (isUnsupportedJudgement(result)) {
+        return [
+          who,
+          translateText(
+            'defensive shape and positioning (not recorded, so no verdict)',
+            language,
+          ),
+          translateNarrative(describePeriodLabel(result.periodLabel), language),
+        ].join(' · ')
+      }
+      const metrics = comparison
+        ? [comparison.metric]
+        : [...new Set([
+            ...result.statistics.map(({ metric }) => metric),
+            ...result.playerStatistics.map(({ metric }) => metric),
+          ])]
+      const what = metrics.length > 0
+        ? metrics
+            .slice(0, 3)
+            .map((metric) => metricLabel(metric, language))
+            .join(language === 'ar' ? '، ' : ', ')
+        : localizeMatchText(
+            translateNarrative(claim.meaning.description, language),
+            datasetId,
+            language,
+          )
+      return [
+        who,
+        what,
+        translateNarrative(describePeriodLabel(result.periodLabel), language),
+      ].join(' · ')
+    })
+}
+
+function localizedPlayerMoments(
+  result: ClaimResult,
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string[] {
+  const foundation = analysis.evidenceFoundation
+  const references = selectRelevantEvidence(result, foundation.players)
+  const ranked = references.filter(
+    ({ role }) => role === 'anchor' || role === 'supporting',
+  )
+  const contextual = references.filter(
+    ({ role }) => role === 'context' || role === 'calculation',
+  )
+  const selected = (ranked.length > 0 ? ranked : contextual).slice(-3)
+  return selected.map(({ reference }) =>
+    localizedEvidenceDescription(reference, analysis, datasetId, language),
+  )
+}
+
+function localizedEvidenceDescription(
+  reference: EvidenceReference,
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  const foundation = analysis.evidenceFoundation
+  const nameFor = (id: string) => {
+    const player = foundation.players.find(({ id: playerId }) => playerId === id)
+    return player
+      ? localizedPlayerName(datasetId, player.id, player.name, language)
+      : translateText('Not available', language)
+  }
+  const team = localizeMatchText(reference.team, datasetId, language)
+  const pass = foundation.passRecords.find(({ id }) => id === reference.id)
+  if (pass) {
+    return formatLocalizedMessage(
+      'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}',
+      {
+        time: reference.time,
+        team,
+        player: nameFor(pass.playerId),
+        receiver: nameFor(pass.receiverId),
+        outcome: translateText(
+          pass.outcome === 'complete' ? 'Complete' : 'Incomplete',
+          language,
+        ),
+      },
+      language,
+    )
+  }
+  const recovery = foundation.recoveryRecords.find(
+    ({ id }) => id === reference.id,
+  )
+  if (recovery) {
+    return formatLocalizedMessage(
+      'Recorded recovery · {time} · {team} · {player} · after a recorded turnover',
+      {
+        time: reference.time,
+        team,
+        player: nameFor(recovery.playerId),
+      },
+      language,
+    )
+  }
+  const pressure = foundation.pressureRecords.find(
+    ({ id }) => id === reference.id,
+  )
+  if (pressure) {
+    return formatLocalizedMessage(
+      'Recorded pressure · {time} · {team} · {player} · {type} · partial sample',
+      {
+        time: reference.time,
+        team,
+        player: nameFor(pressure.playerId),
+        type: translateText(
+          pressure.type === 'challenge' ? 'Challenge' : 'Pressured pass',
+          language,
+        ),
+      },
+      language,
+    )
+  }
+  const event = foundation.eventRecords.find(({ id }) => id === reference.id)
+  if (event?.type === 'shot') {
+    const outcome = event.outcome === 'goal'
+      ? translateText('Goal', language)
+      : event.outcome === 'saved'
+        ? translateText('Saved', language)
+        : event.outcome === 'blocked'
+          ? translateText('Blocked', language)
+          : translateText('Off target', language)
+    return formatLocalizedMessage(
+      'Recorded shot · {time} · {team} · {player} · {outcome}',
+      {
+        time: reference.time,
+        team,
+        player: event.playerId
+          ? nameFor(event.playerId)
+          : translateText('Player not recorded', language),
+        outcome,
+      },
+      language,
+    )
+  }
+  return localizeMatchText(
+    translateNarrative(
+      describeEvidence(reference.description, foundation.players),
+      language,
+    ),
+    datasetId,
+    language,
+  )
+}
+
+function localizedClaimMeaning(
+  result: ClaimResult,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): string {
+  const { claim } = result
+  const entity = claim.playerSubject
+    ? localizedPlayerName(
+        datasetId,
+        claim.playerSubject.id,
+        claim.playerSubject.name,
+        language,
+      )
+    : claim.subject
+      ? localizeMatchText(claim.subject, datasetId, language)
+      : translateText('Both teams', language)
+  if (
+    claim.intent === 'subjective-judgement' &&
+    claim.meaning.category === 'performance-judgement' &&
+    claim.playerSubject
+  ) {
+    return formatLocalizedMessage(
+      'A subjective performance judgement about {entity}.',
+      { entity },
+      language,
+    )
+  }
+  if (claim.intent === 'statistical-request') {
+    const metric = claim.playerMetric ??
+      result.statistics[0]?.metric ??
+      result.playerStatistics[0]?.metric
+    if (metric) {
+      return formatLocalizedMessage(
+        'Selected-period request: {metric} for {entity}.',
+        { metric: metricLabel(metric, language), entity },
+        language,
+      )
+    }
+  }
+  return localizeMatchText(
+    translateNarrative(claim.meaning.description, language),
+    datasetId,
+    language,
+  )
+}
+
 function ClaimCard({
   result,
+  analysis,
   index,
   roster,
   take,
   datasetId,
 }: {
   result: ClaimResult
+  analysis: AnalysisResponse
   index: number
   roster: Roster
   take?: string
@@ -263,6 +758,8 @@ function ClaimCard({
   const claim = result.claim
   const titleId = `claim-result-${index}`
   const contextOnly = isUnsupportedJudgement(result)
+  const playerPresentation = localizedPlayerPerformance(result, datasetId, language)
+  const statisticPresentation = localizedStatistics(result, datasetId, language)
   return (
     <LocalizedMarkup>
     <article className="claim-result" aria-labelledby={titleId}>
@@ -324,14 +821,14 @@ function ClaimCard({
         )}
       </div>
       <p className="assessment-limitation">
-        <strong>Limitations:</strong> {result.limitation}
+        <strong>Limitations:</strong> {playerPresentation?.limitation ?? statisticPresentation?.limitation ?? result.limitation}
       </p>
 
       <details className="claim-evidence-details">
         <summary>View evidence</summary>
         <div className="claim-understanding">
           <p><span>Subject</span><strong>{claim.playerSubject?.name ?? claim.subject ?? 'Needs clarification'}</strong></p>
-          <p><span>What we understood</span><strong>{claim.meaning.description}</strong></p>
+          <p><span>What we understood</span><strong>{localizedClaimMeaning(result, datasetId, language)}</strong></p>
           <p><span>Request type</span><strong>{claim.intent.replaceAll('-', ' ')}</strong></p>
           <p><span>Selected period</span><strong>{describePeriodLabel(result.periodLabel)}</strong></p>
           {claim.historicalEventAnchor && <p><span>Historical anchor</span><strong>{claim.historicalEventAnchor.relationship}</strong></p>}
@@ -346,7 +843,7 @@ function ClaimCard({
                   <strong>
                     {evidenceLabel(item.kind, language)} · {item.available ? 'available' : 'not recorded'}
                   </strong>
-                  <span>{item.detail}</span>
+                  <span>{localizedEvidenceDetail(item, language)}</span>
                 </li>
               ))}
             </ul>
@@ -401,7 +898,7 @@ function ClaimCard({
                     <span className="reference-time">{reference.time}</span>
                     <span className="reference-description">
                       <strong>{reference.team} · {role}</strong>
-                      <span>{describeEvidence(reference.description, roster)}</span>
+                      <span>{localizedEvidenceDescription(reference, analysis, datasetId, language)}</span>
                     </span>
                   </li>
                 ))}
@@ -733,6 +1230,7 @@ function WhatChanged({
   onDownload,
   onShare,
   shareReady,
+  datasetId,
 }: {
   comparison: { earlier: AnswerSnapshot; later: AnswerSnapshot; result: Comparison }
   view: 'fan' | 'analyst'
@@ -741,10 +1239,18 @@ function WhatChanged({
   onDownload: () => void
   onShare: (() => void) | null
   shareReady: boolean
+  datasetId: string
 }) {
   const { earlier, later, result } = comparison
   const { language } = useLocalization()
   const separate = result.status !== 'comparable'
+  const earlierPlayerPresentation = earlier.analysis.claims.length === 1
+    ? localizedPlayerPerformance(earlier.analysis.claims[0], datasetId, language)
+    : undefined
+  const earlierStatisticPresentation = earlier.analysis.claims.length === 1
+    ? localizedStatistics(earlier.analysis.claims[0], datasetId, language)
+    : undefined
+  const earlierCheckedAgainst = localizedCheckedAgainst(earlier.analysis, datasetId, language)
   return (
     <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
@@ -775,8 +1281,12 @@ function WhatChanged({
       {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
         <summary>{translateNarrative(`Earlier answer · ${result.earlierTime} · ${earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}`, language)}</summary>
-        <p className="server-summary">{snapshotReply(earlier)}</p>
-        {checkedAgainst(earlier.analysis).length > 0 && <p className="checked-against"><strong>Checked against</strong> {checkedAgainst(earlier.analysis).join('; ')}</p>}
+        <p className="server-summary">
+          {earlierPlayerPresentation?.answer ??
+            earlierStatisticPresentation?.answer ??
+            translateNarrative(snapshotReply(earlier), language)}
+        </p>
+        {earlierCheckedAgainst.length > 0 && <p className="checked-against"><strong>Checked against</strong> {earlierCheckedAgainst.join(language === 'ar' ? '؛ ' : '; ')}</p>}
         <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
       </details>
       {changeCard && (
@@ -807,19 +1317,33 @@ function localizedShareModel(
   model: ShareCardModel,
   language: ReturnType<typeof useLocalization>['language'],
   datasetId: string,
+  analysis?: AnalysisResponse,
 ): ShareCardModel {
+  const playerPresentation = analysis?.claims.length === 1
+    ? localizedPlayerPerformance(analysis.claims[0], datasetId, language)
+    : undefined
+  const statisticPresentation = analysis?.claims.length === 1
+    ? localizedStatistics(analysis.claims[0], datasetId, language)
+    : undefined
   return {
     ...model,
     scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language),
-    answer: localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
+    answer: playerPresentation?.answer ?? statisticPresentation?.answer ??
+      localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
     claims: model.claims.map((claim) => ({
       ...claim,
       text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
       verdict: claim.verdict ? localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language) : null,
-      facts: claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      moments: claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      facts: model.claims.length === 1 && (playerPresentation || statisticPresentation)
+        ? playerPresentation?.facts ?? statisticPresentation?.facts ?? claim.facts
+        : claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      moments: (playerPresentation || statisticPresentation) && analysis?.claims.length === 1
+        ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
+        : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
       counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      limitations: claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      limitations: model.claims.length === 1 && (playerPresentation || statisticPresentation)
+        ? [playerPresentation?.limitation ?? statisticPresentation?.limitation ?? translateText('Statistics only, no verdict', language)]
+        : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
     })),
     footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
   }
@@ -861,21 +1385,55 @@ function TurnMessages({
   const { language } = useLocalization()
   const { analysis, context } = turn
   const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
-  const checked = checkedAgainst(analysis)
+  const checked = localizedCheckedAgainst(analysis, datasetId, language)
   const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
+  const playerPresentations = new Map(
+    analysis.claims.map((result) => [
+      result.claim.id,
+      localizedPlayerPerformance(result, datasetId, language),
+    ]),
+  )
+  const statisticPresentations = new Map(
+    analysis.claims.map((result) => [
+      result.claim.id,
+      localizedStatistics(result, datasetId, language),
+    ]),
+  )
   const evidenceClaims = analysis.claims
     .map((result, index) => ({ result, index }))
     .filter(({ result }) => !result.playerResolution)
   const answeredReplies = analysis.claims
     .filter(({ playerResolution }) => !playerResolution)
-    .map(({ reply }) => reply)
+    .map((result) =>
+      playerPresentations.get(result.claim.id)?.answer ??
+      statisticPresentations.get(result.claim.id)?.answer ??
+      (result.reply ? translateNarrative(result.reply, language) : undefined),
+    )
     .filter((reply): reply is string => Boolean(reply))
+  const allRepliesStructured = analysis.claims.length > 0 &&
+    analysis.claims.every(
+      (result) =>
+        result.playerResolution ||
+        playerPresentations.get(result.claim.id) !== undefined ||
+        statisticPresentations.get(result.claim.id) !== undefined,
+    )
+  const visibleReply = playerChoices.length > 0
+    ? answeredReplies.join(' ')
+    : allRepliesStructured
+      ? answeredReplies.join(' ')
+      : canonicalReply(analysis)
   const notes = analysis.claims.flatMap((result) => [
     ...(!result.playerResolution
       ? result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' }))
       : []),
     ...(!result.playerResolution && !isRoutineLimitation(result)
-      ? [{ key: `${result.claim.id}-limitation`, text: result.limitation, title: 'Limitation' }]
+      ? [{
+          key: `${result.claim.id}-limitation`,
+          text: playerPresentations.get(result.claim.id)?.limitation ??
+            statisticPresentations.get(result.claim.id)?.limitation ??
+            result.limitation,
+          title: 'Limitation',
+        }]
       : []),
   ])
   return (
@@ -887,12 +1445,11 @@ function TurnMessages({
       </div>
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
         <p className="msg-label">Groupchat Analyst · {scope}</p>
-        {(playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis)) && (
+        {visibleReply && (
           <p className="msg-text">
-            {translateNarrative(
-              playerChoices.length > 0 ? answeredReplies.join(' ') : canonicalReply(analysis),
-              language,
-            )}
+            {playerChoices.length > 0 || allRepliesStructured
+              ? visibleReply
+              : translateNarrative(visibleReply, language)}
           </p>
         )}
         {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
@@ -905,7 +1462,7 @@ function TurnMessages({
             ))}
           </ul>
         )}
-        {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join('; ')}</p>}
+        {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join(language === 'ar' ? '؛ ' : '; ')}</p>}
         {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
         {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
         {playerChoices.map((result) => (
@@ -923,7 +1480,7 @@ function TurnMessages({
             <summary>How this was checked</summary>
             <div className="claim-result-list">
               {evidenceClaims.map(({ result, index }) => (
-                <ClaimCard key={result.claim.id} result={result} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} datasetId={datasetId} />
+                <ClaimCard key={result.claim.id} result={result} analysis={analysis} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} datasetId={datasetId} />
               ))}
             </div>
           </details>
@@ -982,6 +1539,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
+  const [foundryAccessDraft, setFoundryAccessDraft] = useState('')
+  const [foundryAccessCode, setFoundryAccessCode] = useState('')
+  const [foundryAccessError, setFoundryAccessError] = useState('')
+  const [isCheckingFoundryAccess, setIsCheckingFoundryAccess] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -1037,7 +1598,12 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     : []
   const shareModel = useMemo<ShareCardModel | null>(
     () => (analysis && submittedContext && !hasPlayerChoices
-      ? localizedShareModel(buildShareCardModel(submittedContext.opinion, analysis), language, datasetId)
+      ? localizedShareModel(
+          buildShareCardModel(submittedContext.opinion, analysis),
+          language,
+          datasetId,
+          analysis,
+        )
       : null),
     [analysis, submittedContext, language, hasPlayerChoices, datasetId],
   )
@@ -1108,7 +1674,10 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       setCopyMessage('')
       setShareMessage('')
       try {
-        const payload = await requestAnalysis(request, { signal: controller.signal })
+        const payload = await requestAnalysis(request, {
+          signal: controller.signal,
+          accessCode: active.accessCode || undefined,
+        })
         if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
         if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
@@ -1253,6 +1822,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: createSubmissionContext(trimmedOpinion, selectedClock, period, datasetId, language),
       baseline: null,
+      accessCode: foundryAccessCode,
       operation: { kind: 'analysis' },
     })
   }
@@ -1272,6 +1842,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         shown.context.inputLanguage,
       ),
       baseline: shown,
+      accessCode: foundryAccessCode,
       operation: shown.analysis.playerResolutionContinuation
         ? {
             kind: 'recheck-resolved-player',
@@ -1294,6 +1865,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       id,
       context: shown.context,
       baseline: shown,
+      accessCode: foundryAccessCode,
       operation: {
         kind: 'resolve-player',
         continuation,
@@ -1313,6 +1885,32 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     }
     setRequestError('')
     setSubmittedRequest({ ...submittedRequest, id })
+  }
+
+  async function enableFoundryAccess() {
+    const candidate = foundryAccessDraft
+    if (!candidate || isCheckingFoundryAccess) return
+    setIsCheckingFoundryAccess(true)
+    setFoundryAccessError('')
+    try {
+      await requestFoundryAccess(candidate)
+      setFoundryAccessCode(candidate)
+      setFoundryAccessDraft('')
+    } catch (error) {
+      setFoundryAccessError(
+        error instanceof Error
+          ? error.message
+          : 'Judge AI access could not be verified. Use local rules instead.',
+      )
+    } finally {
+      setIsCheckingFoundryAccess(false)
+    }
+  }
+
+  function useLocalRules() {
+    setFoundryAccessCode('')
+    setFoundryAccessDraft('')
+    setFoundryAccessError('')
   }
 
   async function copyAssessment() {
@@ -1391,7 +1989,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
       )}
       {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
       {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
-      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} />}
+      {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} datasetId={datasetId} />}
       {opinion.trim() !== submittedOpinion && (
         <p className="draft-notice">
           {translateNarrative(
@@ -1502,6 +2100,42 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
             />
           </div>
           <div className="conversation-column">
+            <section className="judge-access" aria-label="Judge AI access">
+              {!foundryAccessCode ? (
+                <details>
+                  <summary>Judge AI access (controlled)</summary>
+                  <form onSubmit={(event) => {
+                    event.preventDefault()
+                    void enableFoundryAccess()
+                  }}>
+                    <label htmlFor="foundry-access-code">Judge access code</label>
+                    <input
+                      id="foundry-access-code"
+                      type="password"
+                      autoComplete="off"
+                      value={foundryAccessDraft}
+                      onChange={(event) => setFoundryAccessDraft(event.currentTarget.value)}
+                    />
+                    <button
+                      className="secondary-button"
+                      type="submit"
+                      disabled={!foundryAccessDraft || isCheckingFoundryAccess}
+                    >
+                      {isCheckingFoundryAccess ? 'Checking access…' : 'Enable judge AI'}
+                    </button>
+                  </form>
+                  {foundryAccessError && <p role="alert">{foundryAccessError}</p>}
+                  <p>Public analysis remains on local rules. The code stays in this page’s memory only.</p>
+                </details>
+              ) : (
+                <div role="group" aria-label="Judge AI is enabled">
+                  <p role="status">Judge AI is enabled for this page only.</p>
+                  <button className="secondary-button" type="button" onClick={useLocalRules}>
+                    Use local rules instead
+                  </button>
+                </div>
+              )}
+            </section>
             <section className="conversation" aria-labelledby="conversation-title">
               <div className="conversation-head">
                 <h2 id="conversation-title">Conversation</h2>

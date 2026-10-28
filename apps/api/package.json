@@ -10,10 +10,12 @@
     "start": "npm run build && func start"
   },
   "dependencies": {
+    "@azure/data-tables": "^13.3.2",
     "@azure/functions": "^4.7.2"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "azurite": "^3.37.0",
     "typescript": "~6.0.2"
   }
 }

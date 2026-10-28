@@ -88,6 +88,88 @@ test('both Bruno choices calculate only attributed records without another provi
   }
 })
 
+test('ambiguous performance judgements use the signed player-selection continuation', async () => {
+  for (const opinion of ['How good was Bruno today?', 'How good was Martin today?']) {
+    const claim = {
+      ...ambiguousBruno,
+      text: opinion,
+      playerMetric: null,
+      intent: 'subjective-judgement',
+      meaning: {
+        category: 'performance-judgement',
+        description: opinion,
+        comparison: null,
+      },
+      requiredEvidence: ['possession', 'passing', 'shots', 'goals'],
+    }
+    const stub = providerFor([claim])
+    const initial = await analyzeOpinion(
+      {
+        ...request(opinion),
+        inputLanguage: 'en',
+        datasetId: 'northbridge-eastport-analysis-demo',
+      },
+      stub.provider,
+    )
+    const result = initial.claims[0]
+    assert.equal(result.claim.intent, 'subjective-judgement')
+    assert.equal(result.assessment, 'clarification needed')
+    assert.ok(result.playerResolution)
+    assert.equal(result.playerResolution.candidates.length, 2)
+
+    const candidate = result.playerResolution.candidates[0]
+    const resolved = await analyzeOpinion(
+      {
+        action: 'resolve-player',
+        continuation: result.playerResolution.continuation,
+        claimId: result.claim.id,
+        playerId: candidate.id,
+      },
+      stub.provider,
+    )
+    const resolvedClaim = resolved.claims[0]
+
+    assert.equal(stub.calls(), 1)
+    assert.equal(resolved.provider, 'foundry')
+    assert.equal(resolvedClaim.claim.playerSubject.id, candidate.id)
+    assert.equal(resolvedClaim.claim.subject, candidate.team)
+    assert.equal(resolvedClaim.claim.intent, 'subjective-judgement')
+    assert.equal(resolvedClaim.assessment, 'insufficient evidence for a firm conclusion')
+    assert.ok(resolvedClaim.playerStatistics.length > 0)
+    assert.ok(resolvedClaim.playerStatistics.every(({ playerId }) => playerId === candidate.id))
+    assert.match(resolvedClaim.limitation, /no overall player rating or ranking/i)
+  }
+})
+
+test('local interpretation recognizes today judgements and resolves an unambiguous full name directly', async () => {
+  for (const [opinion, datasetId] of [
+    ['How good was Bruno today?', 'northbridge-eastport-analysis-demo'],
+    ['How good was Martin today?', 'northbridge-eastport-analysis-demo'],
+    ['How good was Pedro today?', 'westhaven-kingswell-demo'],
+  ]) {
+    const ambiguous = await analyzeOpinion({
+      opinion,
+      selectedClock: { period: 2, minute: 58 },
+      period: 'match-so-far',
+      datasetId,
+      inputLanguage: 'en',
+    })
+    assert.equal(ambiguous.claims[0].claim.intent, 'subjective-judgement', opinion)
+    assert.equal(ambiguous.claims[0].playerResolution.candidates.length, 2, opinion)
+  }
+
+  const unambiguous = await analyzeOpinion({
+    opinion: 'How good was Bruno Fernandes today?',
+    selectedClock: { period: 2, minute: 58 },
+    period: 'match-so-far',
+    datasetId: 'northbridge-eastport-analysis-demo',
+    inputLanguage: 'en',
+  })
+  assert.equal(unambiguous.claims[0].claim.playerSubject.id, 'east-player-08')
+  assert.equal(unambiguous.claims[0].playerResolution, undefined)
+  assert.match(unambiguous.claims[0].limitation, /no overall player rating or ranking/i)
+})
+
 test('same-squad unrelated, foreign, and tampered continuation choices are rejected', async () => {
   const initial = await initialBruno()
   const clarification = initial.claims[0].playerResolution

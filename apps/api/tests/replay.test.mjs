@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { getReplayFrame } from '../dist/api/src/functions/replay.js'
+import { DATASET_CATALOG } from '../dist/shared/src/datasetCatalog.js'
 
 test('replay score changes between 57 and the 58th-minute equaliser', () => {
   const beforeEqualiser = getReplayFrame({ period: 2, minute: 57 })
@@ -47,4 +48,42 @@ test('replay rejects clocks that are not available in the fixture', () => {
     () => getReplayFrame({ period: 2, minute: 57, stoppageMinutes: '0' }),
     /valid match time/,
   )
+})
+
+test('replay exposes only squad participation known at the selected time', () => {
+  for (const fixture of DATASET_CATALOG) {
+    const kickoff = getReplayFrame(
+      { period: 1, minute: 1 },
+      fixture.id,
+    )
+    assert.equal(kickoff.players.length, 40, fixture.id)
+    assert.equal(
+      kickoff.players.filter(({ status }) => status === 'starter').length,
+      22,
+      fixture.id,
+    )
+    assert.ok(
+      kickoff.players
+        .filter(({ status }) => status === 'starter')
+        .every(({ participation }) => participation === 'on-pitch'),
+      fixture.id,
+    )
+    assert.ok(
+      kickoff.players
+        .filter(({ status }) => status === 'substitute')
+        .every(({ participation }) => participation === 'not-yet-on-pitch'),
+      fixture.id,
+    )
+
+    const fullTime = getReplayFrame(
+      { period: 2, minute: 90, stoppageMinutes: 4 },
+      fixture.id,
+    )
+    assert.ok(
+      fullTime.players.every(
+        ({ participation }) => participation !== 'not-yet-on-pitch',
+      ),
+      fixture.id,
+    )
+  }
 })

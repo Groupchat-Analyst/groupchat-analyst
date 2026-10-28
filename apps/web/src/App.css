@@ -26,6 +26,12 @@
 .workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) 284px; align-items: start; gap: 34px; }
 .conversation-column, .explore-column { min-width: 0; }
 .opinion-form { padding: 22px; border: 1px solid #415036; border-radius: 18px; background: linear-gradient(145deg, #1b241b, #141c17 65%); box-shadow: 0 8px 32px #0000001a; }
+.judge-access { margin-bottom: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #131a16; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.judge-access summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; color: var(--text); font-weight: 600; }
+.judge-access label, .judge-access input { display: block; width: 100%; }
+.judge-access input { min-height: 42px; margin: 5px 0 10px; padding: 8px 10px; border: 1px solid #465148; border-radius: 8px; background: #101612; color: var(--text); }
+.judge-access p { margin: 9px 0 0; }
+.judge-access [role="alert"] { color: #ffb6a4; }
 .composer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
 .opinion-label { color: var(--text); font-size: 19px; font-weight: 600; letter-spacing: -.035em; }
 .segmented-control { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #101612; }

@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   APP_LANGUAGES,
   canonicalizeSupportedFootballOpinion,
+  formatLocalizedMessage,
   localizedExample,
   translateNarrative,
   translateText,
@@ -80,9 +81,10 @@ test('replay failures and retry stay localized without exposing transport detail
     de: ['Das Spiel konnte nicht geladen werden.', 'Das Spiel konnte nicht geladen werden. Der letzte geladene Moment wird weiterhin angezeigt.', 'Erneut versuchen'],
     ar: ['تعذّر تحميل المباراة.', 'تعذّر تحميل المباراة. لا تزال آخر لحظة تم تحميلها معروضة.', 'أعد المحاولة'],
   }
+  const keys = expected.en
   for (const { code } of APP_LANGUAGES) {
     assert.deepEqual(
-      expected[code].map((message) => translateText(message, code)),
+      keys.map((message) => translateText(message, code)),
       expected[code],
       code,
     )
@@ -94,6 +96,321 @@ test('all five locales have explicit label, native name, and direction metadata'
   assert.deepEqual(APP_LANGUAGES.map(({ code }) => code), ['en', 'es', 'fr', 'de', 'ar'])
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'ar').direction, 'rtl')
   assert.equal(APP_LANGUAGES.find(({ code }) => code === 'es').nativeLabel, 'Español')
+})
+
+test('recent-period descriptions use the selected display language', () => {
+  const expected = {
+    en: 'Last 10 minutes ending 90+4′',
+    es: 'Los últimos 10 minutos hasta 90+4′',
+    fr: 'Les 10 dernières minutes jusqu’à 90+4′',
+    de: 'Die letzten 10 Minuten bis 90+4′',
+    ar: 'آخر عشر دقائق حتى 90+4′',
+  }
+  for (const { code } of APP_LANGUAGES) {
+    assert.equal(
+      translateNarrative('Last 10 minutes ending 90+4′', code),
+      expected[code],
+      code,
+    )
+  }
+})
+
+test('claim metadata and player metric explanations use the selected display language', () => {
+  const expected = {
+    en: {
+      evidence: 'All 4 claim evidence references',
+      claim: 'Claim 2',
+      explanation: 'Report pass completions for Bruno Fernandes from selected synthetic records.',
+    },
+    es: {
+      evidence: 'Todas las 4 referencias de evidencia de la afirmación',
+      claim: 'Afirmación 2',
+      explanation: 'Los registros sintéticos del período seleccionado muestran los pases completados de Bruno Fernandes.',
+    },
+    fr: {
+      evidence: 'Les 4 références aux preuves de l’affirmation',
+      claim: 'Affirmation 2',
+      explanation: 'Les données synthétiques de la période sélectionnée recensent les passes réussies pour Bruno Fernandes.',
+    },
+    de: {
+      evidence: 'Alle 4 Belegverweise zur Aussage',
+      claim: 'Aussage 2',
+      explanation: 'Die synthetischen Aufzeichnungen des ausgewählten Zeitraums zeigen die erfolgreichen Pässe für Bruno Fernandes.',
+    },
+    ar: {
+      evidence: 'كل مراجع الأدلة الخاصة بالادعاء (4)',
+      claim: 'الادعاء 2',
+      explanation: 'تُظهر السجلات الاصطناعية للفترة المحددة التمريرات المكتملة للاعب برونو فرنانديز.',
+    },
+  }
+  for (const { code } of APP_LANGUAGES) {
+    assert.equal(
+      translateNarrative('All 4 claim evidence references', code),
+      expected[code].evidence,
+      `${code} evidence label`,
+    )
+    assert.equal(translateNarrative('Claim 2', code), expected[code].claim, `${code} claim label`)
+    const explanation = localizeMatchText(
+      translateNarrative(
+        'Report pass completions for Bruno Fernandes from selected synthetic records.',
+        code,
+      ),
+      fixtureRecords[0].id,
+      code,
+    )
+    assert.equal(explanation, expected[code].explanation, `${code} player explanation`)
+    if (code !== 'en') {
+      assert.doesNotMatch(explanation, /undefined|Report|pass completions/u, code)
+    }
+  }
+})
+
+test('structured statistical replies and comparison labels are translated without changing figures', () => {
+  const expected = {
+    en: {
+      reply: 'Statistics provided: Eastport · 3 shots on target',
+      comparison: 'Eastport vs Northbridge',
+      completion: '% pass completion',
+    },
+    es: {
+      reply: 'Estadísticas: Eastport · 3 tiros a puerta',
+      comparison: 'Eastport contra Northbridge',
+      completion: '% de precisión de pase',
+    },
+    fr: {
+      reply: 'Statistiques : Eastport · 3 tirs cadrés',
+      comparison: 'Eastport contre Northbridge',
+      completion: '% de réussite des passes',
+    },
+    de: {
+      reply: 'Statistiken: Eastport · 3 Schüsse aufs Tor',
+      comparison: 'Eastport gegen Northbridge',
+      completion: '% Passgenauigkeit',
+    },
+    ar: {
+      reply: 'إحصاءات: إيستبورت · 3 تسديدات على المرمى',
+      comparison: 'إيستبورت ضد نورثبريدج',
+      completion: 'نسبة التمريرات المكتملة',
+    },
+  }
+  for (const { code } of APP_LANGUAGES) {
+    const reply = formatLocalizedMessage(
+      'Statistics provided: {figures}',
+      { figures: `${localizeMatchText('Eastport', fixtureRecords[0].id, code)} · ${translateNarrative('3 shots on target', code)}` },
+      code,
+    )
+    assert.equal(reply, expected[code].reply, `${code} statistical reply`)
+    assert.equal(
+      formatLocalizedMessage(
+        '{subject} {versus} {target}',
+        {
+          subject: localizeMatchText('Eastport', fixtureRecords[0].id, code),
+          versus: translateText('vs', code),
+          target: localizeMatchText('Northbridge', fixtureRecords[0].id, code),
+        },
+        code,
+      ),
+      expected[code].comparison,
+      `${code} comparison label`,
+    )
+    assert.equal(translateText('% pass completion', code), expected[code].completion, `${code} metric`)
+  }
+})
+
+test('structured claim meaning and evidence-coverage messages have locale-specific wording', () => {
+  const expected = {
+    en: {
+      statistic: 'Selected-period request: shots on target for Eastport.',
+      judgement: 'A subjective performance judgement about Bruno Fernandes.',
+      evidence: 'Recorded synthetic event types: shots on target.',
+      playerEvidence: 'Player actions are sparse synthetic event records; they do not represent a complete performance dataset.',
+    },
+    es: {
+      statistic: 'Solicitud para el periodo seleccionado: tiros a puerta de Eastport.',
+      judgement: 'Un juicio subjetivo sobre el rendimiento de Bruno Fernandes.',
+      evidence: 'Tipos de eventos sintéticos registrados: tiros a puerta.',
+      playerEvidence: 'Las acciones de los jugadores son registros sintéticos y escasos; no constituyen un conjunto completo de datos de rendimiento.',
+    },
+    fr: {
+      statistic: 'Demande pour la période sélectionnée : tirs cadrés pour Eastport.',
+      judgement: 'Un jugement subjectif sur la performance de Bruno Fernandes.',
+      evidence: 'Types d’événements synthétiques enregistrés : tirs cadrés.',
+      playerEvidence: 'Les actions des joueurs sont des événements synthétiques peu nombreux ; elles ne constituent pas un jeu de données complet sur les performances.',
+    },
+    de: {
+      statistic: 'Anfrage für den ausgewählten Zeitraum: Schüsse aufs Tor von Eastport.',
+      judgement: 'Ein subjektives Urteil über die Leistung von Bruno Fernandes.',
+      evidence: 'Erfasste synthetische Ereignisarten: Schüsse aufs Tor.',
+      playerEvidence: 'Die Spieleraktionen sind wenige synthetische Ereignisse; sie bilden keinen vollständigen Leistungsdatensatz.',
+    },
+    ar: {
+      statistic: 'طلب الفترة المحددة: تسديدات على المرمى لدى إيستبورت.',
+      judgement: 'حكم شخصي على أداء برونو فرنانديز.',
+      evidence: 'أنواع الأحداث الاصطناعية المسجلة: تسديدات على المرمى.',
+      playerEvidence: 'أفعال اللاعبين سجلات أحداث اصطناعية محدودة، ولا تمثل بيانات أداء كاملة.',
+    },
+  }
+  for (const { code } of APP_LANGUAGES) {
+    const statistic = formatLocalizedMessage(
+      'Selected-period request: {metric} for {entity}.',
+      {
+        metric: translateText('shots on target', code),
+        entity: localizeMatchText('Eastport', fixtureRecords[0].id, code),
+      },
+      code,
+    )
+    const judgement = formatLocalizedMessage(
+      'A subjective performance judgement about {entity}.',
+      {
+        entity: localizedPlayerName(
+          fixtureRecords[0].id,
+          'east-player-08',
+          'Bruno Fernandes',
+          code,
+        ),
+      },
+      code,
+    )
+    const evidence = formatLocalizedMessage(
+      'Recorded synthetic event types: {evidence}.',
+      { evidence: translateText('shots on target', code) },
+      code,
+    )
+    assert.equal(statistic, expected[code].statistic, `${code} statistic meaning`)
+    assert.equal(judgement, expected[code].judgement, `${code} judgement meaning`)
+    assert.equal(evidence, expected[code].evidence, `${code} event type`)
+    assert.equal(
+      translateText(
+        'Player actions are sparse synthetic event records; they do not represent a complete performance dataset.',
+        code,
+      ),
+      expected[code].playerEvidence,
+      `${code} player event coverage`,
+    )
+  }
+})
+
+test('pre-question squad labels have explicit translations in every display language', () => {
+  const expected = {
+    en: [
+      'View squads',
+      'Familiar names. Fictional teams and performances.',
+      'Starters',
+      'Substitutes',
+      'Participation: on-pitch',
+      'Participation: participated',
+      'Participation: unused-substitute',
+      'Participation: not-yet-on-pitch',
+    ],
+    es: [
+      'Ver las plantillas',
+      'Nombres conocidos. Equipos y actuaciones ficticios.',
+      'Titulares',
+      'Suplentes',
+      'Participación: en el campo en este momento',
+      'Participación: jugó antes; ahora no está en el campo',
+      'Participación: suplente no utilizado hasta este momento',
+      'Participación: todavía no había entrado en este momento',
+    ],
+    fr: [
+      'Voir les effectifs',
+      'Des noms familiers. Des équipes et des performances fictives.',
+      'Titulaires',
+      'Remplaçants',
+      'Participation : sur le terrain à cet instant',
+      'Participation : a joué plus tôt, sans être sur le terrain actuellement',
+      'Participation : remplaçant non utilisé à cet instant',
+      'Participation : pas encore entré à cet instant',
+    ],
+    de: [
+      'Kader ansehen',
+      'Vertraute Namen. Fiktive Teams und Leistungen.',
+      'Startelf',
+      'Ersatzspieler',
+      'Einsatz: zu diesem Zeitpunkt auf dem Platz',
+      'Einsatz: zuvor gespielt, derzeit nicht auf dem Platz',
+      'Einsatz: bis zu diesem Zeitpunkt nicht eingewechselt',
+      'Einsatz: zu diesem Zeitpunkt noch nicht eingewechselt',
+    ],
+    ar: [
+      'عرض التشكيلات',
+      'أسماء مألوفة. فرق وأداء خيالي.',
+      'اللاعبون الأساسيون',
+      'البدلاء',
+      'المشاركة: داخل الملعب في هذا الوقت',
+      'المشاركة: لعب سابقًا وهو خارج الملعب الآن',
+      'المشاركة: بديل لم يشارك حتى هذا الوقت',
+      'المشاركة: لم يدخل الملعب بعد في هذا الوقت',
+    ],
+  }
+  for (const { code } of APP_LANGUAGES) {
+    assert.deepEqual(
+      expected[code].map((message) => translateText(message, code)),
+      expected[code],
+      code,
+    )
+  }
+})
+
+test('controlled judge AI labels and failure states have explicit translations', () => {
+  const messages = [
+    'Judge AI access (controlled)',
+    'Judge access code',
+    'Enable judge AI',
+    'Checking access…',
+    'Judge AI is enabled for this page only.',
+    'Use local rules instead',
+    'Public analysis remains on local rules. The code stays in this page’s memory only.',
+    'The judge access code was not accepted.',
+    'Judge AI is not configured on this server. Use local rules instead.',
+    'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
+    'The shared judge AI request allowance is exhausted. Use local rules or contact the judge.',
+    'Your judge AI request allowance is exhausted. Use local rules or try again later.',
+    'Judge AI access could not be verified. Use local rules instead.',
+  ]
+  for (const { code } of APP_LANGUAGES) {
+    for (const message of messages) {
+      const localized = translateText(message, code)
+      assert.ok(localized.trim().length > 0, `${code}: ${message}`)
+      if (code !== 'en') assert.notEqual(localized, message, `${code}: ${message}`)
+    }
+  }
+})
+
+test('structured player-performance messages have translation keys and preserve parameters', () => {
+  const templates = [
+    'Recorded shots: {value}',
+    'Recorded pass completions: {completed}/{attempts}',
+    'Recorded recoveries: {value}',
+    'Participation minutes: {value}',
+    'Selected recorded window: {start}–{end}',
+    'Pass attempts: {value}',
+    'Pass completions: {value}',
+    'Pass completion rate: {value}',
+    'Shots on target: {value}',
+    'Goals: {value}',
+    'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}',
+    'Recorded recovery · {time} · {team} · {player} · after a recorded turnover',
+    'Recorded shot · {time} · {team} · {player} · {outcome}',
+    'Recorded pressure · {time} · {team} · {player} · {type} · partial sample',
+    'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.',
+  ]
+  for (const { code } of APP_LANGUAGES) {
+    for (const template of templates) {
+      if (code !== 'en') assert.notEqual(translateText(template, code), template, `${code}: ${template}`)
+    }
+  }
+  const localized = formatLocalizedMessage(
+    'Recorded pass completions: {completed}/{attempts}',
+    { completed: 1, attempts: 2 },
+    'ar',
+  )
+  assert.match(localized, /١|1/u)
+  assert.doesNotMatch(localized, /\{(?:completed|attempts)\}/u)
+  assert.throws(
+    () => formatLocalizedMessage('Recorded shots: {value}', {}, 'en'),
+    /Missing localization parameter/,
+  )
 })
 
 test('fixture catalog copy is neutral and the opinion wording is localized', () => {

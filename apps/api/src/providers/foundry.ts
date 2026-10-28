@@ -29,7 +29,8 @@ type FoundryConfiguration = {
 
 const MAX_COMPLETION_TOKENS = 8192
 
-const CLAIM_SCHEMA = {
+function claimSchema(teams: string[]) {
+  return {
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -40,7 +41,7 @@ const CLAIM_SCHEMA = {
         additionalProperties: false,
         properties: {
           id: { type: 'string' },
-          subject: { anyOf: [{ type: 'string', enum: ['Northbridge', 'Eastport'] }, { type: 'null' }] },
+          subject: { anyOf: [{ type: 'string', enum: teams }, { type: 'null' }] },
           playerSubject: {
             anyOf: [
               {
@@ -49,7 +50,7 @@ const CLAIM_SCHEMA = {
                 properties: {
                   id: { type: 'string' },
                   name: { type: 'string' },
-                  team: { type: 'string', enum: ['Northbridge', 'Eastport'] },
+                  team: { type: 'string', enum: teams },
                 },
                 required: ['id', 'name', 'team'],
               },
@@ -110,7 +111,7 @@ const CLAIM_SCHEMA = {
                     type: 'object',
                     additionalProperties: false,
                     properties: {
-                      opponent: { type: 'string', enum: ['Northbridge', 'Eastport'] },
+                      opponent: { type: 'string', enum: teams },
                       opponentPlayer: {
                         anyOf: [
                           {
@@ -119,7 +120,7 @@ const CLAIM_SCHEMA = {
                             properties: {
                               id: { type: 'string' },
                               name: { type: 'string' },
-                              team: { type: 'string', enum: ['Northbridge', 'Eastport'] },
+                              team: { type: 'string', enum: teams },
                             },
                             required: ['id', 'name', 'team'],
                           },
@@ -213,6 +214,7 @@ const CLAIM_SCHEMA = {
     },
   },
   required: ['claims'],
+  }
 }
 
 export class FoundryInterpretationProvider implements InterpretationProvider {
@@ -240,6 +242,7 @@ export class FoundryInterpretationProvider implements InterpretationProvider {
   ): Promise<unknown> {
     const endpoint = `${this.configuration.baseUrl.replace(/\/+$/, '')}/chat/completions`
     const timeoutSignal = AbortSignal.timeout(30_000)
+    const availableTeams = [...new Set(context.players.map(({ team }) => team))]
     let response: Response
     try {
       response = await this.request(endpoint, {
@@ -286,7 +289,7 @@ For a historical circumstance or judgement about play before a goal (for example
               opinion,
               selectedTime: context.selectedTime,
               selectedPeriod: context.period,
-              availableTeams: ['Northbridge', 'Eastport'],
+              availableTeams,
               availableEvidenceCapabilities: context.capabilities,
               availablePlayers: context.players.map(({ id, name, team, status }) => ({
                 id,
@@ -313,7 +316,7 @@ For a historical circumstance or judgement about play before a goal (for example
           json_schema: {
             name: 'claim_interpretation',
             strict: true,
-            schema: CLAIM_SCHEMA,
+            schema: claimSchema(availableTeams),
           },
         },
         }),
