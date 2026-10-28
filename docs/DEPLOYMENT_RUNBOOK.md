@@ -126,13 +126,13 @@ Record each result with the deployment URL, workflow run URL, deployed SHA, brow
 
 This is a proposed, capped acceptance rehearsal, not an approved judging allowance. Do **not** run it until the authorized owner approves it, provisions the required backend resources, supplies the judge code out-of-band and authorizes a temporary test configuration. Use an isolated table with a fresh allowance window, a shared cap no greater than six, and a per-client cap sufficient for the planned requests from the test client. The owner chooses a window long enough to finish. Failed and timed-out outbound attempts count. Never copy these rehearsal limits into the eventual judging configuration.
 
-Pin the run to application commit `0bda367ab0d7b9ff3f3da78b9b7c031ac8df1b56`. The proposed maximum set is:
+Pin the run to final application commit `c31c274c1323a71efca99dac6c586500df3eaaca`, which includes the normal merge of current `Origin/main`. The proposed maximum set is:
 
 1. Submit one prepared Northbridge–Eastport opinion at 57′. Expect one Foundry interpreter call, correct fixture/time/evidence and Foundry provenance; the ordinary public route must still report local rules.
 2. Submit an ambiguous Bruno judgement at 58′. Expect the player choices. Resolve one choice through the signed continuation; expect attributed records and limitations with **no additional interpreter call**.
 3. Submit one prepared opinion for each of the other three fixtures. Expect every response to use only its fixture context and calculated evidence.
 4. Explicitly recheck the prepared 57′ baseline opinion at 58′. Expect one correctly scoped additional call and comparison.
-5. This planned set uses at most six outbound attempts. Do not send an extra request to demonstrate exhaustion; explicit denial-at-exhaustion and concurrent overflow are already tested offline against Azurite. Language changes, player selection, replay movement, squad browsing, copy and PNG inspection must not create additional calls.
+5. The six planned analyses use at most six outbound attempts; resolving the clarification uses no additional call. Do not send an extra request to demonstrate exhaustion; explicit denial-at-exhaustion and concurrent overflow are already tested offline against Azurite. Language changes, replay movement, squad browsing, copy and PNG inspection must not create additional calls.
 
 Capture expected outcomes before any authorized run. Stop immediately for an unexpected provider, fixture, identity, selected time, evidence, allowance count, secret exposure, invalid output or stale/mixed-scope content. Do not retry unless the retry is part of the six-call budget. Record sanitized request counts/statuses only, never access codes, keys or raw credentials. This plan is a proposal only; it has not been run.
 
@@ -141,7 +141,7 @@ Capture expected outcomes before any authorized run. Stop immediately for an une
 - Offline verification covers the local public path, access-code rejection, shared/per-client limits, concurrency and restart persistence through fakes and the actual Azure Table SDK against Azurite, real ETag conflicts, missing-table/storage failure, exhaustion and failed-attempt reservation, continuation without a second interpreter call, and fixture-specific contexts.
 - Azurite is a local emulator, not Azure. Hosted app settings, Azure-hosted Table Storage, hosted Foundry calls and a real iPhone are **not verified**.
 - Hosted public acceptance, native iPhone sharing, independent native-speaker/screen-reader review and load testing remain outstanding.
-- No merge, deployment, Azure resource change, credential change or live model/translation call was made.
+- The feature branch was normally merged with current `Origin/main`; no release PR was merged into main. No deployment, Azure resource change, credential change or live model/translation call was made.
 
 ## Remaining AI release blockers
 
