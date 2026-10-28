@@ -1,4 +1,10 @@
-# Next-session handoff
+# Current status: post-deadline public-AI access repair
+
+The separate branch `repair/public-ai-access` was created from current fetched `Origin/main` (`0f4eb27`). It removes the judge-code gate, enables anonymous Foundry analysis only through backend setting `FOUNDRY_PUBLIC_ENABLED`, keeps local rules as an explicit option, and uses the existing durable `FoundryJudging` table with 200 shared / 200 per-client attempts and an 8,760-hour window. The existing row/counts, signing key, 8,192 completion-token maximum and no-retry behavior are preserved. No deployment, merge, live model call, Azure change or credential change was made; the currently deployed version is unchanged.
+
+Verification after this repair: API **385/385**, Azurite **7/7**, web **160/160**, API/web builds, web lint and `git diff --check` pass. All model transports were stubbed. Hosted Azure, hosted Foundry and real-device behavior remain unverified. See [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md), [PR_DESCRIPTION.md](./PR_DESCRIPTION.md) and [SUBMISSION.md](./SUBMISSION.md).
+
+## Historical session handoff
 
 ## Arabic identity and presentation completion (application commit `d61bd5d`)
 

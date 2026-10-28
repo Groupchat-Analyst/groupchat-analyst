@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ANALYSIS_TIMEOUT_MS, AnalysisTimeoutError, requestAnalysis, requestFoundryAccess } from './analysisClient.ts'
+import { ANALYSIS_TIMEOUT_MS, AnalysisRequestError, AnalysisTimeoutError, requestAnalysis } from './analysisClient.ts'
 
 function fakeTimers() {
   const timers = new Map()
@@ -97,12 +97,11 @@ test('success and server errors clear the timer', async () => {
   assert.equal(clock.timers.size, 0)
 })
 
-test('judge access code is sent only in the protected request header', async () => {
+test('public analysis sends no access credential and local mode can only request local rules', async () => {
   const requests = []
   await requestAnalysis(
     { opinion: 'test' },
     {
-      accessCode: 'test-code-held-in-memory',
       fetchImpl: async (url, init) => {
         requests.push({ url, init })
         return jsonResponse({ ok: true })
@@ -118,21 +117,38 @@ test('judge access code is sent only in the protected request header', async () 
       },
     },
   )
+  await requestAnalysis(
+    { opinion: 'local' },
+    {
+      localRulesOnly: true,
+      fetchImpl: async (url, init) => {
+        requests.push({ url, init })
+        return jsonResponse({ ok: true })
+      },
+    },
+  )
   assert.equal(requests[0].url, '/api/analyze')
-  assert.equal(requests[0].init.headers['x-foundry-judge-code'], 'test-code-held-in-memory')
-  assert.equal(requests[0].init.body.includes('test-code-held-in-memory'), false)
-  assert.equal(requests[1].init.headers['x-foundry-judge-code'], undefined)
+  assert.equal(requests[0].init.headers['x-foundry-judge-code'], undefined)
+  assert.equal(requests[0].init.body.includes('code'), false)
+  assert.equal(requests[1].init.headers['x-analysis-mode'], undefined)
+  assert.equal(requests[2].init.headers['x-analysis-mode'], 'local')
 })
 
-test('judge access validation posts the code to the server without a model request', async () => {
-  let captured
-  await requestFoundryAccess('test-code-held-in-memory', async (url, init) => {
-    captured = { url, init }
-    return jsonResponse({ enabled: true })
-  })
-  assert.equal(captured.url, '/api/foundry-access')
-  assert.deepEqual(JSON.parse(captured.init.body), { code: 'test-code-held-in-memory' })
-  assert.equal(captured.init.headers['content-type'], 'application/json')
+test('server error codes remain available for localized failure presentation', async () => {
+  await assert.rejects(
+    requestAnalysis(
+      {},
+      {
+        fetchImpl: async () => jsonResponse({
+          error: 'The shared AI request allowance is exhausted. Use local rules instead.',
+          errorCode: 'foundry_allowance_exhausted',
+        }, 429),
+      },
+    ),
+    (error) =>
+      error instanceof AnalysisRequestError &&
+      error.code === 'foundry_allowance_exhausted',
+  )
 })
 
 test('a superseding abort cancels the fetch and clears the timer without a timeout error', async () => {

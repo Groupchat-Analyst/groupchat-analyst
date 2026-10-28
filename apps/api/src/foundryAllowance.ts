@@ -30,7 +30,7 @@ export type FoundryAllowanceSettings = {
 
 export class FoundryAllowanceConfigurationError extends Error {
   constructor() {
-    super('Judge AI allowance storage and positive request limits are required.')
+    super('AI allowance storage and positive request limits are required.')
     this.name = 'FoundryAllowanceConfigurationError'
   }
 }
@@ -38,7 +38,7 @@ export class FoundryAllowanceConfigurationError extends Error {
 export class FoundryAllowanceUnavailableError extends Error {
   constructor(cause?: unknown) {
     super(
-      'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
+      'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
       { cause },
     )
     this.name = 'FoundryAllowanceUnavailableError'
@@ -51,8 +51,8 @@ export class FoundryAllowanceExceededError extends Error {
   constructor(scope: 'total' | 'client') {
     super(
       scope === 'total'
-        ? 'The shared judge AI request allowance is exhausted. Use local rules or contact the judge.'
-        : 'Your judge AI request allowance is exhausted. Use local rules or try again later.',
+        ? 'The shared AI request allowance is exhausted. Use local rules instead.'
+        : 'The AI request allowance for this network is exhausted. Use local rules instead or try again later.',
     )
     this.name = 'FoundryAllowanceExceededError'
     this.scope = scope
@@ -70,7 +70,7 @@ export function foundryAllowanceSettings(
 ): FoundryAllowanceSettings {
   const tableName =
     environment.FOUNDRY_ALLOWANCE_TABLE_NAME?.trim() ??
-    'FoundryRequestAllowance'
+    'FoundryJudging'
   const maxRequests = positiveInteger(
     environment.FOUNDRY_ALLOWANCE_MAX_REQUESTS,
   )
