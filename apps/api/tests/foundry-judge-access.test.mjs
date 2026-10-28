@@ -69,6 +69,13 @@ class SharedMemoryTable {
     this.entity = structuredClone(entity)
     this.revision += 1
   }
+
+  async *listEntities() {
+    if (this.fail) throw new Error('test storage unavailable')
+    if (this.entity) {
+      yield { ...this.entity, etag: String(this.revision) }
+    }
+  }
 }
 
 function request(body, code, forwardedFor = '192.0.2.10') {

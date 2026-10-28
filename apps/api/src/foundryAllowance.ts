@@ -18,7 +18,7 @@ type AllowanceEntity = {
 
 type AllowanceTable = Pick<
   TableClient,
-  'getEntity' | 'createEntity' | 'updateEntity'
+  'getEntity' | 'createEntity' | 'updateEntity' | 'listEntities'
 >
 
 export type FoundryAllowanceSettings = {
@@ -36,9 +36,10 @@ export class FoundryAllowanceConfigurationError extends Error {
 }
 
 export class FoundryAllowanceUnavailableError extends Error {
-  constructor() {
+  constructor(cause?: unknown) {
     super(
       'Judge AI request allowance is unavailable. No model request was made. Use local rules or try again later.',
+      { cause },
     )
     this.name = 'FoundryAllowanceUnavailableError'
   }
@@ -106,10 +107,28 @@ function storageStatus(error: unknown): { status?: number; code?: string } {
     'statusCode' in error && typeof error.statusCode === 'number'
       ? error.statusCode
       : undefined
-  const code =
+  const directCode =
     'code' in error && typeof error.code === 'string'
       ? error.code
       : undefined
+  const details =
+    'details' in error &&
+    typeof error.details === 'object' &&
+    error.details !== null
+      ? error.details
+      : undefined
+  const detailCode =
+    details && 'errorCode' in details && typeof details.errorCode === 'string'
+      ? details.errorCode
+      : details &&
+          'odataError' in details &&
+          typeof details.odataError === 'object' &&
+          details.odataError !== null &&
+          'code' in details.odataError &&
+          typeof details.odataError.code === 'string'
+        ? details.odataError.code
+        : undefined
+  const code = directCode ?? detailCode
   return { status, code }
 }
 
@@ -129,8 +148,8 @@ function parseClientCounts(value: string): Record<string, number> {
   let parsed: unknown
   try {
     parsed = JSON.parse(value)
-  } catch {
-    throw new FoundryAllowanceUnavailableError()
+  } catch (error) {
+    throw new FoundryAllowanceUnavailableError(error)
   }
   if (
     typeof parsed !== 'object' ||
@@ -176,9 +195,17 @@ export class AzureTableFoundryAllowance {
 
   async checkAvailable(): Promise<void> {
     try {
-      await this.read()
-    } catch {
-      throw new FoundryAllowanceUnavailableError()
+      const entities = this.table.listEntities<AllowanceEntity>({
+        queryOptions: {
+          filter: `PartitionKey eq '${PARTITION_KEY}' and RowKey eq '${ROW_KEY}'`,
+        },
+      })
+      for await (const entity of entities) {
+        validateAllowanceEntity(entity)
+        break
+      }
+    } catch (error) {
+      throw new FoundryAllowanceUnavailableError(error)
     }
   }
 
@@ -189,8 +216,8 @@ export class AzureTableFoundryAllowance {
       let existing: AllowanceEntity | null
       try {
         existing = await this.read()
-      } catch {
-        throw new FoundryAllowanceUnavailableError()
+      } catch (error) {
+        throw new FoundryAllowanceUnavailableError(error)
       }
 
       if (existing && existing.windowStart > windowStart) {
@@ -235,7 +262,7 @@ export class AzureTableFoundryAllowance {
         return
       } catch (error) {
         if (isConditionalConflict(error)) continue
-        throw new FoundryAllowanceUnavailableError()
+        throw new FoundryAllowanceUnavailableError(error)
       }
     }
     throw new FoundryAllowanceUnavailableError()
@@ -257,12 +284,18 @@ export class AzureTableFoundryAllowance {
 
 export function createAzureTableFoundryAllowance(
   environment: NodeJS.ProcessEnv,
+  clientOptions?: Parameters<typeof TableClient.fromConnectionString>[2],
 ): AzureTableFoundryAllowance {
-  const connectionString = environment.AzureWebJobsStorage?.trim()
+  const connectionString =
+    environment.FOUNDRY_ALLOWANCE_STORAGE_CONNECTION_STRING?.trim()
   if (!connectionString) throw new FoundryAllowanceConfigurationError()
   const settings = foundryAllowanceSettings(environment)
   return new AzureTableFoundryAllowance(
-    TableClient.fromConnectionString(connectionString, settings.tableName),
+    TableClient.fromConnectionString(
+      connectionString,
+      settings.tableName,
+      clientOptions,
+    ),
     settings,
   )
 }

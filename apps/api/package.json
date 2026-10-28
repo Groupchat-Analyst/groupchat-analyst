@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "azurite": "^3.37.0",
     "typescript": "~6.0.2"
   }
 }
