@@ -217,6 +217,79 @@ test('structured statistical replies and comparison labels are translated withou
   }
 })
 
+test('structured claim meaning and evidence-coverage messages have locale-specific wording', () => {
+  const expected = {
+    en: {
+      statistic: 'Selected-period request: shots on target for Eastport.',
+      judgement: 'A subjective performance judgement about Bruno Fernandes.',
+      evidence: 'Recorded synthetic event types: shots on target.',
+      playerEvidence: 'Player actions are sparse synthetic event records; they do not represent a complete performance dataset.',
+    },
+    es: {
+      statistic: 'Solicitud para el periodo seleccionado: tiros a puerta de Eastport.',
+      judgement: 'Un juicio subjetivo sobre el rendimiento de Bruno Fernandes.',
+      evidence: 'Tipos de eventos sintéticos registrados: tiros a puerta.',
+      playerEvidence: 'Las acciones de los jugadores son registros sintéticos y escasos; no constituyen un conjunto completo de datos de rendimiento.',
+    },
+    fr: {
+      statistic: 'Demande pour la période sélectionnée : tirs cadrés pour Eastport.',
+      judgement: 'Un jugement subjectif sur la performance de Bruno Fernandes.',
+      evidence: 'Types d’événements synthétiques enregistrés : tirs cadrés.',
+      playerEvidence: 'Les actions des joueurs sont des événements synthétiques peu nombreux ; elles ne constituent pas un jeu de données complet sur les performances.',
+    },
+    de: {
+      statistic: 'Anfrage für den ausgewählten Zeitraum: Schüsse aufs Tor von Eastport.',
+      judgement: 'Ein subjektives Urteil über die Leistung von Bruno Fernandes.',
+      evidence: 'Erfasste synthetische Ereignisarten: Schüsse aufs Tor.',
+      playerEvidence: 'Die Spieleraktionen sind wenige synthetische Ereignisse; sie bilden keinen vollständigen Leistungsdatensatz.',
+    },
+    ar: {
+      statistic: 'طلب الفترة المحددة: تسديدات على المرمى لدى إيستبورت.',
+      judgement: 'حكم شخصي على أداء برونو فرنانديز.',
+      evidence: 'أنواع الأحداث الاصطناعية المسجلة: تسديدات على المرمى.',
+      playerEvidence: 'أفعال اللاعبين سجلات أحداث اصطناعية محدودة، ولا تمثل بيانات أداء كاملة.',
+    },
+  }
+  for (const { code } of APP_LANGUAGES) {
+    const statistic = formatLocalizedMessage(
+      'Selected-period request: {metric} for {entity}.',
+      {
+        metric: translateText('shots on target', code),
+        entity: localizeMatchText('Eastport', fixtureRecords[0].id, code),
+      },
+      code,
+    )
+    const judgement = formatLocalizedMessage(
+      'A subjective performance judgement about {entity}.',
+      {
+        entity: localizedPlayerName(
+          fixtureRecords[0].id,
+          'east-player-08',
+          'Bruno Fernandes',
+          code,
+        ),
+      },
+      code,
+    )
+    const evidence = formatLocalizedMessage(
+      'Recorded synthetic event types: {evidence}.',
+      { evidence: translateText('shots on target', code) },
+      code,
+    )
+    assert.equal(statistic, expected[code].statistic, `${code} statistic meaning`)
+    assert.equal(judgement, expected[code].judgement, `${code} judgement meaning`)
+    assert.equal(evidence, expected[code].evidence, `${code} event type`)
+    assert.equal(
+      translateText(
+        'Player actions are sparse synthetic event records; they do not represent a complete performance dataset.',
+        code,
+      ),
+      expected[code].playerEvidence,
+      `${code} player event coverage`,
+    )
+  }
+})
+
 test('pre-question squad labels have explicit translations in every display language', () => {
   const expected = {
     en: [
