@@ -4,6 +4,8 @@
 
 This PR adds a bounded, access-code-protected Foundry path for an explicitly authorized judging session while preserving the public football evidence demo on local rules. The feature fails closed unless the backend enables it and supplies valid Foundry configuration, a separate judge access code, and a pre-provisioned shared Azure Table allowance.
 
+Application commit: `208dcbfcdd2a68a11ab6b2e5cc93da9a1be5fb77` on `feature/explore-more-matches`. At last fetch, the branch was four commits ahead and one behind `Origin/main`; no merge or rebase was performed.
+
 ## Included functionality
 
 - Preserve the public local-rules provider; the public provider factory rejects a Foundry override, and only a server-validated judge request can select the Foundry adapter.

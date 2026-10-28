@@ -8,7 +8,9 @@ Status: **implementation prepared, not deployed**. This branch contains the publ
 | --- | --- |
 | PR base | `main` |
 | Candidate branch | `feature/explore-more-matches` |
-| Application commit | Record the final pushed branch SHA after review |
+| Application commit | `208dcbfcdd2a68a11ab6b2e5cc93da9a1be5fb77` |
+| `Origin/main` at last fetch | `b2f781de81b37aedd58f681263639d44dbde4abf` |
+| Branch relation at last fetch | Four commits ahead and one commit behind; no merge/rebase performed |
 | Workflow | `.github/workflows/shared-preview.yml` |
 | Trigger | `workflow_dispatch` only; job runs only when dispatched from `main` |
 | Source pin | `actions/checkout` checks out `${{ github.sha }}` |
