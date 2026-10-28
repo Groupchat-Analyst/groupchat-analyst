@@ -173,8 +173,14 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Needs clarification': 'Necesita aclaración',
     'Clarification needed': 'Aclaración necesaria',
     'Statistics only, no verdict': 'Solo estadísticas, sin veredicto',
+    'Statistics provided: {figures}': 'Estadísticas: {figures}',
     'Data not recorded': 'Dato no registrado',
     'Not understood': 'No se ha entendido',
+    'Both teams': 'Ambos equipos',
+    vs: 'contra',
+    'defensive shape and positioning (not recorded, so no verdict)': 'la forma defensiva y el posicionamiento no están registrados; no hay veredicto',
+    '% possession': '% de posesión',
+    '% pass completion': '% de precisión de pase',
     'Clarification:': 'Aclaración:',
     Limitation: 'Limitación',
     'Limitation:': 'Limitación:',
@@ -298,6 +304,38 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Unrecorded player': 'Jugador no registrado',
     'Recorded events in match order': 'Eventos registrados por orden del partido',
     'Nothing recorded yet.': 'Aún no hay eventos registrados.',
+    'View squads': 'Ver las plantillas',
+    'Familiar names. Fictional teams and performances.': 'Nombres conocidos. Equipos y actuaciones ficticios.',
+    Starters: 'Titulares',
+    Substitutes: 'Suplentes',
+    'Participation: on-pitch': 'Participación: en el campo en este momento',
+    'Participation: participated': 'Participación: jugó antes; ahora no está en el campo',
+    'Participation: unused-substitute': 'Participación: suplente no utilizado hasta este momento',
+    'Participation: not-yet-on-pitch': 'Participación: todavía no había entrado en este momento',
+    'Recorded shots: {value}': 'Tiros registrados: {value}',
+    'Recorded pass completions: {completed}/{attempts}': 'Pases completados registrados: {completed}/{attempts}',
+    'Recorded recoveries: {value}': 'Recuperaciones registradas: {value}',
+    'Participation minutes: {value}': 'Minutos de participación: {value}',
+    'Selected recorded window: {start}–{end}': 'Intervalo registrado seleccionado: {start}–{end}',
+    'Pass attempts: {value}': 'Intentos de pase: {value}',
+    'Pass completions: {value}': 'Pases completados: {value}',
+    'Pass completion rate: {value}': 'Porcentaje de pases completados: {value}',
+    'Shots on target: {value}': 'Tiros a puerta: {value}',
+    'Goals: {value}': 'Goles: {value}',
+    'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}': 'Pase registrado · {time} · {team} · {player} → {receiver} · {outcome}',
+    'Recorded recovery · {time} · {team} · {player} · after a recorded turnover': 'Recuperación registrada · {time} · {team} · {player} · tras una pérdida de balón registrada',
+    'Recorded shot · {time} · {team} · {player} · {outcome}': 'Tiro registrado · {time} · {team} · {player} · {outcome}',
+    'Recorded pressure · {time} · {team} · {player} · {type} · partial sample': 'Presión registrada · {time} · {team} · {player} · {type} · muestra parcial',
+    'Player not recorded': 'Jugador no registrado',
+    Complete: 'Completo',
+    Incomplete: 'Incompleto',
+    Goal: 'Gol',
+    Saved: 'Atajado',
+    Blocked: 'Bloqueado',
+    'Off target': 'Fuera',
+    Challenge: 'Desafío',
+    'Pressured pass': 'Pase presionado',
+    'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.': 'Estas acciones sintéticas y escasas solo aportan contexto. No constituyen una medida completa del rendimiento; no se infiere una calificación ni clasificación general del jugador.',
     'Nothing has been recorded yet.': 'Todavía no se ha registrado nada.',
     'Latest recorded moment': 'Último momento registrado',
     'One recorded event — it does not show who is on top.': 'Un evento registrado no demuestra qué equipo domina.',
@@ -466,8 +504,14 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Needs clarification': 'À préciser',
     'Clarification needed': 'Précision nécessaire',
     'Statistics only, no verdict': 'Statistiques uniquement, sans verdict',
+    'Statistics provided: {figures}': 'Statistiques : {figures}',
     'Data not recorded': 'Donnée non enregistrée',
     'Not understood': 'Non compris',
+    'Both teams': 'Les deux équipes',
+    vs: 'contre',
+    'defensive shape and positioning (not recorded, so no verdict)': 'l’organisation défensive et le positionnement ne sont pas enregistrés ; aucun verdict',
+    '% possession': '% de possession',
+    '% pass completion': '% de réussite des passes',
     'Clarification:': 'Précision :',
     Limitation: 'Limite',
     'Limitation:': 'Limite :',
@@ -587,6 +631,38 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Unrecorded player': 'Joueur non enregistré',
     'Recorded events in match order': 'Événements enregistrés dans l’ordre du match',
     'Nothing recorded yet.': 'Aucun événement enregistré pour le moment.',
+    'View squads': 'Voir les effectifs',
+    'Familiar names. Fictional teams and performances.': 'Des noms familiers. Des équipes et des performances fictives.',
+    Starters: 'Titulaires',
+    Substitutes: 'Remplaçants',
+    'Participation: on-pitch': 'Participation : sur le terrain à cet instant',
+    'Participation: participated': 'Participation : a joué plus tôt, sans être sur le terrain actuellement',
+    'Participation: unused-substitute': 'Participation : remplaçant non utilisé à cet instant',
+    'Participation: not-yet-on-pitch': 'Participation : pas encore entré à cet instant',
+    'Recorded shots: {value}': 'Tirs enregistrés : {value}',
+    'Recorded pass completions: {completed}/{attempts}': 'Passes réussies enregistrées : {completed}/{attempts}',
+    'Recorded recoveries: {value}': 'Récupérations enregistrées : {value}',
+    'Participation minutes: {value}': 'Minutes de participation : {value}',
+    'Selected recorded window: {start}–{end}': 'Période enregistrée sélectionnée : {start}–{end}',
+    'Pass attempts: {value}': 'Tentatives de passe : {value}',
+    'Pass completions: {value}': 'Passes réussies : {value}',
+    'Pass completion rate: {value}': 'Taux de passes réussies : {value}',
+    'Shots on target: {value}': 'Tirs cadrés : {value}',
+    'Goals: {value}': 'Buts : {value}',
+    'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}': 'Passe enregistré · {time} · {team} · {player} → {receiver} · {outcome}',
+    'Recorded recovery · {time} · {team} · {player} · after a recorded turnover': 'Récupération enregistrée · {time} · {team} · {player} · après une perte de balle enregistrée',
+    'Recorded shot · {time} · {team} · {player} · {outcome}': 'Tir enregistré · {time} · {team} · {player} · {outcome}',
+    'Recorded pressure · {time} · {team} · {player} · {type} · partial sample': 'Pression enregistrée · {time} · {team} · {player} · {type} · échantillon partiel',
+    'Player not recorded': 'Joueur non enregistré',
+    Complete: 'Réussi',
+    Incomplete: 'Manqué',
+    Goal: 'But',
+    Saved: 'Arrêté',
+    Blocked: 'Contré',
+    'Off target': 'Hors cadre',
+    Challenge: 'Défi',
+    'Pressured pass': 'Passe sous pression',
+    'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.': 'Ces quelques actions synthétiques donnent uniquement du contexte. Elles ne constituent pas une mesure complète de la performance ; aucune note ni aucun classement général du joueur n’est déduit.',
     'Nothing has been recorded yet.': 'Aucun événement n’a encore été enregistré.',
     'Latest recorded moment': 'Dernier moment enregistré',
     'One recorded event — it does not show who is on top.': 'Un événement enregistré ne montre pas quelle équipe domine.',
@@ -755,8 +831,14 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Needs clarification': 'Rückfrage nötig',
     'Clarification needed': 'Rückfrage erforderlich',
     'Statistics only, no verdict': 'Nur Statistik, kein Urteil',
+    'Statistics provided: {figures}': 'Statistiken: {figures}',
     'Data not recorded': 'Daten nicht erfasst',
     'Not understood': 'Nicht verstanden',
+    'Both teams': 'Beide Teams',
+    vs: 'gegen',
+    'defensive shape and positioning (not recorded, so no verdict)': 'Defensivformation und Positionierung sind nicht erfasst; kein Urteil',
+    '% possession': '% Ballbesitz',
+    '% pass completion': '% Passgenauigkeit',
     'Clarification:': 'Rückfrage:',
     Limitation: 'Einschränkung',
     'Limitation:': 'Einschränkung:',
@@ -876,6 +958,38 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Unrecorded player': 'Spieler nicht erfasst',
     'Recorded events in match order': 'Erfasste Ereignisse in Spielreihenfolge',
     'Nothing recorded yet.': 'Noch nichts erfasst.',
+    'View squads': 'Kader ansehen',
+    'Familiar names. Fictional teams and performances.': 'Vertraute Namen. Fiktive Teams und Leistungen.',
+    Starters: 'Startelf',
+    Substitutes: 'Ersatzspieler',
+    'Participation: on-pitch': 'Einsatz: zu diesem Zeitpunkt auf dem Platz',
+    'Participation: participated': 'Einsatz: zuvor gespielt, derzeit nicht auf dem Platz',
+    'Participation: unused-substitute': 'Einsatz: bis zu diesem Zeitpunkt nicht eingewechselt',
+    'Participation: not-yet-on-pitch': 'Einsatz: zu diesem Zeitpunkt noch nicht eingewechselt',
+    'Recorded shots: {value}': 'Erfasste Schüsse: {value}',
+    'Recorded pass completions: {completed}/{attempts}': 'Erfasste erfolgreiche Pässe: {completed}/{attempts}',
+    'Recorded recoveries: {value}': 'Erfasste Balleroberungen: {value}',
+    'Participation minutes: {value}': 'Einsatzminuten: {value}',
+    'Selected recorded window: {start}–{end}': 'Ausgewählter erfasster Zeitraum: {start}–{end}',
+    'Pass attempts: {value}': 'Passversuche: {value}',
+    'Pass completions: {value}': 'Erfolgreiche Pässe: {value}',
+    'Pass completion rate: {value}': 'Passquote: {value}',
+    'Shots on target: {value}': 'Schüsse aufs Tor: {value}',
+    'Goals: {value}': 'Tore: {value}',
+    'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}': 'Erfasster Pass · {time} · {team} · {player} → {receiver} · {outcome}',
+    'Recorded recovery · {time} · {team} · {player} · after a recorded turnover': 'Erfasste Balleroberung · {time} · {team} · {player} · nach einem erfassten Ballverlust',
+    'Recorded shot · {time} · {team} · {player} · {outcome}': 'Erfasster Schuss · {time} · {team} · {player} · {outcome}',
+    'Recorded pressure · {time} · {team} · {player} · {type} · partial sample': 'Erfasster Druck · {time} · {team} · {player} · {type} · Teilauswahl',
+    'Player not recorded': 'Spieler nicht erfasst',
+    Complete: 'Vollständig',
+    Incomplete: 'Unvollständig',
+    Goal: 'Tor',
+    Saved: 'Gehalten',
+    Blocked: 'Geblockt',
+    'Off target': 'Daneben',
+    Challenge: 'Zweikampf',
+    'Pressured pass': 'Pass unter Druck',
+    'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.': 'Diese wenigen synthetischen Aktionen dienen nur als Kontext. Sie bilden keine vollständige Leistungsbewertung; eine Gesamtwertung oder Rangliste des Spielers wird nicht abgeleitet.',
     'Nothing has been recorded yet.': 'Bisher wurde nichts erfasst.',
     'Latest recorded moment': 'Letzter erfasster Moment',
     'One recorded event — it does not show who is on top.': 'Ein erfasstes Ereignis zeigt nicht, welches Team überlegen ist.',
@@ -1045,8 +1159,11 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Needs clarification': 'يحتاج إلى توضيح',
     'Clarification needed': 'يلزم التوضيح',
     'Statistics only, no verdict': 'إحصاءات فقط، دون حكم',
+    'Statistics provided: {figures}': 'إحصاءات: {figures}',
     'Data not recorded': 'البيانات غير مسجلة',
     'Not understood': 'لم يُفهم',
+    'vs': 'ضد',
+    'defensive shape and positioning (not recorded, so no verdict)': 'الشكل الدفاعي والتمركز غير مسجلين؛ لا يصدر حكم',
     'Clarification:': 'التوضيح:',
     Limitation: 'القيد',
     'Limitation:': 'القيد:',
@@ -1164,6 +1281,38 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Unrecorded player': 'لاعب غير مسجل',
     'Recorded events in match order': 'الأحداث المسجلة بترتيب المباراة',
     'Nothing recorded yet.': 'لم يُسجل شيء بعد.',
+    'View squads': 'عرض التشكيلات',
+    'Familiar names. Fictional teams and performances.': 'أسماء مألوفة. فرق وأداء خيالي.',
+    Starters: 'اللاعبون الأساسيون',
+    Substitutes: 'البدلاء',
+    'Participation: on-pitch': 'المشاركة: داخل الملعب في هذا الوقت',
+    'Participation: participated': 'المشاركة: لعب سابقًا وهو خارج الملعب الآن',
+    'Participation: unused-substitute': 'المشاركة: بديل لم يشارك حتى هذا الوقت',
+    'Participation: not-yet-on-pitch': 'المشاركة: لم يدخل الملعب بعد في هذا الوقت',
+    'Recorded shots: {value}': 'التسديدات المسجلة: {value}',
+    'Recorded pass completions: {completed}/{attempts}': 'التمريرات المكتملة المسجلة: {completed}/{attempts}',
+    'Recorded recoveries: {value}': 'الاستردادات المسجلة: {value}',
+    'Participation minutes: {value}': 'دقائق المشاركة: {value}',
+    'Selected recorded window: {start}–{end}': 'الفترة المسجلة المحددة: {start}–{end}',
+    'Pass attempts: {value}': 'محاولات التمرير: {value}',
+    'Pass completions: {value}': 'التمريرات المكتملة: {value}',
+    'Pass completion rate: {value}': 'نسبة التمريرات المكتملة: {value}',
+    'Shots on target: {value}': 'التسديدات على المرمى: {value}',
+    'Goals: {value}': 'الأهداف: {value}',
+    'Recorded pass · {time} · {team} · {player} → {receiver} · {outcome}': 'تمريرة مسجلة · {time} · {team} · {player} → {receiver} · {outcome}',
+    'Recorded recovery · {time} · {team} · {player} · after a recorded turnover': 'استرداد مسجل · {time} · {team} · {player} · بعد فقدان كرة مسجل',
+    'Recorded shot · {time} · {team} · {player} · {outcome}': 'تسديدة مسجلة · {time} · {team} · {player} · {outcome}',
+    'Recorded pressure · {time} · {team} · {player} · {type} · partial sample': 'ضغط مسجل · {time} · {team} · {player} · {type} · عينة جزئية',
+    'Player not recorded': 'اللاعب غير مسجل',
+    Complete: 'مكتملة',
+    Incomplete: 'غير مكتملة',
+    Goal: 'هدف',
+    Saved: 'تم التصدي لها',
+    Blocked: 'تم اعتراضها',
+    'Off target': 'خارج المرمى',
+    Challenge: 'منافسة',
+    'Pressured pass': 'تمرير تحت الضغط',
+    'These sparse synthetic actions are context only. They are not a complete performance measure; no overall player rating or ranking is inferred.': 'هذه الأفعال الاصطناعية المحدودة للسياق فقط. ولا تمثل مقياسًا كاملًا للأداء؛ ولا يُستنتج منها تقييم أو ترتيب عام للاعب.',
     'Nothing has been recorded yet.': 'لم يُسجَّل أي حدث حتى الآن.',
     'Latest recorded moment': 'أحدث لحظة مسجلة',
     'One recorded event — it does not show who is on top.': 'حدث واحد مسجل لا يوضح أي فريق يسيطر.',
@@ -1715,6 +1864,20 @@ export function translateText(text: string, language: AppLanguage): string {
   return `${leading}${translated}${trailing}`
 }
 
+export function formatLocalizedMessage(
+  template: string,
+  parameters: Readonly<Record<string, string | number>>,
+  language: AppLanguage,
+): string {
+  return translateText(template, language).replace(/\{([a-zA-Z]+)\}/gu, (_token, key: string) => {
+    const value = parameters[key]
+    if (value === undefined) {
+      throw new Error(`Missing localization parameter "${key}" for message "${template}".`)
+    }
+    return String(value)
+  })
+}
+
 function arabicCountedMetricLabel(countText: string, metric: string): string | undefined {
   const forms: Record<string, { singular: string; dual: string; plural: string }> = {
     'shots on target': {
@@ -2107,16 +2270,35 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   }
 
   const recentPeriod = text.match(/^Last 10 minutes ending (.+)$/u)
-  if (recentPeriod) return `آخر عشر دقائق حتى ${recentPeriod[1]}`
+  if (recentPeriod) {
+    return {
+      es: `Los últimos 10 minutos hasta ${recentPeriod[1]}`,
+      fr: `Les 10 dernières minutes jusqu’à ${recentPeriod[1]}`,
+      de: `Die letzten 10 Minuten bis ${recentPeriod[1]}`,
+      ar: `آخر عشر دقائق حتى ${recentPeriod[1]}`,
+    }[language]
+  }
 
   const claimEvidenceCount = text.match(/^All (\d+) claim evidence references$/u)
   if (claimEvidenceCount) {
     const count = claimEvidenceCount[1]
-    return `كل مراجع الأدلة الخاصة بالادعاء (${count})`
+    return {
+      es: `Todas las ${count} referencias de evidencia de la afirmación`,
+      fr: `Les ${count} références aux preuves de l’affirmation`,
+      de: `Alle ${count} Belegverweise zur Aussage`,
+      ar: `كل مراجع الأدلة الخاصة بالادعاء (${count})`,
+    }[language]
   }
 
   const claimNumber = text.match(/^Claim (\d+)$/u)
-  if (claimNumber) return `الادعاء ${claimNumber[1]}`
+  if (claimNumber) {
+    return {
+      es: `Afirmación ${claimNumber[1]}`,
+      fr: `Affirmation ${claimNumber[1]}`,
+      de: `Aussage ${claimNumber[1]}`,
+      ar: `الادعاء ${claimNumber[1]}`,
+    }[language]
+  }
 
   const playerMetricExplanation = text.match(
     /^Report (.+?) for (.+?) from selected synthetic records\.$/u,
@@ -2124,22 +2306,58 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   if (playerMetricExplanation) {
     const metric = playerMetricExplanation[1]
     const player = playerMetricExplanation[2]
-    const metricLabel = metric === 'pass completions'
-      ? 'عدد التمريرات المكتملة'
-      : metric === 'pass attempts'
-        ? 'عدد محاولات التمرير'
-        : metric === 'shots on target'
-          ? 'عدد التسديدات على المرمى'
-          : metric === 'shots'
-            ? 'عدد التسديدات'
-            : metric === 'goals'
-              ? 'عدد الأهداف'
-              : metric === 'recoveries'
-                ? 'عدد الاستعادات'
-                : metric === 'pressure observations'
-                  ? 'عدد ملاحظات الضغط'
-                  : metric
-    return `يعرض ${metricLabel} المسجلة للاعب ${player} ضمن السجلات الاصطناعية للفترة المحددة.`
+    const metricLabels: Record<string, Record<Exclude<AppLanguage, 'en'>, string>> = {
+      'pass completions': {
+        es: 'los pases completados',
+        fr: 'les passes réussies',
+        de: 'die erfolgreichen Pässe',
+        ar: 'التمريرات المكتملة',
+      },
+      'pass attempts': {
+        es: 'los intentos de pase',
+        fr: 'les tentatives de passe',
+        de: 'die Passversuche',
+        ar: 'محاولات التمرير',
+      },
+      'shots on target': {
+        es: 'los tiros a puerta',
+        fr: 'les tirs cadrés',
+        de: 'die Schüsse aufs Tor',
+        ar: 'التسديدات على المرمى',
+      },
+      shots: {
+        es: 'los tiros',
+        fr: 'les tirs',
+        de: 'die Schüsse',
+        ar: 'التسديدات',
+      },
+      goals: {
+        es: 'los goles',
+        fr: 'les buts',
+        de: 'die Tore',
+        ar: 'الأهداف',
+      },
+      recoveries: {
+        es: 'las recuperaciones',
+        fr: 'les récupérations',
+        de: 'die Balleroberungen',
+        ar: 'الاستردادات',
+      },
+      'pressure observations': {
+        es: 'las observaciones de presión',
+        fr: 'les observations de pressing',
+        de: 'die Pressing-Beobachtungen',
+        ar: 'ملاحظات الضغط',
+      },
+    }
+    const localizedMetric = metricLabels[metric]
+    if (!localizedMetric) return text
+    return {
+      es: `Los registros sintéticos del período seleccionado muestran ${localizedMetric.es} de ${player}.`,
+      fr: `Les données synthétiques de la période sélectionnée recensent ${localizedMetric.fr} pour ${player}.`,
+      de: `Die synthetischen Aufzeichnungen des ausgewählten Zeitraums zeigen ${localizedMetric.de} für ${player}.`,
+      ar: `تُظهر السجلات الاصطناعية للفترة المحددة ${localizedMetric.ar} للاعب ${player}.`,
+    }[language]
   }
 
   const sameWording = text.match(/^Same wording, same (match-so-far|last-10-minutes) option( — this checks the saved opinion, not your edit)?\.$/u)

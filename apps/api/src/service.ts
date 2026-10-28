@@ -51,8 +51,10 @@ import { LocalInterpretationProvider } from './providers/local.js'
 import {
   classifyOpinion,
   DEFENSIVE_SHAPE_PATTERN,
+  evidenceForTopic,
   topicLimitation,
 } from '../../shared/src/opinionTopics.js'
+import { playerParticipationAt } from '../../shared/src/playerParticipation.js'
 import {
   goalBeforeHalfTimeAssertion,
   hasExplicitBuildUpPassingScope,
@@ -621,25 +623,7 @@ function participationStatus(
   fixture: SyntheticMatchEvidence,
   endElapsed: number,
 ): AnalysisResponse['evidenceFoundation']['players'][number]['participation'] {
-  const subs = fixture.substitutions.filter(({ team }) => team === player.team)
-  const entered =
-    player.status === 'starter' ||
-    subs.some(
-      ({ playerOnId, clock }) =>
-        playerOnId === player.id && elapsedMatchMinute(clock) <= endElapsed,
-    )
-  const left = subs.some(
-    ({ playerOffId, clock }) =>
-      playerOffId === player.id && elapsedMatchMinute(clock) <= endElapsed,
-  )
-  if (entered && !left) return 'on-pitch'
-  if (entered) return 'participated'
-  const fullTime = elapsedMatchMinute({
-    period: 2,
-    minute: 90,
-    stoppageMinutes: 4,
-  })
-  return endElapsed >= fullTime ? 'unused-substitute' : 'not-yet-on-pitch'
+  return playerParticipationAt(player, fixture, endElapsed)
 }
 
 function evidenceForClaim(
@@ -2630,6 +2614,34 @@ function createEvidenceFoundation(
       recoveredBy: turnover.recoveredBy,
       provenance: turnover.provenance,
     })),
+    eventRecords: selectedEvents.map((event) => ({
+      id: event.id,
+      time: formatMatchClock(event.clock),
+      team: event.team,
+      type: event.type,
+      ...(event.type === 'shot' ? { outcome: event.outcome } : {}),
+      ...(event.type === 'shot' && event.playerId
+        ? { playerId: event.playerId }
+        : {}),
+    })),
+    recoveryRecords: advanced.recoveries.map((recovery) => ({
+      id: recovery.id,
+      team: recovery.team,
+      playerId: recovery.playerId,
+      time: formatMatchClock(recovery.clock),
+      turnoverId: recovery.turnoverId,
+      location: recovery.location,
+      provenance: recovery.provenance,
+    })),
+    pressureRecords: advanced.pressures.map((pressure) => ({
+      id: pressure.id,
+      team: pressure.team,
+      playerId: pressure.playerId,
+      time: formatMatchClock(pressure.clock),
+      type: pressure.type,
+      location: pressure.location,
+      provenance: pressure.provenance,
+    })),
     passReferences,
     turnoverReferences,
     recoveryReferences,
@@ -2799,16 +2811,28 @@ function playerCandidatesForClaim(
   naming: TeamNaming,
   datasetId: string,
 ): PlayerResolutionOption[] {
+  const performanceTopic =
+    claim.intent === 'subjective-judgement' &&
+    claim.meaning.category === 'performance-judgement'
+      ? classifyOpinion(claim.text)?.topic
+      : undefined
+  const isPlayerPerformanceClarification =
+    performanceTopic !== undefined &&
+    performanceTopic !== 'physical-condition' &&
+    performanceTopic !== 'prediction'
   if (
-    claim.intent !== 'statistical-request' ||
     claim.subject !== null ||
     claim.playerSubject !== null ||
-    claim.meaning.category !== 'other' ||
     claim.meaning.comparison !== null ||
     claim.clarificationNeeds.length === 0 ||
-    claim.playerMetric === null ||
-    !claim.requiredEvidence.some((kind) =>
-      ['passing', 'player-events', 'lineups'].includes(kind),
+    !(
+      (claim.intent === 'statistical-request' &&
+        claim.meaning.category === 'other' &&
+        claim.playerMetric !== null &&
+        claim.requiredEvidence.some((kind) =>
+          ['passing', 'player-events', 'lineups'].includes(kind),
+        )) ||
+      isPlayerPerformanceClarification
     )
   ) {
     return []
@@ -3059,11 +3083,21 @@ export async function resolvePlayerSelection(
   const player = validated.players.find(({ id }) => id === request.playerId)
   if (!player) throw new InputValidationError('Selected player is not in this fixture.')
   const resolvedClaims = validated.claims.map((claim, index) =>
-    index === claimIndex
-      ? {
+    {
+      if (index !== claimIndex) return claim
+      const performanceTopic =
+        claim.intent === 'subjective-judgement'
+          ? classifyOpinion(claim.text)?.topic
+          : undefined
+      return {
           ...claim,
           subject: player.team,
           playerSubject: player,
+          requiredEvidence:
+            performanceTopic && performanceTopic !== 'physical-condition' &&
+            performanceTopic !== 'prediction'
+              ? evidenceForTopic(performanceTopic, true)
+              : claim.requiredEvidence,
           meaning: {
             ...claim.meaning,
             description: claim.playerMetric
@@ -3072,7 +3106,7 @@ export async function resolvePlayerSelection(
           },
           clarificationNeeds: [],
         }
-      : claim,
+    },
   )
   let checkedClaims: InterpretedClaim[]
   try {

@@ -118,6 +118,13 @@ export type MatchReplayResponse = {
   datasetVersion?: string
   selectedTime: string
   score: Record<MatchTeam, number>
+  players: Array<{
+    id: string
+    team: MatchTeam
+    name: string
+    status: 'starter' | 'substitute'
+    participation: 'on-pitch' | 'participated' | 'unused-substitute' | 'not-yet-on-pitch'
+  }>
   events: Array<{
     id: string
     time: string
@@ -228,6 +235,32 @@ export type EvidenceFoundation = {
     location: { x: number; y: number }
     lostPassId: string
     recoveredBy: MatchTeam | null
+    provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
+  }>
+  eventRecords: Array<{
+    id: string
+    time: string
+    team: MatchTeam
+    type: 'shot' | 'other'
+    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target'
+    playerId?: string
+  }>
+  recoveryRecords: Array<{
+    id: string
+    team: MatchTeam
+    playerId: string
+    time: string
+    turnoverId: string
+    location: { x: number; y: number }
+    provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
+  }>
+  pressureRecords: Array<{
+    id: string
+    team: MatchTeam
+    playerId: string
+    time: string
+    type: 'challenge' | 'pressured-pass'
+    location: { x: number; y: number }
     provenance: 'synthetic' | 'observed' | 'inferred' | 'modelled'
   }>
   passReferences: EvidenceReference[]

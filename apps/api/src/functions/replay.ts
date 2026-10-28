@@ -11,6 +11,8 @@ import {
 } from '../../../shared/src/match.js'
 import { findCatalogEntry } from '../../../shared/src/datasetCatalog.js'
 import { toDisplay } from '../../../shared/src/teamNaming.js'
+import { elapsedMatchMinute } from '../../../shared/src/matchClock.js'
+import { playerParticipationAt } from '../../../shared/src/playerParticipation.js'
 import { resolveDataset } from '../datasets.js'
 import type { MatchReplayResponse } from '../../../shared/src/apiContracts.js'
 
@@ -51,12 +53,24 @@ export function getReplayFrame(
   const dataset = resolveDataset(datasetId)
 
   const analysis = analyzeMatch(dataset.events, clock, 'match-so-far')
+  const selectedElapsed = elapsedMatchMinute(clock)
 
   return toDisplay({
     datasetId: dataset.id,
     datasetVersion: dataset.version,
     selectedTime: formatMatchClock(clock),
     score: analysis.score,
+    players: dataset.evidence.players.map((player) => ({
+      id: player.id,
+      team: player.team,
+      name: player.name,
+      status: player.status,
+      participation: playerParticipationAt(
+        player,
+        dataset.evidence,
+        selectedElapsed,
+      ),
+    })),
     events: analysis.periodEvents.map((event) => ({
       id: event.id,
       time: formatMatchClock(event.clock),

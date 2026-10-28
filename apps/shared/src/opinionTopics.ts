@@ -78,8 +78,8 @@ const TOPIC_PATTERNS: Array<[OpinionTopic, RegExp]> = [
   [
     'overall-performance',
     new RegExp(
-      `\\b(?:${NEGATIVE_WORDS}|${POSITIVE_WORDS})\\s+(?:game|performance|match|day|night|half|display|outing|form)\\b|\\b(?:play(?:ed|ing|s)?|been|being|is|was|looking|looked)\\s+(?:really |very |so |quite |pretty )?(?:${NEGATIVE_WORDS}|${POSITIVE_WORDS}|well|badly|poorly)\\b|\\b(?:nightmare|stinker|shocker|blinder|mare|masterclass|struggl\\w*|in form|off form)\\b`,
-      'i',
+      `\\b(?:${NEGATIVE_WORDS}|${POSITIVE_WORDS})(?:\\s+[\\p{L}'’.-]+){0,4}\\s+(?:game|performance|match|day|today|tonight|half|display|outing|form)\\b|\\b(?:play(?:ed|ing|s)?|been|being|is|was|looking|looked)\\s+(?:really |very |so |quite |pretty )?(?:${NEGATIVE_WORDS}|${POSITIVE_WORDS}|well|badly|poorly)\\b|\\b(?:nightmare|stinker|shocker|blinder|mare|masterclass|struggl\\w*|in form|off form)\\b`,
+      'iu',
     ),
   ],
 ]

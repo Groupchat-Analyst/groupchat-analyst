@@ -7,6 +7,7 @@ import { DATASET_CATALOG } from '../../shared/src/datasetCatalog.ts'
 const frame = (home, away) => ({
   selectedTime: '58′',
   score: { [home]: 1, [away]: 0 },
+  players: [],
   events: [{ id: 'event-01', time: '10′', team: home, description: 'x', type: 'other' }],
 })
 

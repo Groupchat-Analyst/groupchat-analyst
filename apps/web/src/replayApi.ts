@@ -15,6 +15,8 @@ export function isMatchReplayResponse(
     !('score' in value) ||
     typeof value.score !== 'object' ||
     value.score === null ||
+    !('players' in value) ||
+    !Array.isArray(value.players) ||
     !('events' in value) ||
     !Array.isArray(value.events)
   ) {
@@ -30,7 +32,26 @@ export function isMatchReplayResponse(
     return false
   }
 
-  return value.events.every(
+  const validPlayers = value.players.every(
+    (player: unknown) =>
+      typeof player === 'object' &&
+      player !== null &&
+      'id' in player &&
+      typeof player.id === 'string' &&
+      'team' in player &&
+      (player.team === teams[0] || player.team === teams[1]) &&
+      'name' in player &&
+      typeof player.name === 'string' &&
+      'status' in player &&
+      (player.status === 'starter' || player.status === 'substitute') &&
+      'participation' in player &&
+      (player.participation === 'on-pitch' ||
+        player.participation === 'participated' ||
+        player.participation === 'unused-substitute' ||
+        player.participation === 'not-yet-on-pitch'),
+  )
+
+  return validPlayers && value.events.every(
     (event: unknown) =>
       typeof event === 'object' &&
       event !== null &&

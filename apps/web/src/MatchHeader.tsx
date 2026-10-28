@@ -6,7 +6,10 @@ import { clockKey, REPLAY_LOAD_ERROR, type ReplaySnapshot } from './replayContro
 import { teamMonogram } from './teamMonogram'
 import { LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
-import { localizedTeamMonogram } from '../../shared/src/displayNames'
+import {
+  localizedPlayerName,
+  localizedTeamMonogram,
+} from '../../shared/src/displayNames'
 import { translateText } from '../../shared/src/localization'
 
 export type KeyMoment = { label: string; clock: MatchClock }
@@ -164,6 +167,40 @@ export function MatchHeader({
           </span>
         </div>
       </div>
+      {displayed && (
+        <details className="all-evidence match-squad">
+          <summary>{translateText('View squads', language)}</summary>
+          <p>{translateText('Familiar names. Fictional teams and performances.', language)}</p>
+          {teams.map((team) => (
+            <section key={team} aria-label={team}>
+              <h3>{team}</h3>
+              {(['starter', 'substitute'] as const).map((status) => (
+                <div key={status}>
+                  <h4>
+                    {translateText(status === 'starter' ? 'Starters' : 'Substitutes', language)}
+                  </h4>
+                  <ul>
+                    {displayed.players
+                      .filter((player) => player.team === team && player.status === status)
+                      .map((player) => (
+                        <li key={player.id}>
+                          <bdi dir="auto">
+                            {localizedPlayerName(datasetId, player.id, player.name, language)}
+                          </bdi>
+                          {' · '}
+                          {translateText(
+                            `Participation: ${player.participation}`,
+                            language,
+                          )}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ))}
+        </details>
+      )}
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
       <div className="replay-bar" role="group" aria-label="Replay controls">
