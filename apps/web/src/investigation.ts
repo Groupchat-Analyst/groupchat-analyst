@@ -10,6 +10,12 @@ import {
 } from '../../shared/src/matchClock.ts'
 import type { SubmissionContext } from './matchday.ts'
 import { COMPARISON_MESSAGES } from '../../shared/src/comparisonLocale.ts'
+import type {
+  ChangeCaveat,
+  ChangeFigure,
+  ChangePair,
+  ComparisonFacts,
+} from '../../shared/src/changeLocale.ts'
 import {
   ASSESSMENT_LABELS,
   sourceFooter,
@@ -89,16 +95,23 @@ export function checkedAgainst(analysis: Pick<AnalysisResponse, 'claims'>): stri
   })
 }
 
-type Figure = { entity: string; team: string; metric: string; value: number | null }
+type Figure = {
+  entity: string
+  team: string
+  metric: string
+  value: number | null
+  playerId?: string
+}
 
 function figuresOf(result: ClaimResult): Figure[] {
   return [
     ...result.statistics.map(({ team, metric, value }) => ({ entity: team, team, metric, value })),
-    ...result.playerStatistics.map(({ playerName, team, metric, value }) => ({
+    ...result.playerStatistics.map(({ playerId, playerName, team, metric, value }) => ({
       entity: playerName,
       team,
       metric,
       value,
+      playerId,
     })),
   ]
 }
@@ -146,6 +159,8 @@ export type PairChange = {
   removed: string[]
   /** Whether the listed record changes account for the change in the counted figures. */
   accounting: 'complete' | 'partial' | 'incomplete' | 'rate' | 'unchanged'
+  /** Typed, language-free facts for localized rendering; the English fields above are legacy. */
+  facts: ChangePair
 }
 
 export type Comparison = {
@@ -162,6 +177,8 @@ export type Comparison = {
   /** Material data qualifications from both snapshots; time-specific ones are labelled. */
   qualifications: string[]
   pairs: PairChange[]
+  /** Typed facts for localized rendering with renderComparisonFacts. */
+  facts: ComparisonFacts
 }
 
 const COUNT_EVIDENCE: Record<string, string> = {
@@ -302,7 +319,28 @@ function pairChange(
       else accounting = netMatches && everyRecordAttributed ? 'complete' : 'partial'
     }
   }
+  const afterFigures = figuresOf(after)
+  const typedFigures: ChangeFigure[] = figures.map((figure, index) => {
+    const source = afterFigures[index]
+    return {
+      entity: source.playerId === undefined
+        ? { kind: 'team', team: source.team }
+        : { kind: 'player', id: source.playerId, name: source.entity, team: source.team },
+      metric: figure.metric,
+      before: figure.before,
+      after: figure.after,
+    }
+  })
   return {
+    facts: {
+      quote: after.claim.text,
+      before: before.assessment,
+      after: after.assessment,
+      figures: typedFigures,
+      addedRecordIds: added.map(({ id }) => id),
+      removedRecordIds: removed.map(({ id }) => id),
+      accounting,
+    },
     text: after.claim.text,
     before: before.assessment,
     after: after.assessment,
@@ -362,10 +400,23 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
   }
   const a = earlier.analysis.claims
   const b = later.analysis.claims
+  const checks = {
+    earlier: { clock: earlier.context.selectedClock, period: earlier.context.period },
+    later: { clock: later.context.selectedClock, period: later.context.period },
+  }
+  const factsOf = (
+    status: ComparisonFacts['status'],
+    caveats: ChangeCaveat[],
+    extra: Partial<ComparisonFacts> = {},
+  ): ComparisonFacts => ({ version: 1, status, ...checks, pairs: [], caveats, ...extra })
   if (datasetOf(earlier) !== datasetOf(later)) {
     const [first, second] = [earlier, later].map((snapshot) => {
       const { label, version } = snapshot.analysis.evidenceFoundation.dataset
       return `${label.split('.')[0]} (version ${version})`
+    })
+    const [one, two] = [earlier, later].map(({ analysis }) => {
+      const { label, version } = analysis.evidenceFoundation.dataset
+      return { label: label.split('.')[0], version }
     })
     return {
       ...base,
@@ -373,6 +424,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
       headline: COMPARISON_MESSAGES.differentData,
       lines: [separately],
       caveats: [`The ${earlierTime} check used ${first}; the ${laterTime} check used ${second}. Figures from different data can't be compared like for like.`],
+      facts: factsOf('not-comparable', [{ code: 'different-data', earlier: one, later: two }], { reason: 'different-data' }),
     }
   }
   if (a.length === 0 || a.length !== b.length || a.some((result, i) => claimKey(result) !== claimKey(b[i]))) {
@@ -382,25 +434,29 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
       headline: COMPARISON_MESSAGES.differentInterpretation,
       lines: [separately],
       caveats: [COMPARISON_MESSAGES.differentClaims],
+      facts: factsOf('different-interpretation', [{ code: 'different-claims' }], { reason: 'different-interpretation' }),
     }
   }
   if (!sameWindowKind(earlier.context, later.context) || a.some((r, i) => !isAssessed(r) || !isAssessed(b[i]))) {
+    const samePeriod = sameWindowKind(earlier.context, later.context)
     return {
       ...base,
       status: 'not-comparable',
       headline: COMPARISON_MESSAGES.notComparable,
       lines: [separately],
-      caveats: [
-        sameWindowKind(earlier.context, later.context)
-          ? COMPARISON_MESSAGES.notAssessed
-          : COMPARISON_MESSAGES.differentPeriods,
-      ],
+      caveats: [samePeriod ? COMPARISON_MESSAGES.notAssessed : COMPARISON_MESSAGES.differentPeriods],
+      facts: factsOf(
+        'not-comparable',
+        [{ code: samePeriod ? 'not-assessed' : 'different-periods' }],
+        { reason: samePeriod ? 'not-assessed' : 'different-periods' },
+      ),
     }
   }
 
   const pairs = a.map((result, index) => pairChange(earlier, later, result, b[index]))
   const lines: string[] = []
   const caveats: string[] = []
+  const typedCaveats: ChangeCaveat[] = []
   const multiple = pairs.length > 1
   for (const pair of pairs) {
     const [, nowPhrase] = STATE_PHRASE[pair.after]
@@ -416,12 +472,20 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     if (pair.added.length > 0) lines.push(`New in the records: ${pair.added.map(trimStop).join('; ')}.`)
     if (pair.removed.length > 0) lines.push(`No longer in the window: ${pair.removed.map(trimStop).join('; ')}.`)
     const caveat = ACCOUNTING_CAVEAT[pair.accounting]
-    if (caveat) caveats.push(multiple ? `${caveat} (“${pair.text}”)` : caveat)
+    if (caveat) {
+      caveats.push(multiple ? `${caveat} (“${pair.text}”)` : caveat)
+      if (pair.accounting !== 'unchanged') {
+        typedCaveats.push(multiple
+          ? { code: 'accounting', accounting: pair.accounting, quote: pair.text }
+          : { code: 'accounting', accounting: pair.accounting })
+      }
+    }
   }
   if (earlier.context.period === 'last-10-minutes') {
     caveats.push(
       `Rolling windows: ${base.earlierWindow} against ${base.laterWindow}, so earlier moments can drop out.`,
     )
+    typedCaveats.push({ code: 'rolling-windows' })
   }
   const headline = multiple
     ? `${pairs.length} claims rechecked: here's how each one moved.`
@@ -433,6 +497,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     lines: multiple ? lines : lines.slice(1),
     caveats,
     pairs,
+    facts: factsOf('comparable', typedCaveats, { pairs: pairs.map(({ facts }) => facts) }),
   }
 }
 
