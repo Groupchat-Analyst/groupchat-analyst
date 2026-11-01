@@ -33,6 +33,7 @@ import {
   formatCountWithNoun,
   formatFactualComparison,
   formatNumber,
+  formatPercent,
 } from '../../shared/src/factualPresentation'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
@@ -99,6 +100,7 @@ import { findCatalogEntry, BASELINE_DATASET_ID, type DatasetExample } from '../.
 import {
   formatLocalizedMessage,
   localizedExample,
+  localizedExampleShows,
   translateNarrative,
   translateText,
 } from '../../shared/src/localization'
@@ -377,7 +379,7 @@ function localizedPlayerPerformance(
   const displayValue = (value: number | null | undefined) =>
     value === null || value === undefined
       ? translateText('Not available', language)
-      : String(value)
+      : formatNumber(value, language)
   const durationWindow = result.playerCalculations.find(
     ({ playerId, metric }) =>
       playerId === claim.playerSubject?.id && metric === 'minutes-played',
@@ -440,7 +442,7 @@ function localizedPlayerPerformance(
           value: valueFor('pass-completion-percentage') === null ||
             valueFor('pass-completion-percentage') === undefined
             ? translateText('Not available', language)
-            : `${valueFor('pass-completion-percentage')}%`,
+            : formatPercent(valueFor('pass-completion-percentage') as number, language),
         },
         language,
       ),
@@ -474,15 +476,15 @@ function localizedStatisticValue(
     return `${translateText('Not available', language)} · ${metricLabel(metric, language)}`
   }
   if (metric === 'pass-completion-percentage') {
-    return `${value}% ${translateText('pass completion', language)}`
+    return `${formatPercent(value, language)} ${translateText('pass completion', language)}`
   }
   if (metric === 'possession-percentage') {
-    return `${value}% ${translateText('possession', language)}`
+    return `${formatPercent(value, language)} ${translateText('possession', language)}`
   }
   if (metric === 'minutes-played') {
     return formatLocalizedMessage(
       'Participation minutes: {value}',
-      { value },
+      { value: formatNumber(value, language) },
       language,
     )
   }
@@ -525,7 +527,7 @@ function localizedStatisticValue(
   }
   const singular = value === 1 ? singularMetricLabels[metric]?.[language] : undefined
   const label = singular ?? metricLabel(metric, language, value)
-  return `${value} ${label}`
+  return `${formatNumber(value, language)} ${label}`
 }
 
 function localizedStatistics(
@@ -545,7 +547,7 @@ function localizedStatistics(
       value === null
         ? translateText('Not available', language)
         : isPercent
-          ? `${formatNumber(value, language)}%`
+          ? formatPercent(value, language)
           : formatCountWithNoun(metric, value, language)
     return {
       answer: formatFactualComparison(factual, language),
@@ -1031,8 +1033,8 @@ function ClaimCard({
                 <section key={`${trace.team}-${trace.metric}-${trace.area ?? ''}`}>
                   <h4>{trace.team}{trace.area ? ` · ${trace.area.replaceAll('-', ' ')}` : ''}</h4>
                   <p>{trace.metric === 'possession-losses-by-area'
-                    ? `${trace.value ?? 'Not available'} turnovers`
-                    : `${trace.numerator}/${trace.denominator}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : `${trace.value}%`})` : ''}`}</p>
+                    ? `${trace.value === null ? 'Not available' : formatNumber(trace.value, language)} turnovers`
+                    : `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : formatPercent(trace.value, language)})` : ''}`}</p>
                   <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
@@ -1045,12 +1047,12 @@ function ClaimCard({
                   <h4>{trace.playerName} · {trace.metric === 'minutes-played' ? 'participation within recorded window' : trace.metric.replaceAll('-', ' ')}</h4>
                   <p>
                     {trace.metric === 'minutes-played'
-                      ? `${trace.value ?? 0} ${translateText('elapsed minutes', language)}`
+                      ? `${formatNumber(trace.value ?? 0, language)} ${translateText('elapsed minutes', language)}`
                       : trace.metric === 'pass-completion-percentage'
-                      ? `${trace.numerator}/${trace.denominator} (${trace.value === null ? 'rate not available' : `${trace.value}%`})`
+                      ? `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)} (${trace.value === null ? 'rate not available' : formatPercent(trace.value, language)})`
                       : trace.metric === 'pass-completions'
-                        ? `${trace.numerator} completions among ${trace.denominator} attempts`
-                        : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
+                        ? `${formatNumber(trace.numerator, language)} completions among ${formatNumber(trace.denominator, language)} attempts`
+                        : `${formatNumber(trace.value ?? trace.numerator, language)} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
                   </p>
                   <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
@@ -1134,6 +1136,8 @@ function EvidenceFoundationPanel({
   foundation: AnalysisResponse['evidenceFoundation']
   selectedPeriodLabel: string
 }) {
+  const { language } = useLocalization()
+  const num = (value: number) => formatNumber(value, language)
   const roster = foundation.players
   const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   return (
@@ -1168,22 +1172,22 @@ function EvidenceFoundationPanel({
                 <strong>
                   {metrics.possessionPercentage === null
                     ? 'Not available'
-                    : `${metrics.possessionPercentage}%`}
+                    : formatPercent(metrics.possessionPercentage, language)}
                 </strong>
-                <span>possession · {metrics.possessionMinutes} minutes</span>
+                <span>possession · {num(metrics.possessionMinutes)} minutes</span>
               </p>
               <p>
                 <strong>
                   {metrics.passCompletionPercentage === null
                     ? 'Not available'
-                    : `${metrics.passCompletionPercentage}%`}
+                    : formatPercent(metrics.passCompletionPercentage, language)}
                 </strong>
                 <span>
-                  passes complete · {metrics.completedPasses}/{metrics.passAttempts}
+                  passes complete · {num(metrics.completedPasses)}/{num(metrics.passAttempts)}
                 </span>
               </p>
-              <p><strong>{lossCount ?? 'Not available'}</strong><span>recorded pass turnovers</span></p>
-              <p><strong>{metrics.finalThirdEntries ?? 'Not available'}</strong><span>final-third entries</span></p>
+              <p><strong>{lossCount === null ? 'Not available' : num(lossCount)}</strong><span>recorded pass turnovers</span></p>
+              <p><strong>{metrics.finalThirdEntries === null ? 'Not available' : num(metrics.finalThirdEntries)}</strong><span>final-third entries</span></p>
               <ul className="loss-area-list">
                 {Object.entries(metrics.possessionLosses).map(([area, count]) => (
                   <li key={area}>{area.replaceAll('-', ' ')}: {count ?? 'not available'}</li>
@@ -1391,7 +1395,7 @@ function WhatChanged({
     ? null
     : renderComparisonFacts(result.facts, changeContext(earlier, later, datasetId, language), language)
   const nameOf = presentationContext(datasetId, language).nameOf
-  const earlierScope = formatMatchClock(earlier.context.selectedClock) + ' · ' + translateText(earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes', language)
+  const earlierScope = translateText(earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes', language)
   return (
     <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
@@ -2478,8 +2482,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                 <div className="suggestions" role="group" aria-label="Example opinions">
                   <span>Examples (these fill the box; nothing is sent until you check)</span>
                   {examples.map((example) => {
-                    const text = localizedExample(example.text, language)
-                    return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${translateNarrative(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
+                    const text = localizeMatchText(localizedExample(example.text, language), datasetId, language)
+                    return <button key={example.id} type="button" onClick={() => fillExample(example)} title={`${localizedExampleShows(example.shows, language)} · ${formatMatchClock(example.clock)}`}>{text}</button>
                   })}
                 </div>
               )}

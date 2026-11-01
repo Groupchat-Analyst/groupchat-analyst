@@ -78,7 +78,7 @@ function PreviewSwitch() {
           </article>
         </div>
         <p className="lp-caption">
-          An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.
+          An illustrative preview of the fictional replay, using prewritten answers checked against recorded evidence. It is not a live conversation, and no AI is involved in this homepage illustration.
         </p>
       </section>
     </LocalizedMarkup>
@@ -99,7 +99,7 @@ export function HomePage() {
           <div className="lp-actions">
             <a className="lp-primary" href={MATCHES_HASH}>Try it Out</a>
           </div>
-          <p className="lp-disclosure">Fictional matches · Local rules · No AI model connected</p>
+          <p className="lp-disclosure">Fictional matches, no live feed · AI reads questions when enabled · Local rules available</p>
         </section>
 
         <PreviewSwitch />
@@ -124,9 +124,9 @@ export function HomePage() {
           <summary>What this demo is, and is not</summary>
           <ul>
             <li>Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.</li>
-            <li>Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.</li>
+            <li>When AI interpretation is enabled, an AI model helps read your question; the application then checks each claim against recorded match evidence and calculates the statistics itself. Local rules remain available as a limited option, and unfamiliar wording may be declined or answered with a question.</li>
             <li>Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.</li>
-            <li>Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.</li>
+            <li>Answers live in your browser and are lost on refresh. Only your opinion, the chosen minute and period, the match and your input language are sent to the server. If AI interpretation is used, the server passes your opinion to Microsoft Foundry; local rules send it to no model. The server keeps only a hashed network identifier and request counts to apply usage allowances, not your opinion text.</li>
           </ul>
         </details>
       </div>

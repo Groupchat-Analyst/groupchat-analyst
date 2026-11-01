@@ -131,6 +131,13 @@ export function formatNumber(value: number, language: AppLanguage): string {
   }).format(value)
 }
 
+// CLDR places a (narrow) no-break space before the percent sign in French, German and Spanish.
+const PERCENT_SEPARATOR: Record<AppLanguage, string> = { en: '', ar: '', es: '\u00a0', de: '\u00a0', fr: '\u202f' }
+
+export function formatPercent(value: number, language: AppLanguage): string {
+  return `${formatNumber(value, language)}${PERCENT_SEPARATOR[language]}%`
+}
+
 export function formatCountWithNoun(
   metric: ComparisonMetric,
   value: number,
@@ -237,7 +244,7 @@ export function formatFactualComparison(
     const shown = available.value === null
       ? null
       : metric === 'possession-percentage' || metric === 'pass-completion-percentage'
-        ? `${formatNumber(available.value, language)}%`
+        ? formatPercent(available.value, language)
         : formatCountWithNoun(metric, available.value, language)
     return `${lead}${shown === null
       ? t.unavailableBoth(missing.name, metricName, available.name)
@@ -247,14 +254,14 @@ export function formatFactualComparison(
     const n = (value: number | null | undefined) =>
       value === null || value === undefined ? '—' : formatNumber(value, language)
     return `${lead}${t.passRate(
-      subject.name, n(subject.completions), n(subject.attempts), `${n(subject.value)}%`,
-      opponent.name, n(opponent.completions), n(opponent.attempts), `${n(opponent.value)}%`,
+      subject.name, n(subject.completions), n(subject.attempts), formatPercent(subject.value, language),
+      opponent.name, n(opponent.completions), n(opponent.attempts), formatPercent(opponent.value, language),
     )}`
   }
   if (metric === 'possession-percentage') {
     return `${lead}${t.possession(
-      subject.name, `${formatNumber(subject.value, language)}%`,
-      opponent.name, `${formatNumber(opponent.value, language)}%`,
+      subject.name, formatPercent(subject.value, language),
+      opponent.name, formatPercent(opponent.value, language),
     )}`
   }
   if (subject.value === opponent.value) {

@@ -1,16 +1,16 @@
 # Release and deployment runbook
 
-Status: **multilingual response and player-clarification repair prepared, not deployed**. It is a separate branch based on `Origin/main` `e22e76a`; anonymous Foundry analysis remains controlled only by backend configuration and the shared durable Azure Table allowance, which this repair does not change. No deployment, live model request, Azure change, allowance reset or credential change has occurred. Deploying requires a separate owner decision.
+Status: **multilingual response, player-clarification and native-language local-rule repair prepared, not deployed**. The current work is on `repair/localised-examples-and-formatting` (based on `ac15800`); anonymous Foundry analysis remains controlled only by backend configuration and the shared durable Azure Table allowance, which this repair does not change. No deployment, live model request, Azure change, allowance reset or credential change has occurred. Deploying requires a separate owner decision.
 
 ## Candidate and workflow
 
 | Item | Value |
 | --- | --- |
 | PR base | `main` |
-| Repair branch | `repair/i18n-player-resolution` |
-| Base commit | `e22e76a2a4d415d2107101e8e4956804c7fec2a0` |
-| Final application commit | `db548417293785c0155b8e0edacbc4ce6950e3c6` (docs-only commits follow on the branch head; they do not change application code) |
-| Superseded | `f80e624`, `35a8e1c`, `738fcc4` and `652b013` are earlier checkpoints and must **not** be the deployment target (`f80e624` shipped a corrupted possession note in es/fr/de/ar) |
+| Repair branch | `repair/localised-examples-and-formatting` |
+| Base commit | `ac15800` (main after PRs #10–#12) |
+| Final application commit | `df518c33fc4e6b7d7c47c32e6d6c70fb9aceb4c5` (docs-only commits follow on the branch head; they do not change application code) |
+| Superseded | `db548417293785c0155b8e0edacbc4ce6950e3c6` (previous application target, already merged via earlier PRs), `528849e`, `f80e624`, `35a8e1c`, `738fcc4` and `652b013` are earlier checkpoints and must **not** be the deployment target (`f80e624` shipped a corrupted possession note in es/fr/de/ar) |
 | Branch relation | Created from `Origin/main`; no merge, rebase or reset |
 | Workflow | `.github/workflows/shared-preview.yml` |
 | Trigger | `workflow_dispatch` only; job runs only when dispatched from `main` |
@@ -96,10 +96,10 @@ Microsoft documents that Static Web Apps API application settings are configured
 
 The workflow deploys exactly the commit the run was started on; **re-running an older workflow run, or dispatching an older ref, never selects newer code.**
 
-1. After review, the authorized owner merges the PR into `main` and records the merge commit `M`. Confirm `git merge-base --is-ancestor db548417293785c0155b8e0edacbc4ce6950e3c6 M` succeeds (the final application commit is contained in `M`).
+1. After review, the authorized owner merges the PR into `main` and records the merge commit `M`. Confirm `git merge-base --is-ancestor df518c33fc4e6b7d7c47c32e6d6c70fb9aceb4c5 M` succeeds (the final application commit is contained in `M`).
 2. Start a **new** run: Actions → *Deploy shared preview* → *Run workflow* → branch `main` (do not use "Re-run" on an earlier run).
 3. In the new run's summary, confirm the event/head SHA equals `M`. In the *Checkout* step log, confirm the checked-out `HEAD` equals `M` (the workflow pins `ref: ${{ github.sha }}`). Stop if either differs, or if the run is a re-run of an earlier attempt.
-4. Confirm the checked-out tree contains the repair: `apps/shared/src/claimState.ts`, `apps/shared/src/comparisonLocale.ts`, `apps/shared/src/playerQuestions.ts`, `apps/shared/src/factualPresentation.ts` and `apps/shared/src/evidenceLocale.ts` exist.
+4. Confirm the checked-out tree contains the repair: `apps/shared/src/claimState.ts`, `apps/shared/src/comparisonLocale.ts`, `apps/shared/src/playerQuestions.ts`, `apps/shared/src/factualPresentation.ts` `apps/shared/src/evidenceLocale.ts` and `apps/shared/src/nativeClaimGrammar.ts` exist.
 5. No backend setting changes are required; do not reset the `FoundryJudging` table or rotate `PLAYER_RESOLUTION_SIGNING_KEY`. Clarification continuations issued before the deployment may be rejected if the signing configuration changes; they are otherwise unaffected.
 6. After deployment, run the hosted acceptance checklist below, including a native-language player question (for example German "Wie hat Bruno gespielt?") with AI enabled; a hosted Foundry check is **not yet verified** and uses allowance attempts.
 

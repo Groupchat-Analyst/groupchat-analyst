@@ -9,6 +9,7 @@ import {
   renderLimitationFact,
   renderPresentationReason,
 } from '../../shared/src/claimPresentationLocale.ts'
+import { formatPercent } from '../../shared/src/factualPresentation.ts'
 import { renderChangeCardLabels, renderComparisonFacts } from '../../shared/src/changeLocale.ts'
 import { compareSnapshots, createSnapshot } from './investigation.ts'
 
@@ -306,7 +307,7 @@ test('topics and insufficient answers render literal expectations', () => {
   assert.equal(topic.verdict, 'Not enough evidence for a firm conclusion')
   assert.deepEqual(topic.limitations, ['This is a broad judgement about passing quality; the recorded figures are context and do not give a verdict.'])
   assert.equal(topic.scope, 'Match so far, up to 70′')
-  assert.equal(render(mk(ANSWERS.topic[0]), 'de').answer, 'Thema: Passqualität. Northbridge spielte 4 von 5 erfassten Pässen erfolgreich (80%).')
+  assert.equal(render(mk(ANSWERS.topic[0]), 'de').answer, 'Thema: Passqualität. Northbridge spielte 4 von 5 erfassten Pässen erfolgreich (80\u00a0%).')
   // No attempts: the rate is not recorded, so no percentage is shown.
   assert.doesNotMatch(render(mk(ANSWERS.topic[1]), 'en').answer, /%/)
 
@@ -486,4 +487,14 @@ test('unsupported comparison facts and change-card labels are localized', () => 
     '57′ (match so far): Contradicted',
   )
   assert.deepEqual(en.figures(comparison.facts.pairs[0], { nameOf }), ['Shots on target: Northbridge 2, Eastport 2 → 3.'])
+})
+
+test('percentages use each locale’s number format and percent spacing', () => {
+  assert.equal(formatPercent(16.7, 'en'), '16.7%')
+  assert.equal(formatPercent(16.7, 'fr'), '16,7\u202f%')
+  assert.equal(formatPercent(54.5, 'de'), '54,5\u00a0%')
+  assert.equal(formatPercent(54.5, 'es'), '54,5\u00a0%')
+  assert.equal(formatPercent(100, 'fr'), '100\u202f%')
+  assert.equal(formatPercent(0, 'de'), '0\u00a0%')
+  assert.equal(formatPercent(16.7, 'ar'), '16.7%')
 })

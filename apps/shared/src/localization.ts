@@ -1,5 +1,7 @@
 import { resolutionTranslations } from './resolutionLocale.ts'
 import { translateComparisonMessage } from './comparisonLocale.ts'
+import { EXAMPLE_SHOWS, EXAMPLE_TEXT } from './exampleLocale.ts'
+import { canonicalizeNativeClaim } from './nativeClaimGrammar.ts'
 
 export type AppLanguage = 'en' | 'es' | 'fr' | 'de' | 'ar'
 
@@ -40,7 +42,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Recorded moment': 'Momento registrado',
     'See how one minute changes the opinion': 'Mira cómo cambia la opinión en un minuto',
     'The two checks interpret this opinion differently, so they cannot be compared directly.': 'Las dos comprobaciones interpretan esta opinión de forma distinta, así que no se pueden comparar directamente.',
-    'An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.': 'Vista previa ilustrativa de la repetición ficticia, basada en respuestas verificadas por reglas locales. No es una conversación en directo y no interviene ningún modelo de IA.',
+    'An illustrative preview of the fictional replay, using prewritten answers checked against recorded evidence. It is not a live conversation, and no AI is involved in this homepage illustration.': 'Vista previa ilustrativa de la repetición ficticia, con respuestas escritas de antemano y comprobadas con las pruebas registradas. No es una conversación en directo y en esta ilustración de la página de inicio no interviene ninguna IA.',
     'Evidence receipt at': 'Comprobante de pruebas en',
     'Illustrative · fictional replay · local rules ·': 'Ilustrativo · repetición ficticia · reglas locales ·',
     'Illustrative': 'Ilustrativo',
@@ -90,7 +92,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Pick a match. Check the moment. Bring the evidence back to the chat.': 'Elige un partido. Comprueba el minuto. Comparte las pruebas en el chat.',
     'The answer can change as the match goes on, so check the same opinion again a minute later.': 'La respuesta puede cambiar durante el partido: vuelve a comprobar la misma opinión un minuto después.',
     'Try it Out': 'Probar',
-    'Fictional matches · Local rules · No AI model connected': 'Partidos ficticios · Reglas locales · Sin modelo de IA conectado',
+    'Fictional matches, no live feed · AI reads questions when enabled · Local rules available': 'Partidos ficticios, sin datos en directo · La IA lee las preguntas cuando está activada · Reglas locales disponibles',
     'Same opinion. Different minute.': 'La misma opinión. Otro minuto.',
     'Preview match minute': 'Minuto de la vista previa',
     'Illustrative conversation': 'Conversación ilustrativa',
@@ -141,9 +143,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Check an opinion here, then share the evidence with your mates. A WhatsApp companion is planned; this demo doesn’t connect to your chats.': 'Comprueba aquí una opinión y comparte las pruebas con tus amigos. Está prevista una versión para WhatsApp; esta demo no se conecta a tus chats.',
     'What this demo is, and is not': 'Qué es y qué no es esta demo',
     'Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.': 'Todos los partidos son ficticios. Los jugadores usan nombres reales como identidades inventadas; ninguna actuación, resultado o estadística es real.',
-    'Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.': 'Las opiniones se interpretan con reglas locales limitadas, no con un modelo de IA. Puede que no se reconozcan expresiones poco habituales o que se pida una aclaración.',
+    'When AI interpretation is enabled, an AI model helps read your question; the application then checks each claim against recorded match evidence and calculates the statistics itself. Local rules remain available as a limited option, and unfamiliar wording may be declined or answered with a question.': 'Cuando la interpretación con IA está activada, un modelo de IA ayuda a leer tu pregunta; después la aplicación comprueba cada afirmación con las pruebas registradas del partido y calcula ella misma las estadísticas. Las reglas locales siguen disponibles como opción limitada; una expresión poco habitual puede rechazarse o dar lugar a una pregunta.',
     'Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.': 'Las pruebas proceden de una muestra sintética de eventos. No hay vídeo, seguimiento, calidad de ocasiones ni datos de estructura defensiva.',
-    'Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.': 'Las respuestas permanecen en el navegador y se pierden al actualizar la página. No se guarda ni envía nada salvo tu opinión y el minuto elegido para comprobarla.',
+    'Answers live in your browser and are lost on refresh. Only your opinion, the chosen minute and period, the match and your input language are sent to the server. If AI interpretation is used, the server passes your opinion to Microsoft Foundry; local rules send it to no model. The server keeps only a hashed network identifier and request counts to apply usage allowances, not your opinion text.': 'Las respuestas permanecen en el navegador y se pierden al actualizar la página. Al servidor solo se envían tu opinión, el minuto y el periodo elegidos, el partido y el idioma de entrada. Si se usa la interpretación con IA, el servidor pasa tu opinión a Microsoft Foundry; las reglas locales no la envían a ningún modelo. El servidor solo conserva un identificador de red cifrado (hash) y recuentos de solicitudes para aplicar los límites de uso, no el texto de tu opinión.',
     Language: 'Idioma',
     'Fictional match replay': 'Repetición de partido ficticio',
     'Replay controls': 'Controles de repetición',
@@ -389,7 +391,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Recorded moment': 'Moment enregistré',
     'See how one minute changes the opinion': 'Voyez comment un avis change en une minute',
     'The two checks interpret this opinion differently, so they cannot be compared directly.': 'Les deux vérifications interprètent cet avis différemment ; elles ne peuvent donc pas être comparées directement.',
-    'An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.': 'Aperçu illustratif de la rediffusion fictive, rédigé à partir de réponses vérifiées par les règles locales. Ce n’est pas une conversation en direct et aucun modèle d’IA n’intervient.',
+    'An illustrative preview of the fictional replay, using prewritten answers checked against recorded evidence. It is not a live conversation, and no AI is involved in this homepage illustration.': 'Aperçu illustratif de la rediffusion fictive, avec des réponses rédigées à l’avance et vérifiées d’après les preuves enregistrées. Ce n’est pas une conversation en direct, et aucune IA n’intervient dans cette illustration de la page d’accueil.',
     'Evidence receipt at': 'Reçu des preuves à',
     'Illustrative · fictional replay · local rules ·': 'Illustratif · rediffusion fictive · règles locales ·',
     'Illustrative': 'Illustratif',
@@ -439,7 +441,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Pick a match. Check the moment. Bring the evidence back to the chat.': 'Choisissez un match. Vérifiez le moment. Ramenez les preuves dans la conversation.',
     'The answer can change as the match goes on, so check the same opinion again a minute later.': 'La réponse peut évoluer pendant le match : vérifiez à nouveau le même avis une minute plus tard.',
     'Try it Out': 'Essayer',
-    'Fictional matches · Local rules · No AI model connected': 'Matchs fictifs · Règles locales · Aucun modèle d’IA connecté',
+    'Fictional matches, no live feed · AI reads questions when enabled · Local rules available': 'Matchs fictifs, sans flux en direct · L’IA lit les questions lorsqu’elle est activée · Règles locales disponibles',
     'Same opinion. Different minute.': 'Même avis. Minute différente.',
     'Preview match minute': 'Minute de l’aperçu',
     'Illustrative conversation': 'Conversation illustrative',
@@ -490,9 +492,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Check an opinion here, then share the evidence with your mates. A WhatsApp companion is planned; this demo doesn’t connect to your chats.': 'Vérifiez un avis ici, puis partagez les preuves avec vos amis. Un compagnon WhatsApp est prévu ; cette démo ne se connecte pas à vos discussions.',
     'What this demo is, and is not': 'Ce que cette démo est — et n’est pas',
     'Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.': 'Tous les matchs sont fictifs. Les joueurs portent des noms réels comme identités inventées ; aucune performance, aucun résultat ni aucune statistique n’est réel.',
-    'Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.': 'Les avis sont interprétés par un ensemble limité de règles locales, pas par un modèle d’IA. Une formulation inhabituelle peut être refusée ou donner lieu à une question.',
+    'When AI interpretation is enabled, an AI model helps read your question; the application then checks each claim against recorded match evidence and calculates the statistics itself. Local rules remain available as a limited option, and unfamiliar wording may be declined or answered with a question.': 'Lorsque l’interprétation par IA est activée, un modèle d’IA aide à lire votre question ; l’application vérifie ensuite chaque affirmation d’après les preuves enregistrées du match et calcule elle-même les statistiques. Les règles locales restent disponibles comme option limitée ; une formulation inhabituelle peut être refusée ou donner lieu à une question.',
     'Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.': 'Les preuves proviennent d’un échantillon synthétique d’événements. Il n’y a ni vidéo, ni suivi, ni qualité des occasions, ni données sur le bloc défensif.',
-    'Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.': 'Les réponses restent dans votre navigateur et disparaissent au rechargement. Rien n’est stocké ni envoyé, hormis votre avis et la minute choisie pour la vérification.',
+    'Answers live in your browser and are lost on refresh. Only your opinion, the chosen minute and period, the match and your input language are sent to the server. If AI interpretation is used, the server passes your opinion to Microsoft Foundry; local rules send it to no model. The server keeps only a hashed network identifier and request counts to apply usage allowances, not your opinion text.': 'Les réponses restent dans votre navigateur et disparaissent au rechargement. Seuls votre avis, la minute et la période choisies, le match et la langue de saisie sont envoyés au serveur. Si l’interprétation par IA est utilisée, le serveur transmet votre avis à Microsoft Foundry ; les règles locales ne l’envoient à aucun modèle. Le serveur ne conserve qu’un identifiant réseau haché et des compteurs de requêtes pour appliquer les quotas d’utilisation, pas le texte de votre avis.',
     Language: 'Langue',
     'Fictional match replay': 'Replay d’un match fictif',
     'Replay controls': 'Commandes du replay',
@@ -734,7 +736,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Recorded moment': 'Aufgezeichneter Moment',
     'See how one minute changes the opinion': 'Sieh, wie sich die Meinung in einer Minute ändert',
     'The two checks interpret this opinion differently, so they cannot be compared directly.': 'Die beiden Prüfungen interpretieren diese Meinung unterschiedlich und sind daher nicht direkt vergleichbar.',
-    'An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.': 'Eine beispielhafte Vorschau der fiktiven Wiederholung auf Grundlage geprüfter Antworten der lokalen Regeln. Kein Live-Gespräch und kein KI-Modell ist beteiligt.',
+    'An illustrative preview of the fictional replay, using prewritten answers checked against recorded evidence. It is not a live conversation, and no AI is involved in this homepage illustration.': 'Eine beispielhafte Vorschau der fiktiven Wiederholung mit vorab geschriebenen Antworten, die anhand der aufgezeichneten Belege geprüft wurden. Kein Live-Gespräch, und an dieser Illustration der Startseite ist keine KI beteiligt.',
     'Evidence receipt at': 'Beleg zum Zeitpunkt',
     'Illustrative · fictional replay · local rules ·': 'Beispielhaft · fiktive Wiederholung · lokale Regeln ·',
     'Illustrative': 'Beispielhaft',
@@ -784,7 +786,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Pick a match. Check the moment. Bring the evidence back to the chat.': 'Wähle ein Spiel. Prüfe den Moment. Bring die Belege zurück in den Chat.',
     'The answer can change as the match goes on, so check the same opinion again a minute later.': 'Die Antwort kann sich im Spielverlauf ändern. Prüfe dieselbe Meinung eine Minute später erneut.',
     'Try it Out': 'Ausprobieren',
-    'Fictional matches · Local rules · No AI model connected': 'Fiktive Spiele · Lokale Regeln · Kein KI-Modell verbunden',
+    'Fictional matches, no live feed · AI reads questions when enabled · Local rules available': 'Fiktive Spiele, kein Live-Feed · KI liest Fragen, wenn aktiviert · Lokale Regeln verfügbar',
     'Same opinion. Different minute.': 'Gleiche Meinung. Andere Minute.',
     'Preview match minute': 'Vorschau-Spielminute',
     'Illustrative conversation': 'Beispielgespräch',
@@ -835,9 +837,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Check an opinion here, then share the evidence with your mates. A WhatsApp companion is planned; this demo doesn’t connect to your chats.': 'Prüfe hier eine Meinung und teile die Belege mit deinen Freunden. Ein WhatsApp-Begleiter ist geplant; diese Demo greift nicht auf deine Chats zu.',
     'What this demo is, and is not': 'Was diese Demo ist – und was nicht',
     'Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.': 'Alle Spiele sind fiktiv. Reale Spielernamen sind erfundene Identitäten; keine Leistung, kein Ergebnis und keine Statistik ist echt.',
-    'Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.': 'Meinungen werden mit begrenzten lokalen Regeln und nicht mit einem KI-Modell interpretiert. Unbekannte Formulierungen werden möglicherweise abgelehnt oder mit einer Rückfrage beantwortet.',
+    'When AI interpretation is enabled, an AI model helps read your question; the application then checks each claim against recorded match evidence and calculates the statistics itself. Local rules remain available as a limited option, and unfamiliar wording may be declined or answered with a question.': 'Ist die KI-Interpretation aktiviert, hilft ein KI-Modell beim Lesen deiner Frage; die Anwendung prüft dann jede Behauptung anhand der aufgezeichneten Spielbelege und berechnet die Statistiken selbst. Lokale Regeln bleiben als begrenzte Option verfügbar; unbekannte Formulierungen werden möglicherweise abgelehnt oder mit einer Rückfrage beantwortet.',
     'Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.': 'Die Belege stammen aus einem ausgewählten synthetischen Ereignisprotokoll. Video-, Tracking-, Chancenqualitäts- und Defensivform-Daten gibt es nicht.',
-    'Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.': 'Antworten bleiben im Browser und gehen beim Aktualisieren verloren. Gespeichert oder gesendet werden nur deine Meinung und die gewählte Prüfminute.',
+    'Answers live in your browser and are lost on refresh. Only your opinion, the chosen minute and period, the match and your input language are sent to the server. If AI interpretation is used, the server passes your opinion to Microsoft Foundry; local rules send it to no model. The server keeps only a hashed network identifier and request counts to apply usage allowances, not your opinion text.': 'Antworten bleiben im Browser und gehen beim Aktualisieren verloren. Nur deine Meinung, die gewählte Minute und Periode, das Spiel und deine Eingabesprache werden an den Server gesendet. Wird die KI-Interpretation genutzt, gibt der Server deine Meinung an Microsoft Foundry weiter; lokale Regeln senden sie an kein Modell. Der Server speichert nur eine gehashte Netzwerkkennung und Anfragezähler zur Anwendung von Nutzungskontingenten, nicht den Text deiner Meinung.',
     Language: 'Sprache',
     'Fictional match replay': 'Fiktive Spielwiederholung',
     'Replay controls': 'Wiedergabesteuerung',
@@ -1079,7 +1081,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Recorded moment': 'لحظة مسجلة',
     'See how one minute changes the opinion': 'شاهد كيف يتغير الرأي خلال دقيقة',
     'The two checks interpret this opinion differently, so they cannot be compared directly.': 'يفسر الفحصان هذا الرأي بطرق مختلفة، لذا لا يمكن مقارنتهما مباشرةً.',
-    'An illustrative preview of the fictional replay, written from verified local-rule answers. It is not a live conversation and no AI model is involved.': 'معاينة توضيحية لإعادة المباراة الخيالية، مبنية على إجابات مؤكدة بالقواعد المحلية. ليست محادثة مباشرة ولا يستخدم فيها نموذج ذكاء اصطناعي.',
+    'An illustrative preview of the fictional replay, using prewritten answers checked against recorded evidence. It is not a live conversation, and no AI is involved in this homepage illustration.': 'معاينة توضيحية لإعادة المباراة الخيالية، بإجابات مكتوبة مسبقًا ومراجعة وفق الأدلة المسجلة. ليست محادثة مباشرة، ولا يشارك أي ذكاء اصطناعي في هذا الرسم التوضيحي للصفحة الرئيسية.',
     'Evidence receipt at': 'إيصال الأدلة عند',
     'Illustrative · fictional replay · local rules ·': 'توضيحي · إعادة خيالية · قواعد محلية ·',
     'Illustrative': 'توضيحي',
@@ -1129,7 +1131,7 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Pick a match. Check the moment. Bring the evidence back to the chat.': 'اختر مباراة. تحقّق من الدقيقة. وأحضر الأدلة إلى المحادثة.',
     'The answer can change as the match goes on, so check the same opinion again a minute later.': 'قد تتغير الإجابة أثناء المباراة؛ تحقّق من الرأي نفسه مجدداً بعد دقيقة.',
     'Try it Out': 'جرّب الآن',
-    'Fictional matches · Local rules · No AI model connected': 'مباريات خيالية · قواعد محلية · لا يوجد نموذج ذكاء اصطناعي متصل',
+    'Fictional matches, no live feed · AI reads questions when enabled · Local rules available': 'مباريات خيالية، بلا بث مباشر · يقرأ الذكاء الاصطناعي الأسئلة عند تفعيله · القواعد المحلية متاحة',
     'Same opinion. Different minute.': 'الرأي نفسه. دقيقة مختلفة.',
     'Preview match minute': 'معاينة دقيقة المباراة',
     'Illustrative conversation': 'محادثة توضيحية',
@@ -1180,9 +1182,9 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Check an opinion here, then share the evidence with your mates. A WhatsApp companion is planned; this demo doesn’t connect to your chats.': 'تحقّق من رأي هنا ثم شارك الأدلة مع أصدقائك. نخطط لمرافق عبر واتساب؛ هذا العرض لا يتصل بمحادثاتك.',
     'What this demo is, and is not': 'ما يقدمه هذا العرض وما لا يقدمه',
     'Every match is fictional. Players carry real names as invented identities; no performance, result or statistic is real.': 'كل المباريات خيالية. أسماء اللاعبين الحقيقية مستخدمة كهويات متخيلة؛ لا يوجد أداء أو نتيجة أو إحصائية حقيقية.',
-    'Opinions are read by a limited local rule set, not an AI model. Unfamiliar wording may be declined or answered with a question.': 'تُفسر الآراء بقواعد محلية محدودة، لا بنموذج ذكاء اصطناعي. قد لا تُفهم الصياغة غير المألوفة أو يُطلب توضيحها.',
+    'When AI interpretation is enabled, an AI model helps read your question; the application then checks each claim against recorded match evidence and calculates the statistics itself. Local rules remain available as a limited option, and unfamiliar wording may be declined or answered with a question.': 'عند تفعيل التفسير بالذكاء الاصطناعي، يساعد نموذج ذكاء اصطناعي في قراءة سؤالك؛ ثم يتحقق التطبيق من كل ادعاء مقابل أدلة المباراة المسجلة ويحسب الإحصائيات بنفسه. تبقى القواعد المحلية متاحة كخيار محدود، وقد تُرفض الصياغة غير المألوفة أو يُطلب توضيحها.',
     'Evidence comes from a sampled synthetic event record. There is no video, tracking, chance quality or defensive-shape data.': 'تأتي الأدلة من سجل أحداث اصطناعي محدود. لا تتوفر فيديوهات أو بيانات تتبع أو جودة الفرص أو شكل الدفاع.',
-    'Answers live in your browser and are lost on refresh. Nothing is stored or sent anywhere except your opinion and the chosen minute for checking.': 'تُحفظ الإجابات في متصفحك وتُفقد عند التحديث. لا يُخزن أو يُرسل شيء سوى رأيك والدقيقة التي اخترتها للتحقق.',
+    'Answers live in your browser and are lost on refresh. Only your opinion, the chosen minute and period, the match and your input language are sent to the server. If AI interpretation is used, the server passes your opinion to Microsoft Foundry; local rules send it to no model. The server keeps only a hashed network identifier and request counts to apply usage allowances, not your opinion text.': 'تُحفظ الإجابات في متصفحك وتُفقد عند التحديث. لا يُرسل إلى الخادم سوى رأيك والدقيقة والفترة المختارتين والمباراة ولغة الإدخال. إذا استُخدم التفسير بالذكاء الاصطناعي، يمرر الخادم رأيك إلى Microsoft Foundry؛ أما القواعد المحلية فلا ترسله إلى أي نموذج. يحتفظ الخادم فقط بمعرّف شبكة مشفّر (هاش) وبعدّادات الطلبات لتطبيق حدود الاستخدام، وليس بنص رأيك.',
     Language: 'اللغة',
     'Fictional match replay': 'إعادة مباراة خيالية',
     'Replay controls': 'عناصر التحكم بالإعادة',
@@ -2077,10 +2079,12 @@ function canonicalizeLocalizedStatisticFamily(text: string): string | undefined 
 }
 export function canonicalizeSupportedFootballOpinion(opinion: string): string {
   const trimmed = opinion.trim()
-  const compoundParts = trimmed.split(/\s+(?:but|however|pero|mais|aber|لكن|بل)\s+(?=(?:Northbridge|Eastport)\b)/iu)
+  const compoundParts = trimmed.split(/[,،]?\s+(?:but|however|pero|mais|aber|لكن|بل)\s+(?=\S)/iu)
   if (compoundParts.length > 1) {
-    return compoundParts.map((part) => canonicalizeSupportedFootballOpinion(part.replace(/[,.!?؟]+$/u, '')).replace(/[,.!?؟]+$/u, '')).join(' but ')
+    return compoundParts.map((part) => canonicalizeSupportedFootballOpinion(part.replace(/[,.!?؟،]+$/u, '')).replace(/[,.!?؟،]+$/u, '')).join(' but ')
   }
+  const nativeClause = canonicalizeNativeClaim(trimmed.replace(/^[¿¡\s]+|[.!?؟¿]+$/gu, ''))
+  if (nativeClause) return nativeClause
   const localizedStatistic = canonicalizeLocalizedStatisticFamily(trimmed)
   if (localizedStatistic) return localizedStatistic
   for (const { pattern, canonical } of localizedFootballOpinions) {
@@ -2912,8 +2916,15 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   return text
 }
 
+export function localizedExampleShows(shows: string, language: AppLanguage): string {
+  if (language === 'en') return shows
+  if (language === 'ar') return translateNarrative(shows, language)
+  return EXAMPLE_SHOWS[shows]?.[language] ?? shows
+}
+
 export function localizedExample(text: string, language: AppLanguage): string {
   if (language === 'en') return text
+  if (language !== 'ar' && EXAMPLE_TEXT[text]) return EXAMPLE_TEXT[text][language]
   const arabicExamples: Record<string, string> = {
     'Eastport had more possession than Northbridge but Northbridge had more shots':
       'استحوذ إيستبورت على الكرة أكثر من نورثبريدج، لكن سدد نورثبريدج أكثر.',
