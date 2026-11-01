@@ -73,6 +73,8 @@ import {
   type AppLanguage,
 } from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
+import { claimResolution, resolutionMessage } from '../../shared/src/claimState'
+import { RESOLUTION_MESSAGES } from '../../shared/src/resolutionLocale'
 import { LanguageSelector, LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
 import './App.css'
@@ -143,6 +145,21 @@ function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOpti
   )
 }
 
+function isClaimResolution(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || !('status' in value)) return false
+  switch (value.status) {
+    case 'needs-clarification':
+      return true
+    case 'player-not-in-fixture':
+      return 'name' in value && typeof value.name === 'string'
+    case 'player-choice':
+    case 'unsupported-wording':
+      return 'players' in value && Array.isArray(value.players) && value.players.every(isPlayerResolutionOption)
+    default:
+      return false
+  }
+}
+
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (typeof value !== 'object' || value === null) return false
   const foundation =
@@ -187,6 +204,7 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
         'playerCalculations' in claim &&
         Array.isArray(claim.playerCalculations) &&
         (!('reply' in claim) || typeof claim.reply === 'string') &&
+        (!('resolution' in claim) || isClaimResolution(claim.resolution)) &&
         (!('playerResolution' in claim) ||
           (typeof claim.playerResolution === 'object' &&
             claim.playerResolution !== null &&
@@ -1418,6 +1436,9 @@ function TurnMessages({
   const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
   const checked = localizedCheckedAgainst(analysis, datasetId, language)
   const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
+  const states = new Map(analysis.claims.map((result) => [result.claim.id, claimResolution(result)]))
+  const isPending = (result: ClaimResult) => states.get(result.claim.id) !== undefined
+  const anyPending = analysis.claims.some(isPending)
   const playerPresentations = new Map(
     analysis.claims.map((result) => [
       result.claim.id,
@@ -1432,9 +1453,9 @@ function TurnMessages({
   )
   const evidenceClaims = analysis.claims
     .map((result, index) => ({ result, index }))
-    .filter(({ result }) => !result.playerResolution)
+    .filter(({ result }) => !isPending(result))
   const answeredReplies = analysis.claims
-    .filter(({ playerResolution }) => !playerResolution)
+    .filter((result) => !isPending(result))
     .map((result) =>
       playerPresentations.get(result.claim.id)?.answer ??
       statisticPresentations.get(result.claim.id)?.answer ??
@@ -1444,29 +1465,40 @@ function TurnMessages({
   const allRepliesStructured = analysis.claims.length > 0 &&
     analysis.claims.every(
       (result) =>
-        result.playerResolution ||
+        isPending(result) ||
         playerPresentations.get(result.claim.id) !== undefined ||
         statisticPresentations.get(result.claim.id) !== undefined,
     )
-  const visibleReply = playerChoices.length > 0
+  const visibleReply = anyPending
     ? answeredReplies.join(' ')
     : allRepliesStructured
       ? answeredReplies.join(' ')
       : canonicalReply(analysis)
-  const notes = analysis.claims.flatMap((result) => [
-    ...(!result.playerResolution
-      ? result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' }))
-      : []),
-    ...(!result.playerResolution && !isRoutineLimitation(result)
-      ? [{
+  // Clarification is rendered once, from the structured state; provider prose is never guidance.
+  const notes = analysis.claims.flatMap((result) => {
+    const state = states.get(result.claim.id)
+    if (state) {
+      return [{
+        key: `${result.claim.id}-clarification`,
+        text: localizeMatchText(resolutionMessage(state, language), datasetId, language),
+        title: 'Clarification:',
+      }]
+    }
+    return isRoutineLimitation(result)
+      ? []
+      : [{
           key: `${result.claim.id}-limitation`,
           text: playerPresentations.get(result.claim.id)?.limitation ??
             statisticPresentations.get(result.claim.id)?.limitation ??
             result.limitation,
-          title: 'Limitation',
+          title: 'Limitation:',
         }]
-      : []),
-  ])
+  })
+  const providerWording = analysis.provider === 'foundry'
+    ? analysis.claims.flatMap((result) =>
+        isPending(result) ? result.claim.clarificationNeeds : [],
+      )
+    : []
   return (
     <LocalizedMarkup>
     <>
@@ -1494,7 +1526,13 @@ function TurnMessages({
           </ul>
         )}
         {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join(language === 'ar' ? '؛ ' : '; ')}</p>}
-        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
+        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{translateText(item.title, language)}</strong> {item.text}</p>)}
+        {providerWording.length > 0 && (
+          <details className="msg-note">
+            <summary>{formatLocalizedMessage(RESOLUTION_MESSAGES.providerWording, {}, language)}</summary>
+            {providerWording.map((text) => <p key={text} dir="auto">{text}</p>)}
+          </details>
+        )}
         {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
         {playerChoices.map((result) => (
           <PlayerResolutionPicker
@@ -1596,8 +1634,9 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         analysis.playerResolutionContinuation) &&
       isLaterClock(displayedClock, shown.context.selectedClock),
   )
+  // Any unresolved claim (choice, absent player, unclear wording) is not a completed, shareable answer.
   const hasPlayerChoices = Boolean(
-    analysis?.claims.some(({ playerResolution }) => playerResolution),
+    analysis?.claims.some((result) => claimResolution(result) !== undefined),
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(

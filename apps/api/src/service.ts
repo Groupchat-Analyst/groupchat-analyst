@@ -13,6 +13,7 @@ import type {
   PlayerEntityReference,
   PlayerStatistic,
   PlayerResolutionOption,
+  ClaimResolution,
   TeamStatistic,
 } from '../../shared/src/apiContracts.js'
 import {
@@ -47,7 +48,8 @@ import {
   InterpretationProviderError,
   type InterpretationProvider,
 } from './providers/provider.js'
-import { LocalInterpretationProvider } from './providers/local.js'
+import { LocalInterpretationProvider, mentionedPlayers } from './providers/local.js'
+import { looksLikePersonName, parsePlayerQuestion } from '../../shared/src/playerQuestions.js'
 import {
   classifyOpinion,
   DEFENSIVE_SHAPE_PATTERN,
@@ -2941,7 +2943,13 @@ function addPlayerResolutionContinuation(
     ...response,
     claims: response.claims.map((result) => {
       const options = candidates.find(({ claimId }) => claimId === result.claim.id)
-      return options ? { ...result, playerResolution: { continuation, candidates: options.players } } : result
+      return options
+        ? {
+            ...result,
+            resolution: { status: 'player-choice' as const, players: options.players },
+            playerResolution: { continuation, candidates: options.players },
+          }
+        : result
     }),
     playerResolutionContinuation: continuation,
     ...(selectedPlayers.length > 0 ? { selectedPlayers } : {}),
@@ -3155,6 +3163,100 @@ export async function recheckResolvedPlayer(
   )
 }
 
+function isUnresolvedClaim(claim: InterpretedClaim): boolean {
+  return (
+    claim.subject === null &&
+    claim.playerSubject === null &&
+    claim.meaning.comparison === null &&
+    (claim.clarificationNeeds.length > 0 || claim.intent === 'unrecognized-language')
+  )
+}
+
+function isTeamName(name: string, naming: TeamNaming): boolean {
+  const normalized = normalizePlayerName(name.trim())
+  return ['Northbridge', 'Eastport', ...naming.teams, ...naming.aliases.flat()].some(
+    (team) => normalizePlayerName(team) === normalized,
+  )
+}
+
+/**
+ * Wording-independent player reconciliation shared by every provider. When the question is in a
+ * supported family, the roster decides who is meant; provider clarification prose, paraphrases and
+ * incomplete categories cannot change that.
+ */
+async function reconcilePlayerQuestion(
+  claims: InterpretedClaim[],
+  opinion: string,
+  players: SyntheticMatchEvidence['players'],
+  naming: TeamNaming,
+  datasetId: string,
+  context: Parameters<LocalInterpretationProvider['interpret']>[1],
+  events: MatchEvent[],
+): Promise<InterpretedClaim[]> {
+  if (claims.length !== 1 || !opinion) return claims
+  const question = parsePlayerQuestion(opinion)
+  if (!question || isTeamName(question.name, naming)) return claims
+  const mentions = mentionedPlayers(question.name, players)
+  const [claim] = claims
+  if (mentions.length === 0 && !looksLikePersonName(question.name)) return claims
+  if (mentions.length === 1 && !isUnresolvedClaim(claim)) return claims
+  if (
+    mentions.length > 1 &&
+    playerCandidatesForClaim(claim, opinion, players, naming, datasetId).length > 1
+  ) {
+    return claims
+  }
+  const local = await new LocalInterpretationProvider().interpret(question.canonical, context)
+  const [replacement] = validateInterpretation(
+    normalizeKnownInterpretation(local),
+    events,
+    players,
+    { requireClaims: true },
+  )
+  return replacement ? [{ ...replacement, id: claim.id }] : claims
+}
+
+function absentPlayerFromClaims(
+  claims: InterpretedClaim[],
+  opinion: string,
+  players: SyntheticMatchEvidence['players'],
+  naming: TeamNaming,
+): { claimId: string; name: string } | undefined {
+  if (claims.length !== 1 || !isUnresolvedClaim(claims[0])) return undefined
+  const question = parsePlayerQuestion(opinion)
+  if (
+    !question ||
+    isTeamName(question.name, naming) ||
+    !looksLikePersonName(question.name) ||
+    mentionedPlayers(question.name, players).length > 0
+  ) {
+    return undefined
+  }
+  return { claimId: claims[0].id, name: question.name }
+}
+
+function claimResolution(
+  result: ClaimResult,
+  absentPlayer: { claimId: string; name: string } | undefined,
+  opinion: string,
+  players: SyntheticMatchEvidence['players'],
+  singleClaim: boolean,
+): ClaimResolution | undefined {
+  if (absentPlayer?.claimId === result.claim.id) {
+    return { status: 'player-not-in-fixture', name: absentPlayer.name }
+  }
+  const unresolved =
+    result.assessment === 'clarification needed' ||
+    result.claim.intent === 'unrecognized-language'
+  if (!unresolved) return undefined
+  const named = result.claim.playerSubject
+    ? [result.claim.playerSubject]
+    : mentionedPlayers(singleClaim ? opinion : result.claim.text, players)
+  return named.length > 0
+    ? { status: 'unsupported-wording', players: named }
+    : { status: 'needs-clarification' }
+}
+
 async function analyzeSlottedOpinion(
   request: ReturnType<typeof parseAnalysisRequest>,
   dataset: ReturnType<typeof resolveDataset>,
@@ -3188,18 +3290,19 @@ async function analyzeSlottedOpinion(
     request.period === 'match-so-far'
       ? `Match so far through ${selectedTime}`
       : `Last 10 minutes ending ${selectedTime}`
+  const interpretationContext = {
+    events: eventsThroughSelectedTime,
+    selectedClock: request.selectedClock,
+    selectedTime,
+    period: request.period,
+    capabilities: EVIDENCE_CAPABILITIES,
+    players: fixture.players,
+    inputLanguage: request.inputLanguage,
+  }
   const interpreted = validatedClaims
     ? undefined
     : request.opinion
-    ? await provider.interpret(request.opinion, {
-        events: eventsThroughSelectedTime,
-        selectedClock: request.selectedClock,
-        selectedTime,
-        period: request.period,
-        capabilities: EVIDENCE_CAPABILITIES,
-        players: fixture.players,
-        inputLanguage: request.inputLanguage,
-      })
+    ? await provider.interpret(request.opinion, interpretationContext)
     : { claims: [] }
   let claims: InterpretedClaim[]
   try {
@@ -3221,6 +3324,18 @@ async function analyzeSlottedOpinion(
     }
     throw error
   }
+  if (!validatedClaims) {
+    claims = await reconcilePlayerQuestion(
+      claims,
+      request.opinion,
+      fixture.players,
+      dataset.naming,
+      dataset.id,
+      interpretationContext,
+      eventsThroughSelectedTime,
+    )
+  }
+  const absentPlayer = absentPlayerFromClaims(claims, request.opinion, fixture.players, dataset.naming)
   const results = claims.map((claim) => {
     const anchorEventId =
       claim.timePeriod.kind === 'before-event'
@@ -3324,7 +3439,20 @@ async function analyzeSlottedOpinion(
       fixture,
       matchAnalysis.periodEvents,
     ),
-    claims: results.map((result, index) => ({ ...result, reply: replies[index] })),
+    claims: results.map((result, index) => {
+      const resolution = claimResolution(
+        result,
+        absentPlayer,
+        originalOpinion,
+        fixture.players,
+        claims.length === 1,
+      )
+      return {
+        ...result,
+        reply: replies[index],
+        ...(resolution ? { resolution } : {}),
+      }
+    }),
   }
 
   return response

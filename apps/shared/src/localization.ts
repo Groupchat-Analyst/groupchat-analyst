@@ -1,3 +1,5 @@
+import { resolutionTranslations } from './resolutionLocale.ts'
+
 export type AppLanguage = 'en' | 'es' | 'fr' | 'de' | 'ar'
 
 export const APP_LANGUAGES: ReadonlyArray<{
@@ -1931,6 +1933,7 @@ export function translateText(text: string, language: AppLanguage): string {
   const translated =
     (language === 'ar' ? arabicSupplementalTranslations[content] : undefined) ??
     translations[language]?.[content] ??
+    resolutionTranslations[language]?.[content] ??
     evidenceTranslations[language]?.[content] ??
     content
   return `${leading}${translated}${trailing}`

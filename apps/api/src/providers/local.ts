@@ -21,6 +21,7 @@ import {
 } from '../../../shared/src/countAssertions.js'
 import { classifyOpinion, evidenceForTopic } from '../../../shared/src/opinionTopics.js'
 import { canonicalizeSupportedFootballOpinion } from '../../../shared/src/localization.js'
+import { parsePlayerQuestion } from '../../../shared/src/playerQuestions.js'
 import type {
   InterpretationContext,
   InterpretationProvider,
@@ -186,6 +187,21 @@ function mentionedPlayers(
     name,
     team,
   }))
+}
+
+export { mentionedPlayers }
+
+/** Applies a native-language question family only when its name slot identifies a roster player. */
+function canonicalPlayerQuestion(
+  original: string,
+  alreadyCanonical: string,
+  players: InterpretationContext['players'],
+): string {
+  if (alreadyCanonical !== original) return alreadyCanonical
+  const question = parsePlayerQuestion(original)
+  return question && mentionedPlayers(question.name, players).length > 0
+    ? question.canonical
+    : original
 }
 
 function playerComparisonMetric(text: string): ClaimMetric | undefined {
@@ -998,7 +1014,11 @@ export class LocalInterpretationProvider implements InterpretationProvider {
     opinion: string,
     context: InterpretationContext,
   ): Promise<unknown> {
-    const locallyInterpretableOpinion = canonicalizeSupportedFootballOpinion(opinion)
+    const locallyInterpretableOpinion = canonicalPlayerQuestion(
+      opinion,
+      canonicalizeSupportedFootballOpinion(opinion),
+      context.players,
+    )
     const claims = splitOpinion(locallyInterpretableOpinion).flatMap((text) => {
       const mentions = mentionedPlayers(text, context.players)
       const sharedJudgement =

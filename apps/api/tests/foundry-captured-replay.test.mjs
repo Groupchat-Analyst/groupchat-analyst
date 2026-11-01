@@ -68,7 +68,14 @@ test('captured Bruno request returns the explicit clarification without guessing
   const claim = result.claims[0]
   assert.equal(claim.assessment, 'clarification needed')
   assert.equal(claim.claim.playerSubject, null)
-  assert.match(result.fanReply, /Bruno Fernandes \(Eastport\) or Bruno Guimarães \(Northbridge\)/)
+  // The captured model asked in prose only; the shared resolver now supplies structured choices from the roster.
+  assert.equal(claim.resolution?.status, 'player-choice')
+  assert.deepEqual(
+    claim.playerResolution.candidates.map(({ name }) => name).sort(),
+    ['Bruno Fernandes', 'Bruno Guimarães'],
+  )
+  assert.match(result.fanReply, /Bruno Fernandes \(Eastport\)/)
+  assert.match(result.fanReply, /Bruno Guimarães \(Northbridge\)/)
   assert.doesNotMatch(result.fanReply, /\d+ (?:completed )?passes?/i)
 })
 
