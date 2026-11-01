@@ -1,4 +1,7 @@
 import type { AnalysisPeriod, MatchClock, MatchTeam } from './match.js'
+import type { ClaimPresentation } from './claimPresentation.js'
+
+export type * from './claimPresentation.js'
 
 export type EvidenceKind =
   | 'possession'
@@ -356,6 +359,8 @@ export type ClaimResult = {
   reply?: string
   /** Absent on responses saved before structured resolution; consumers must treat that explicitly. */
   resolution?: ClaimResolution
+  /** Typed, language-free descriptors. Always set by the current server; absent on older saved responses. */
+  presentation?: ClaimPresentation
   playerResolution?: {
     continuation: string
     candidates: PlayerResolutionOption[]
