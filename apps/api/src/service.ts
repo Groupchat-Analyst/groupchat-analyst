@@ -3258,6 +3258,35 @@ function claimResolution(
     : { status: 'needs-clarification' }
 }
 
+function avoidMergedCompoundAssessment(
+  claims: InterpretedClaim[],
+  opinion: string,
+): InterpretedClaim[] {
+  const clauses = opinion.split(/\s+(?:but|however|pero|mais|aber|لكن|بل)\s+/iu)
+  if (
+    claims.length !== 1 ||
+    clauses.length < 2 ||
+    !clauses.every((clause) => /\b(?:Northbridge|Eastport)\b/iu.test(clause))
+  ) {
+    return claims
+  }
+  const [claim] = claims
+  return [{
+    ...claim,
+    subject: null,
+    playerSubject: null,
+    playerMetric: null,
+    intent: 'unrecognized-language',
+    meaning: {
+      category: 'other',
+      description: 'The question contains multiple propositions, but only one claim was interpreted; no partial assessment is presented as complete.',
+      comparison: null,
+    },
+    requiredEvidence: [],
+    historicalEventAnchor: null,
+    clarificationNeeds: ['This question contains multiple propositions, but the interpreter returned only one claim. Please separate the propositions so each can be checked independently.'],
+  }]
+}
 async function analyzeSlottedOpinion(
   request: ReturnType<typeof parseAnalysisRequest>,
   dataset: ReturnType<typeof resolveDataset>,
@@ -3335,6 +3364,9 @@ async function analyzeSlottedOpinion(
       interpretationContext,
       eventsThroughSelectedTime,
     )
+  }
+  if (!validatedClaims && provider.name === 'foundry') {
+    claims = avoidMergedCompoundAssessment(claims, request.opinion)
   }
   const absentPlayer = absentPlayerFromClaims(claims, request.opinion, fixture.players, dataset.naming)
   const results = claims.map((claim) => {

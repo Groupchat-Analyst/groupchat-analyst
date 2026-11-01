@@ -20,6 +20,19 @@ import {
   type MatchClock,
   type MatchTeam,
 } from '../../shared/src/matchClock'
+import {
+  formatLegacyEvidence,
+  formatOtherEventEvidence,
+  formatPossessionEvidence,
+  formatTurnoverEvidence,
+} from '../../shared/src/evidenceLocale'
+import {
+  comparisonFactsFromResult,
+  comparisonLimitation,
+  formatCountWithNoun,
+  formatFactualComparison,
+  formatNumber,
+} from '../../shared/src/factualPresentation'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
 import {
@@ -520,6 +533,28 @@ function localizedStatistics(
   datasetId: string,
   language: ReturnType<typeof useLocalization>['language'],
 ): { answer: string; facts: string[]; limitation: string } | undefined {
+  const factual = comparisonFactsFromResult(
+    result,
+    (team) => localizeMatchText(team, datasetId, language),
+    (player) => localizedPlayerName(datasetId, player.id, player.name, language),
+  )
+  if (factual) {
+    const metric = factual.metric
+    const isPercent = metric === 'possession-percentage' || metric === 'pass-completion-percentage'
+    const show = (value: number | null) =>
+      value === null
+        ? translateText('Not available', language)
+        : isPercent
+          ? `${formatNumber(value, language)}%`
+          : formatCountWithNoun(metric, value, language)
+    return {
+      answer: formatFactualComparison(factual, language),
+      facts: [factual.subject, factual.opponent].map(
+        (side) => `${side.name} · ${show(side.value)}`,
+      ),
+      limitation: comparisonLimitation(factual, language),
+    }
+  }
   if (
     result.claim.intent !== 'statistical-request' ||
     result.assessment !== 'statistics provided'
@@ -732,14 +767,31 @@ function localizedEvidenceDescription(
       language,
     )
   }
-  return localizeMatchText(
-    translateNarrative(
-      describeEvidence(reference.description, foundation.players),
+  const turnover = foundation.turnoverRecords.find(({ id }) => id === reference.id)
+  if (turnover) {
+    return formatTurnoverEvidence(
+      { time: reference.time, team, player: nameFor(turnover.playerId), passId: turnover.lostPassId },
       language,
-    ),
-    datasetId,
-    language,
-  )
+    )
+  }
+  const interval = foundation.possessionIntervals.find(({ id }) => id === reference.id)
+  if (interval) {
+    return formatPossessionEvidence(
+      { time: reference.time, team, minutes: interval.durationMinutes, status: interval.status },
+      language,
+    )
+  }
+  if (event?.type === 'other') {
+    return language === 'en'
+      ? describeEvidence(reference.description, foundation.players)
+      : formatOtherEventEvidence({ time: reference.time, team }, language)
+  }
+  return language === 'en'
+    ? describeEvidence(reference.description, foundation.players)
+    : formatLegacyEvidence(
+        { time: reference.time, team, source: reference.description },
+        language,
+      )
 }
 
 function localizedClaimMeaning(
@@ -1391,7 +1443,7 @@ function localizedShareModel(
         : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
       counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
       limitations: model.claims.length === 1 && (playerPresentation || statisticPresentation)
-        ? [playerPresentation?.limitation ?? statisticPresentation?.limitation ?? translateText('Statistics only, no verdict', language)]
+        ? [playerPresentation?.limitation ?? statisticPresentation?.limitation ?? translateText('Statistics only, no verdict', language)].filter(Boolean)
         : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
     })),
     footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
@@ -1409,6 +1461,33 @@ function localizedShareCardBlocks(
       ? block.text
       : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
   }))
+}
+
+function localizedAnswerText(
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): { text: string; structured: boolean } {
+  const pending = (result: ClaimResult) => claimResolution(result) !== undefined
+  const replies = analysis.claims
+    .filter((result) => !pending(result))
+    .map((result) =>
+      localizedPlayerPerformance(result, datasetId, language)?.answer ??
+      localizedStatistics(result, datasetId, language)?.answer ??
+      (result.reply ? translateNarrative(result.reply, language) : undefined),
+    )
+    .filter((reply): reply is string => Boolean(reply))
+  const allStructured = analysis.claims.length > 0 &&
+    analysis.claims.every(
+      (result) =>
+        pending(result) ||
+        localizedPlayerPerformance(result, datasetId, language) !== undefined ||
+        localizedStatistics(result, datasetId, language) !== undefined,
+    )
+  const anyPending = analysis.claims.some(pending)
+  return anyPending || allStructured
+    ? { text: replies.join(' '), structured: true }
+    : { text: canonicalReply(analysis), structured: false }
 }
 
 // One question and its reply, frozen at the minute and period it was asked.
@@ -1484,13 +1563,18 @@ function TurnMessages({
         title: 'Clarification:',
       }]
     }
+    const structured = playerPresentations.get(result.claim.id) ??
+      statisticPresentations.get(result.claim.id)
+    if (structured) {
+      return structured.limitation
+        ? [{ key: `${result.claim.id}-limitation`, text: structured.limitation, title: 'Limitation:' }]
+        : []
+    }
     return isRoutineLimitation(result)
       ? []
       : [{
           key: `${result.claim.id}-limitation`,
-          text: playerPresentations.get(result.claim.id)?.limitation ??
-            statisticPresentations.get(result.claim.id)?.limitation ??
-            result.limitation,
+          text: result.limitation,
           title: 'Limitation:',
         }]
   })
@@ -1996,8 +2080,11 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyAssessment() {
     if (!analysis) return
     try {
+      const answer = localizedAnswerText(analysis, datasetId, language)
       await navigator.clipboard.writeText(
-        localizeMatchText(translateNarrative(canonicalReply(analysis), language), datasetId, language),
+        answer.structured
+          ? answer.text
+          : localizeMatchText(translateNarrative(answer.text, language), datasetId, language),
       )
       setCopyMessage('Reply copied.')
     } catch {
