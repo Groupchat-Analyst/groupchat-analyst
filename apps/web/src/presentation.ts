@@ -152,8 +152,20 @@ export type ShareCardClaim = {
   facts: string[]
   moments: string[]
   counter: string[]
+  /** Typed sources of `facts`, `moments` and `counter`, so localized cards never parse the English lines. */
+  factData?: ShareFact[]
+  momentRefs?: EvidenceReference[]
+  counterRefs?: EvidenceReference[]
+  /** `facts`, `moments` and `counter` were rendered in the reader's language from the typed sources. */
+  linesRendered?: boolean
   limitations: string[]
   omitted: number
+}
+
+export type ShareFact = {
+  entity: { kind: 'team'; team: string } | { kind: 'player'; id: string; name: string; team: string }
+  metric: string
+  value: number
 }
 
 /** Localized wording around already-rendered share-card text; English defaults apply when absent. */
@@ -173,6 +185,7 @@ export type ShareCardModel = {
   /** Scope and answer were rendered in the reader's language from typed descriptors. */
   scopeLocalized?: boolean
   answerLocalized?: boolean
+  footerLocalized?: boolean
   /** English text of a saved legacy answer, shown only as labelled source. */
   legacySource?: string
   labels?: ShareCardLabels
@@ -238,8 +251,22 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
         : ASSESSMENT_LABELS[result.assessment],
     contextOnly: isUnsupportedJudgement(result),
     facts: [...stats, ...playerStats],
+    factData: [
+      ...result.statistics
+        .filter((stat) => stat.value !== null && (teams.size === 0 || teams.has(stat.team)))
+        .map((stat): ShareFact => ({ entity: { kind: 'team', team: stat.team }, metric: stat.metric, value: stat.value as number })),
+      ...result.playerStatistics
+        .filter((stat) => stat.value !== null)
+        .map((stat): ShareFact => ({
+          entity: { kind: 'player', id: stat.playerId, name: stat.playerName, team: stat.team },
+          metric: stat.metric,
+          value: stat.value as number,
+        })),
+    ],
     moments: shown.map(({ reference }) => eventLine(reference, roster)),
     counter: shownCounter.map(({ reference }) => eventLine(reference, roster)),
+    momentRefs: shown.map(({ reference }) => reference),
+    counterRefs: shownCounter.map(({ reference }) => reference),
     limitations: dedupe([
       ...result.claim.clarificationNeeds,
       ...(isRoutineLimitation(result)
@@ -358,13 +385,13 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
     if (claim.facts.length > 0) {
       blocks.push({ kind: 'label', text: claim.contextOnly ? CONTEXT_ONLY_LABEL : 'Key facts' })
     }
-    for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact })
+    for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.moments.length > 0) {
       blocks.push({ kind: 'label', text: 'Selected recorded moments' })
     }
-    for (const moment of claim.moments) blocks.push({ kind: 'bullet', text: moment })
+    for (const moment of claim.moments) blocks.push({ kind: 'bullet', text: moment, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.counter.length > 0) blocks.push({ kind: 'label', text: 'Evidence against' })
-    for (const item of claim.counter) blocks.push({ kind: 'bullet', text: item })
+    for (const item of claim.counter) blocks.push({ kind: 'bullet', text: item, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.omitted > 0) {
       blocks.push({
         kind: 'note',
@@ -386,7 +413,7 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
       localized: true,
     })
   }
-  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL })
+  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL, ...(model.footerLocalized ? { localized: true } : {}) })
   return blocks
 }
 

@@ -92,6 +92,14 @@ const EN = {
   'ht.goal': 'A first-half goal for {subject} is recorded at {clock}.',
   'ht.none': 'No first-half goal for {subject} is recorded in the completed first half (checked at {clock}).',
   'ht.open': 'The first half is not over at {clock}, so a first-half goal could still be recorded.',
+  'focus.halfTime': 'goals before half-time',
+  'focus.possession': 'possession',
+  'focus.passing': 'passing',
+  'focus.attacking': 'attacking output',
+  'focus.involvement': 'recorded involvement',
+  'focus.events': 'recorded match events',
+  'understood.entity': 'A claim about {focus} for {entity}, checked against the recorded synthetic match data.',
+  'understood.plain': 'A claim about {focus}, checked against the recorded synthetic match data.',
   'hist.claim': 'Claim: “{quote}”.',
   'hist.possession': 'Recorded possession over the checked window: {team} {value}% to {opponent} {opponentValue}%, from {minutes} of controlled play (contested and out-of-play time excluded).',
   'hist.runOfPlay': 'Possession share alone does not establish the run of play.',
@@ -256,6 +264,14 @@ const ES: Dict = {
   'ht.goal': 'Consta un gol de {subject} en la primera parte, en el {clock}.',
   'ht.none': 'No consta ningún gol de {subject} en la primera parte ya completada (comprobado en el {clock}).',
   'ht.open': 'La primera parte no ha terminado en el {clock}, así que aún podría registrarse un gol.',
+  'focus.halfTime': 'goles antes del descanso',
+  'focus.possession': 'posesión',
+  'focus.passing': 'pases',
+  'focus.attacking': 'ataque',
+  'focus.involvement': 'participación registrada',
+  'focus.events': 'eventos registrados del partido',
+  'understood.entity': 'Una afirmación sobre {focus} de {entity}, comprobada con los datos sintéticos registrados del partido.',
+  'understood.plain': 'Una afirmación sobre {focus}, comprobada con los datos sintéticos registrados del partido.',
   'hist.claim': 'Afirmación: «{quote}».',
   'hist.possession': 'Posesión registrada en el periodo comprobado: {team} {value}% frente a {opponent} {opponentValue}%, sobre {minutes} de juego controlado (sin contar el juego disputado ni el balón fuera de juego).',
   'hist.runOfPlay': 'El porcentaje de posesión por sí solo no establece el desarrollo del juego.',
@@ -417,6 +433,14 @@ const FR: Dict = {
   'ht.goal': 'Un but de {subject} en première mi-temps est enregistré à {clock}.',
   'ht.none': 'Aucun but de {subject} n’est enregistré dans la première mi-temps terminée (vérifié à {clock}).',
   'ht.open': 'La première mi-temps n’est pas terminée à {clock} ; un but pourrait donc encore être enregistré.',
+  'focus.halfTime': 'les buts avant la mi-temps',
+  'focus.possession': 'la possession',
+  'focus.passing': 'les passes',
+  'focus.attacking': 'l’attaque',
+  'focus.involvement': 'la participation enregistrée',
+  'focus.events': 'les événements enregistrés du match',
+  'understood.entity': 'Une affirmation sur {focus} pour {entity}, vérifiée avec les données synthétiques enregistrées du match.',
+  'understood.plain': 'Une affirmation sur {focus}, vérifiée avec les données synthétiques enregistrées du match.',
   'hist.claim': 'Affirmation : « {quote} ».',
   'hist.possession': 'Possession enregistrée sur la période vérifiée : {team} {value}% contre {opponent} {opponentValue}%, sur {minutes} de jeu contrôlé (jeu disputé et ballon hors jeu exclus).',
   'hist.runOfPlay': 'Le taux de possession seul n’établit pas le déroulement du jeu.',
@@ -578,6 +602,14 @@ const DE: Dict = {
   'ht.goal': 'Ein Tor von {subject} in der ersten Halbzeit ist bei {clock} erfasst.',
   'ht.none': 'In der abgeschlossenen ersten Halbzeit ist kein Tor von {subject} erfasst (geprüft bei {clock}).',
   'ht.open': 'Die erste Halbzeit ist bei {clock} noch nicht vorbei, daher könnte noch ein Tor erfasst werden.',
+  'focus.halfTime': 'Tore vor der Halbzeit',
+  'focus.possession': 'Ballbesitz',
+  'focus.passing': 'Pässe',
+  'focus.attacking': 'Angriff',
+  'focus.involvement': 'erfasste Beteiligung',
+  'focus.events': 'erfasste Spielereignisse',
+  'understood.entity': 'Eine Behauptung zu {focus} von {entity}, geprüft anhand der erfassten synthetischen Spieldaten.',
+  'understood.plain': 'Eine Behauptung zu {focus}, geprüft anhand der erfassten synthetischen Spieldaten.',
   'hist.claim': 'Aussage: „{quote}“.',
   'hist.possession': 'Erfasster Ballbesitz im geprüften Zeitraum: {team} {value}% gegenüber {opponent} {opponentValue}%, aus {minutes} kontrolliertem Spiel (umkämpfte und Aus-Zeiten ausgenommen).',
   'hist.runOfPlay': 'Der Ballbesitzanteil allein belegt den Spielverlauf nicht.',
@@ -739,6 +771,14 @@ const AR: Dict = {
   'ht.goal': 'سُجّل هدف لـ{subject} في الشوط الأول عند {clock}.',
   'ht.none': 'لا يوجد هدف مسجّل لـ{subject} في الشوط الأول المكتمل (فُحص عند {clock}).',
   'ht.open': 'لم ينتهِ الشوط الأول عند {clock}، لذلك قد يُسجَّل هدف بعد.',
+  'focus.halfTime': 'الأهداف قبل نهاية الشوط الأول',
+  'focus.possession': 'الاستحواذ',
+  'focus.passing': 'التمريرات',
+  'focus.attacking': 'الهجوم',
+  'focus.involvement': 'المشاركة المسجّلة',
+  'focus.events': 'أحداث المباراة المسجّلة',
+  'understood.entity': 'ادعاء بشأن {focus} لدى {entity}، جرى فحصه مقابل بيانات المباراة الاصطناعية المسجّلة.',
+  'understood.plain': 'ادعاء بشأن {focus}، جرى فحصه مقابل بيانات المباراة الاصطناعية المسجّلة.',
   'hist.claim': 'الادعاء: «{quote}».',
   'hist.possession': 'الاستحواذ المسجّل في الفترة المفحوصة: {team} {value}% مقابل {opponent} {opponentValue}%، من {minutes} من اللعب المسيطَر عليه (باستثناء اللعب المتنازع عليه والكرة خارج الملعب).',
   'hist.runOfPlay': 'نسبة الاستحواذ وحدها لا تثبت مجريات اللعب.',
@@ -1298,6 +1338,86 @@ export function renderPresentationScope(scope: ScopeFact, ctx: PresentationConte
 export function renderPresentationReason(reason: ReasonCode, language: AppLanguage): string {
   const template = DICTS[language][`reason.${reason}`]
   return template ?? text(language, 'unsupported')
+}
+
+/** The topic a presentation-backed claim is about, in the reader's language; null for structured-elsewhere answers. */
+export function renderPresentationFocus(answer: AnswerFact, language: AppLanguage): string | null {
+  let key: string
+  switch (answer.code) {
+    case 'structured-elsewhere':
+      return null
+    case 'count-assertion': {
+      const label = metricLabel(answer.metric, language)
+      if (label !== null) return label.toLocaleLowerCase(language)
+      key = 'focus.events'
+      break
+    }
+    case 'half-time':
+      key = 'focus.halfTime'
+      break
+    case 'possession-dominance':
+      key = 'focus.possession'
+      break
+    case 'historical':
+      key = answer.possession ? 'focus.possession' : answer.playerFacts ? 'focus.involvement' : 'focus.events'
+      break
+    case 'player-broad':
+      key = 'focus.involvement'
+      break
+    case 'topic':
+      key = answer.facts.kind === 'passing'
+        ? 'focus.passing'
+        : answer.facts.kind === 'attacking'
+          ? 'focus.attacking'
+          : answer.facts.kind === 'involvement' || answer.facts.kind === 'player-summary'
+            ? 'focus.involvement'
+            : 'focus.events'
+      break
+    default:
+      key = 'focus.events'
+  }
+  return text(language, key)
+}
+
+/** "What we understood" line from typed answer facts; null for structured-elsewhere answers. */
+export function renderPresentationUnderstood(
+  presentation: ClaimPresentation,
+  ctx: PresentationContext,
+  language: AppLanguage,
+): string | null {
+  const { answer } = presentation
+  const focus = renderPresentationFocus(answer, language)
+  if (focus === null) return null
+  const entity: EntityRef | undefined =
+    answer.code === 'count-assertion' || answer.code === 'half-time' || answer.code === 'topic'
+      ? answer.subject
+      : answer.code === 'player-broad'
+        ? answer.player
+        : answer.code === 'possession-dominance'
+          ? { kind: 'team', team: answer.team }
+          : undefined
+  return entity
+    ? text(language, 'understood.entity', { focus, entity: ctx.nameOf(entity) })
+    : text(language, 'understood.plain', { focus })
+}
+
+/**
+ * One share-card key fact, "Name: 1 goal", from typed fields (recorded value, never null).
+ * Returns null for metrics without a localized noun so callers omit it rather than show English.
+ */
+export function renderStatisticFact(
+  name: string,
+  metric: string,
+  value: number,
+  language: AppLanguage,
+): string | null {
+  const colon = language === 'fr' ? ' : ' : ': '
+  if (COUNT_METRICS.has(metric)) return `${name}${colon}${countText(metric, value, language)}`
+  if (metric === 'possession-percentage' || metric === 'pass-completion-percentage') {
+    const label = metricLabel(metric, language)
+    return label === null ? null : `${name}${colon}${percent(value, language)} ${label}`
+  }
+  return null
 }
 
 export function renderPresentationLimitations(

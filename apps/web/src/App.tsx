@@ -38,8 +38,14 @@ import { PassMap } from './PassMap'
 import {
   AnalysisRequestError,
   AnalysisTimeoutError,
+  ANALYSIS_TIMEOUT_MS,
   requestAnalysis,
 } from './analysisClient'
+import {
+  renderRequestError,
+  requestErrorFact,
+  type RequestErrorFact,
+} from '../../shared/src/requestErrorLocale'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -67,7 +73,8 @@ import {
   type AnswerText,
   type ClaimView,
 } from './localizedPresentation'
-import { renderAssessmentLabel, renderLegacyCompatibility, renderLegacySourceLabel } from '../../shared/src/claimPresentationLocale'
+import { renderAssessmentLabel, renderLegacyCompatibility, renderLegacySourceLabel, renderPresentationFocus, renderPresentationScope, renderPresentationUnderstood, renderStatisticFact } from '../../shared/src/claimPresentationLocale'
+import type { EntityRef } from '../../shared/src/claimPresentation'
 import {
   buildLocalizedChangeCard,
   changeCardText,
@@ -80,7 +87,7 @@ import {
   type ChangeCard,
   type Comparison,
 } from './investigation'
-import { renderComparisonFacts, type ChangeContext } from '../../shared/src/changeLocale'
+import { renderChangeCardFooter, renderChangeCardLabels, renderComparisonFacts, type ChangeContext } from '../../shared/src/changeLocale'
 import { presentationContext } from './localizedPresentation'
 import { createBlocksImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
@@ -93,7 +100,6 @@ import {
   localizedExample,
   translateNarrative,
   translateText,
-  type AppLanguage,
 } from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
 import { claimResolution, hasUnresolvedClaims, resolutionMessage } from '../../shared/src/claimState'
@@ -129,30 +135,13 @@ type SubmittedRequest = {
   operation: RequestOperation
 }
 
-const publicAiErrorMessages: Readonly<Record<string, string>> = {
-  foundry_not_configured:
-    'AI interpretation is unavailable. Use local rules instead.',
-  foundry_allowance_unavailable:
-    'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
-  foundry_allowance_exhausted:
-    'The shared AI request allowance is exhausted. Use local rules instead.',
-  foundry_client_allowance_exhausted:
-    'The AI request allowance for this network is exhausted. Use local rules instead or try again later.',
-  foundry_interpretation_failed:
-    'AI interpretation failed. This attempt used one allowance. Try again or use local rules instead.',
-  analysis_timeout:
-    'The check timed out. The request may still be processing. Try again when ready, or use local rules.',
-}
+class ClientRequestFailure extends Error {
+  readonly kind: 'incomplete' | 'different-match'
 
-function localizeAnalysisError(
-  message: string,
-  code: string,
-  language: AppLanguage,
-): string {
-  return translateNarrative(
-    code ? publicAiErrorMessages[code] ?? message : message,
-    language,
-  )
+  constructor(kind: 'incomplete' | 'different-match', message: string) {
+    super(message)
+    this.kind = kind
+  }
 }
 
 function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOption {
@@ -638,6 +627,11 @@ function localizedCheckedAgainst(
             )
           : subject
         : translateText('Both teams', language)
+      const typed = result.presentation
+      const names = presentationContext(datasetId, language)
+      const periodText = typed
+        ? renderPresentationScope(typed.scope, names, language)
+        : translateNarrative(describePeriodLabel(result.periodLabel), language)
       if (isUnsupportedJudgement(result)) {
         return [
           who,
@@ -645,7 +639,7 @@ function localizedCheckedAgainst(
             'defensive shape and positioning (not recorded, so no verdict)',
             language,
           ),
-          translateNarrative(describePeriodLabel(result.periodLabel), language),
+          periodText,
         ].join(' · ')
       }
       const metrics = comparison
@@ -654,21 +648,18 @@ function localizedCheckedAgainst(
             ...result.statistics.map(({ metric }) => metric),
             ...result.playerStatistics.map(({ metric }) => metric),
           ])]
+      const typedFocus = typed ? renderPresentationFocus(typed.answer, language) : null
       const what = metrics.length > 0
         ? metrics
             .slice(0, 3)
             .map((metric) => metricLabel(metric, language))
             .join(language === 'ar' ? '، ' : ', ')
-        : localizeMatchText(
+        : typedFocus ?? localizeMatchText(
             translateNarrative(claim.meaning.description, language),
             datasetId,
             language,
           )
-      return [
-        who,
-        what,
-        translateNarrative(describePeriodLabel(result.periodLabel), language),
-      ].join(' · ')
+      return [who, what, periodText].join(' · ')
     })
 }
 
@@ -843,6 +834,10 @@ function localizedClaimMeaning(
       )
     }
   }
+  const typedUnderstood = result.presentation
+    ? renderPresentationUnderstood(result.presentation, presentationContext(datasetId, language), language)
+    : null
+  if (typedUnderstood !== null) return typedUnderstood
   return localizeMatchText(
     translateNarrative(claim.meaning.description, language),
     datasetId,
@@ -1120,7 +1115,7 @@ function PlayerResolutionPicker({
             <p>{translateText('Player selection failed.', language)}</p>
             <details className="msg-evidence">
               <summary>{translateText('Details', language)}</summary>
-              <p>{translateNarrative(requestError, language)}</p>
+              <p>{requestError}</p>
             </details>
             <button className="secondary-button" type="button" onClick={onRetry}>
               {translateText('Try again', language)}
@@ -1437,7 +1432,11 @@ function WhatChanged({
         </div>
       )}
       {(rendered?.caveats ?? []).map((caveat) => <p className="change-caveat" key={caveat} data-original-source="true" dir="auto">{caveat}</p>)}
-      {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
+      {rendered && result.facts.qualifications
+        ? rendered.qualifications.map((text) => (
+            <p className="change-caveat" key={text} data-original-source="true" dir="auto">{renderChangeCardLabels(language).limitation(text)}</p>
+          ))
+        : result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
         <summary>{translateText('Earlier answer', language)} · {result.earlierTime} · <span data-original-source="true" dir="auto">{earlierScope}</span></summary>
         <p className="server-summary" data-original-source="true" dir="auto">{earlierAnswer.text}</p>
@@ -1466,6 +1465,18 @@ function WhatChanged({
 
 function scopePeriod(period: AnalysisPeriod): string {
   return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+}
+
+function catalogMatchLabel(
+  datasetId: string,
+  version: string | undefined,
+  language: ReturnType<typeof useLocalization>['language'],
+): string | undefined {
+  const entry = findCatalogEntry(datasetId)
+  if (!entry || !version) return undefined
+  const teams = localizeMatchText(translateNarrative(`${entry.teams[0]} v ${entry.teams[1]}`, language), datasetId, language)
+  const fixture = localizeMatchText(translateNarrative(`${entry.name} v${version}`, language), datasetId, language)
+  return `${teams} · ${fixture}`
 }
 
 function localizedShareModel(
@@ -1522,6 +1533,19 @@ function localizedShareModel(
           ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
           : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
         counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        ...(view?.kind === 'presentation' && analysis && claim.factData && claim.momentRefs && claim.counterRefs
+          ? (() => {
+              const names = presentationContext(datasetId, language)
+              return {
+                linesRendered: true,
+                facts: claim.factData
+                  .map((fact) => renderStatisticFact(names.nameOf(fact.entity as EntityRef), fact.metric, fact.value, language))
+                  .filter((line): line is string => line !== null),
+                moments: claim.momentRefs.map((reference) => localizedEvidenceDescription(reference, analysis, datasetId, language)),
+                counter: claim.counterRefs.map((reference) => localizedEvidenceDescription(reference, analysis, datasetId, language)),
+              }
+            })()
+          : {}),
         limitations: view?.kind === 'presentation' || view?.kind === 'structured'
           ? view.limitations
           : view?.kind === 'legacy'
@@ -1529,7 +1553,19 @@ function localizedShareModel(
             : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
       }
     }),
-    footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
+    ...(analysis && model.footer
+      ? {
+          footerLocalized: true,
+          footer: renderChangeCardFooter(
+            {
+              matchLabel: catalogMatchLabel(datasetId, analysis.evidenceFoundation.dataset?.version, language),
+              reader: analysis.provider === 'local' ? 'local' : 'foundry',
+              playerSelected: (analysis.selectedPlayers?.length ?? 0) > 0,
+            },
+            language,
+          ),
+        }
+      : { footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined }),
   }
 }
 
@@ -1744,7 +1780,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
-  const [requestErrorCode, setRequestErrorCode] = useState('')
+  const [requestErrorFactState, setRequestErrorFact] = useState<RequestErrorFact | null>(null)
   const [localRulesOnly, setLocalRulesOnly] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [shareMessage, setShareMessage] = useState('')
@@ -1754,7 +1790,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const resolutionRequestId = useRef<number | null>(null)
   const answerRef = useRef<HTMLDivElement>(null)
   const localizedRequestError = requestError
-    ? localizeAnalysisError(requestError, requestErrorCode, language)
+    ? renderRequestError(requestErrorFactState ?? { code: 'unknown' }, language)
     : ''
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
@@ -1784,6 +1820,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         comparison.result,
         changeContext(comparison.earlier, comparison.later, datasetId, language),
         language,
+        catalogMatchLabel(datasetId, comparison.later.analysis.evidenceFoundation.dataset?.version, language) ?? '',
       )
       if (!card) return null
       return {
@@ -1891,8 +1928,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           signal: controller.signal,
           localRulesOnly: active.localRulesOnly,
         })
-        if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
-        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
+        if (!isAnalysisResponse(payload)) throw new ClientRequestFailure('incomplete', 'The analysis service returned an incomplete answer.')
+        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new ClientRequestFailure('different-match', 'The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
           if (active.operation.kind === 'resolve-player' && active.baseline) {
             const snapshot = createSnapshot(
@@ -1929,21 +1966,23 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           !controller.signal.aborted &&
           isLatestRequest(requestId, analysisRequestId.current)
         ) {
-          setRequestErrorCode(
-            error instanceof AnalysisRequestError
-              ? error.code ?? ''
-              : error instanceof AnalysisTimeoutError
-                ? 'analysis_timeout'
-                : '',
+          setRequestErrorFact(
+            requestErrorFact(
+              error instanceof ClientRequestFailure
+                ? { kind: error.kind }
+                : error instanceof AnalysisRequestError
+                  ? { kind: 'server', code: error.code }
+                  : error instanceof AnalysisTimeoutError
+                    ? { kind: 'timeout', timeoutSeconds: Math.round(ANALYSIS_TIMEOUT_MS / 1000) }
+                    : error instanceof TypeError
+                      ? { kind: 'network' }
+                      : { kind: 'other' },
+            ),
           )
           setRequestError(
-            error instanceof AnalysisRequestError
+            error instanceof Error
               ? error.message
-              : error instanceof TypeError
-                ? 'The analysis service could not be reached. You can try again or use local rules.'
-                : error instanceof Error
-                  ? error.message
-                  : 'The analysis service could not be reached. You can try again or use local rules.',
+              : 'The analysis service could not be reached. You can try again or use local rules.',
           )
         }
       } finally {

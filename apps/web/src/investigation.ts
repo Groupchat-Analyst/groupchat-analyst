@@ -13,11 +13,13 @@ import { COMPARISON_MESSAGES } from '../../shared/src/comparisonLocale.ts'
 import type {
   ChangeCaveat,
   ChangeContext,
+  ChangeCoverage,
   ChangeFigure,
   ChangePair,
+  ChangeQualification,
   ComparisonFacts,
 } from '../../shared/src/changeLocale.ts'
-import { renderChangeCardLabels, renderComparisonFacts } from '../../shared/src/changeLocale.ts'
+import { renderChangeCardFooter, renderChangeCardLabels, renderComparisonFacts } from '../../shared/src/changeLocale.ts'
 import type { AppLanguage } from '../../shared/src/localization.ts'
 import {
   ASSESSMENT_LABELS,
@@ -240,6 +242,55 @@ function datasetOf(snapshot: AnswerSnapshot): string {
   return `${id}@${version}`
 }
 
+/** Typed counterpart of qualificationsOf, built only from typed fields; never from the English text. */
+function typedQualificationsOf(snapshot: AnswerSnapshot): ChangeQualification['detail'][] {
+  const { analysis } = snapshot
+  const found = new Map<string, ChangeQualification['detail']>()
+  const add = (detail: ChangeQualification['detail']) => found.set(JSON.stringify(detail), detail)
+  for (const result of analysis.claims) {
+    if (result.claim.clarificationNeeds.length > 0) add({ code: 'clarification-needed' })
+    const routine = isRoutineLimitation(result)
+    for (const limitation of result.presentation?.limitations ?? []) {
+      if (routine && (limitation.code === 'descriptive-statistics-only' || limitation.code === 'comparison-generic')) continue
+      add(limitation)
+    }
+    for (const item of result.evidenceAvailability) {
+      if (!item.available) add({ code: 'unavailable-evidence', kind: item.kind })
+    }
+    for (const [kind, flag] of COVERAGE_FLAGS) {
+      if (result.claim.requiredEvidence.includes(kind as never) && !analysis.evidenceFoundation[flag]) {
+        add({
+          code: 'coverage-partial',
+          coverage: kind as ChangeCoverage,
+          missingPeriods: [...analysis.evidenceFoundation.missingCoveragePeriods],
+        })
+      }
+    }
+  }
+  return [...found.values()]
+}
+
+/** Undefined when any saved claim predates typed presentations, so callers show the legacy compatibility state. */
+function typedQualifications(earlier: AnswerSnapshot, later: AnswerSnapshot): ChangeQualification[] | undefined {
+  const claims = [...earlier.analysis.claims, ...later.analysis.claims]
+  if (claims.some((result) => result.presentation === undefined)) return undefined
+  const before = typedQualificationsOf(earlier)
+  const after = typedQualificationsOf(later)
+  const key = (detail: ChangeQualification['detail']) => JSON.stringify(detail)
+  const afterKeys = new Set(after.map(key))
+  const beforeKeys = new Set(before.map(key))
+  const sameClock = formatMatchClock(earlier.context.selectedClock) === formatMatchClock(later.context.selectedClock)
+  return [
+    ...before.filter((detail) => afterKeys.has(key(detail))).map((detail) => ({ detail })),
+    ...before
+      .filter((detail) => !afterKeys.has(key(detail)))
+      .map((detail) => ({ detail, at: earlier.context.selectedClock })),
+    ...after
+      .filter((detail) => !beforeKeys.has(key(detail)))
+      .map((detail) => (sameClock ? { detail } : { detail, at: later.context.selectedClock })),
+  ]
+}
+
 const STATE_PHRASE: Record<ClaimResult['assessment'], [string, string]> = {
   supported: ['held up', 'holds up'],
   contradicted: ["didn't hold up", "doesn't hold up"],
@@ -389,6 +440,14 @@ function windowOf(snapshot: AnswerSnapshot): string {
 
 /** Deterministic comparison of two returned answers. It never calls a model and never asserts a cause. */
 export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot): Comparison {
+  const comparison = compareCore(earlier, later)
+  const qualifications = typedQualifications(earlier, later)
+  return qualifications === undefined
+    ? comparison
+    : { ...comparison, facts: { ...comparison.facts, qualifications } }
+}
+
+function compareCore(earlier: AnswerSnapshot, later: AnswerSnapshot): Comparison {
   const earlierTime = formatMatchClock(earlier.context.selectedClock)
   const laterTime = formatMatchClock(later.context.selectedClock)
   const qualifications = combinedQualifications(earlier, later, earlierTime, laterTime)
@@ -571,6 +630,8 @@ export function buildLocalizedChangeCard(
   comparison: Comparison,
   ctx: ChangeContext,
   language: AppLanguage,
+  /** Localized "Northbridge v Eastport · Original match v3.0.0" ('' when the dataset is unknown); absent keeps the legacy English footer. */
+  matchLabel?: string,
 ): ChangeCard | null {
   if (comparison.status !== 'comparable' || !comparison.facts) return null
   const { facts } = comparison
@@ -608,8 +669,27 @@ export function buildLocalizedChangeCard(
     }
   })
   for (const caveat of rendered.caveats) blocks.push({ kind: 'note', text: labels.note(caveat), localized: true })
-  for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
-  blocks.push({ kind: 'footer', text: sourceFooter(later.analysis) })
+  if (facts.qualifications) {
+    for (const text of rendered.qualifications) blocks.push({ kind: 'note', text: labels.limitation(text), localized: true })
+  } else {
+    for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
+  }
+  blocks.push(
+    matchLabel === undefined
+      ? { kind: 'footer', text: sourceFooter(later.analysis) }
+      : {
+          kind: 'footer',
+          localized: true,
+          text: renderChangeCardFooter(
+            {
+              matchLabel: matchLabel || undefined,
+              reader: later.analysis.provider === 'local' ? 'local' : 'foundry',
+              playerSelected: (later.analysis.selectedPlayers?.length ?? 0) > 0,
+            },
+            language,
+          ),
+        },
+  )
   return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
 

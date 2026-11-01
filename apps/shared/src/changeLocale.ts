@@ -1,6 +1,7 @@
 import type { ClaimResult } from './apiContracts.ts'
 import { COMPARISON_MESSAGES, comparisonTranslations } from './comparisonLocale.ts'
-import { renderAssessmentLabel } from './claimPresentationLocale.ts'
+import { renderAssessmentLabel, renderLimitationFact } from './claimPresentationLocale.ts'
+import type { LimitationFact } from './claimPresentation.ts'
 import { formatNumber } from './factualPresentation.ts'
 import type { AppLanguage } from './localization.ts'
 import { formatMatchClock, type AnalysisPeriod, type MatchClock } from './matchClock.ts'
@@ -52,6 +53,19 @@ export type ChangeCaveat =
 
 export type ChangeCheck = { clock: MatchClock; period: AnalysisPeriod }
 
+export type ChangeCoverage = 'possession' | 'passing' | 'possession-losses'
+
+/**
+ * A material data qualification carried by one or both answers. `detail` is typed: either a
+ * ClaimPresentation LimitationFact copied from the saved answer, or a coverage-partial flag with
+ * the raw missing-period ids. `at` is the check clock the qualification applies to; it is absent
+ * when it applies to both checks (or the checks share one clock).
+ */
+export type ChangeQualification = {
+  detail: LimitationFact | { code: 'coverage-partial'; coverage: ChangeCoverage; missingPeriods: string[] }
+  at?: MatchClock
+}
+
 export type ComparisonFacts = {
   version: 1
   status: ChangeStatus
@@ -60,6 +74,8 @@ export type ComparisonFacts = {
   /** Empty unless status is 'comparable'. */
   pairs: ChangePair[]
   caveats: ChangeCaveat[]
+  /** Typed qualifications; absent on facts saved before they existed (legacy English stays elsewhere). */
+  qualifications?: ChangeQualification[]
   /** Which headline applies when the checks cannot be compared. */
   reason?: 'different-data' | 'different-interpretation' | 'different-periods' | 'not-assessed'
 }
@@ -70,7 +86,7 @@ export type ChangeContext = {
   describeRecord?: (recordId: string, change: 'added' | 'removed') => string
 }
 
-export type RenderedComparison = { headline: string; lines: string[]; caveats: string[] }
+export type RenderedComparison = { headline: string; lines: string[]; caveats: string[]; qualifications: string[] }
 
 class UnsupportedChange extends Error {}
 
@@ -131,6 +147,16 @@ const EN = {
   'card.removed': 'No longer in the window',
   'card.note': 'Note: {text}',
   'card.limitation': 'Limitation: {text}',
+  'q.at': 'At {clock}: {text}',
+  'q.cov.possession': 'Possession coverage is partial',
+  'q.cov.passing': 'Pass coverage is partial',
+  'q.cov.possession-losses': 'Turnover coverage is partial',
+  'q.cov.missing': '{text}: missing {periods}.',
+  'q.cov.plain': '{text}.',
+  'foot.synthetic': 'Synthetic data · fictional match',
+  'foot.local': 'read by local rules',
+  'foot.foundry': 'read by Foundry (server-side)',
+  'foot.selected': 'Player selected by you; no additional model call was made.',
   'card.bullet': '{clock} ({window}): {label}',
 }
 
@@ -194,6 +220,16 @@ const ES: Dict = {
   'card.removed': 'Ya no están en la ventana',
   'card.note': 'Nota: {text}',
   'card.limitation': 'Limitación: {text}',
+  'q.at': 'En {clock}: {text}',
+  'q.cov.possession': 'La cobertura de posesión es parcial',
+  'q.cov.passing': 'La cobertura de pases es parcial',
+  'q.cov.possession-losses': 'La cobertura de pérdidas de balón es parcial',
+  'q.cov.missing': '{text}: faltan {periods}.',
+  'q.cov.plain': '{text}.',
+  'foot.synthetic': 'Datos sintéticos · partido ficticio',
+  'foot.local': 'interpretado por reglas locales',
+  'foot.foundry': 'interpretado por Foundry (en el servidor)',
+  'foot.selected': 'Jugador elegido por ti; no se hizo ninguna llamada adicional al modelo.',
   'card.bullet': '{clock} ({window}): {label}',
 }
 
@@ -254,6 +290,16 @@ const FR: Dict = {
   'card.removed': 'N’est plus dans la fenêtre',
   'card.note': 'Note : {text}',
   'card.limitation': 'Limite : {text}',
+  'q.at': 'À {clock} : {text}',
+  'q.cov.possession': 'La couverture de la possession est partielle',
+  'q.cov.passing': 'La couverture des passes est partielle',
+  'q.cov.possession-losses': 'La couverture des pertes de balle est partielle',
+  'q.cov.missing': '{text} : manquant {periods}.',
+  'q.cov.plain': '{text}.',
+  'foot.synthetic': 'Données synthétiques · match fictif',
+  'foot.local': 'interprété par les règles locales',
+  'foot.foundry': 'interprété par Foundry (côté serveur)',
+  'foot.selected': 'Joueur choisi par vous ; aucun appel supplémentaire au modèle n’a été effectué.',
   'card.bullet': '{clock} ({window}) : {label}',
 }
 
@@ -314,6 +360,16 @@ const DE: Dict = {
   'card.removed': 'Nicht mehr im Zeitfenster',
   'card.note': 'Hinweis: {text}',
   'card.limitation': 'Einschränkung: {text}',
+  'q.at': 'Bei {clock}: {text}',
+  'q.cov.possession': 'Die Ballbesitz-Abdeckung ist nur teilweise vorhanden',
+  'q.cov.passing': 'Die Pass-Abdeckung ist nur teilweise vorhanden',
+  'q.cov.possession-losses': 'Die Ballverlust-Abdeckung ist nur teilweise vorhanden',
+  'q.cov.missing': '{text}: es fehlen {periods}.',
+  'q.cov.plain': '{text}.',
+  'foot.synthetic': 'Synthetische Daten · fiktives Spiel',
+  'foot.local': 'mit lokalen Regeln interpretiert',
+  'foot.foundry': 'mit Foundry (serverseitig) interpretiert',
+  'foot.selected': 'Spieler von dir ausgewählt; es wurde kein zusätzlicher Modellaufruf ausgeführt.',
   'card.bullet': '{clock} ({window}): {label}',
 }
 
@@ -374,6 +430,16 @@ const AR: Dict = {
   'card.removed': 'لم تعد ضمن الفترة',
   'card.note': 'ملاحظة: {text}',
   'card.limitation': 'قيد: {text}',
+  'q.at': 'عند {clock}: {text}',
+  'q.cov.possession': 'تغطية الاستحواذ جزئية',
+  'q.cov.passing': 'تغطية التمريرات جزئية',
+  'q.cov.possession-losses': 'تغطية فقدان الكرة جزئية',
+  'q.cov.missing': '{text}: الفترات الناقصة {periods}.',
+  'q.cov.plain': '{text}.',
+  'foot.synthetic': 'بيانات اصطناعية · مباراة خيالية',
+  'foot.local': 'تم تفسيره بالقواعد المحلية',
+  'foot.foundry': 'تم تفسيره عبر Foundry (من جهة الخادم)',
+  'foot.selected': 'اخترتَ اللاعب بنفسك؛ ولم يُجرَ أي استدعاء إضافي للنموذج.',
   'card.bullet': '{clock} ({window}): {label}',
 }
 
@@ -471,6 +537,57 @@ function caveatText(caveat: ChangeCaveat, facts: ComparisonFacts, language: AppL
   }
 }
 
+function qualificationText(
+  qualification: ChangeQualification,
+  ctx: ChangeContext,
+  language: AppLanguage,
+): string {
+  const { detail } = qualification
+  let body: string
+  try {
+    if (detail.code === 'coverage-partial') {
+      const label = text(language, `q.cov.${detail.coverage}`)
+      body = detail.missingPeriods.length > 0
+        ? text(language, 'q.cov.missing', { text: label, periods: joinList(detail.missingPeriods, language) })
+        : text(language, 'q.cov.plain', { text: label })
+    } else {
+      body = renderLimitationFact(detail, { nameOf: (entity) => ctx.nameOf(entity) }, language)
+    }
+    return qualification.at
+      ? text(language, 'q.at', { clock: formatMatchClock(qualification.at), text: body })
+      : body
+  } catch (error) {
+    if (error instanceof UnsupportedChange) return text(language, 'unsupported')
+    throw error
+  }
+}
+
+/** Localized qualification lines for a comparison, from typed facts only. */
+export function renderChangeQualifications(
+  facts: Pick<ComparisonFacts, 'qualifications'>,
+  ctx: ChangeContext,
+  language: AppLanguage,
+): string[] {
+  return (facts.qualifications ?? []).map((qualification) => qualificationText(qualification, ctx, language))
+}
+
+export type ChangeFooterFacts = {
+  /** Already-localized "Northbridge v Eastport · Original match v3.0.0", or absent when the dataset is unknown. */
+  matchLabel?: string
+  reader: 'local' | 'foundry'
+  playerSelected: boolean
+}
+
+/** Localized source footer: synthetic-data label, match, how the opinion was read. */
+export function renderChangeCardFooter(facts: ChangeFooterFacts, language: AppLanguage): string {
+  return [
+    text(language, 'foot.synthetic'),
+    facts.matchLabel,
+    text(language, facts.reader === 'local' ? 'foot.local' : 'foot.foundry'),
+    facts.playerSelected ? text(language, 'foot.selected') : undefined,
+  ].filter(Boolean).join(' · ')
+}
+
 function renderUnavailableHeadline(facts: ComparisonFacts, language: AppLanguage): string {
   switch (facts.status) {
     case 'different-interpretation': return sharedMessage(language, 'differentInterpretation')
@@ -491,6 +608,7 @@ export function renderComparisonFacts(
   try {
     if ((facts as { version: number }).version !== 1) throw new UnsupportedChange('version')
     const caveats = facts.caveats.map((caveat) => caveatText(caveat, facts, language))
+    const qualifications = renderChangeQualifications(facts, ctx, language)
     if (facts.status !== 'comparable') {
       return {
         headline: renderUnavailableHeadline(facts, language),
@@ -499,6 +617,7 @@ export function renderComparisonFacts(
           later: formatMatchClock(facts.later.clock),
         })],
         caveats,
+        qualifications,
       }
     }
     const earlier = formatMatchClock(facts.earlier.clock)
@@ -528,10 +647,10 @@ export function renderComparisonFacts(
     const headline = multiple
       ? text(language, 'multi', { count: formatNumber(facts.pairs.length, language) })
       : lines[0]
-    return { headline, lines: multiple ? lines : lines.slice(1), caveats }
+    return { headline, lines: multiple ? lines : lines.slice(1), caveats, qualifications }
   } catch (error) {
     if (error instanceof UnsupportedChange) {
-      return { headline: text(language, 'unsupported'), lines: [], caveats: [] }
+      return { headline: text(language, 'unsupported'), lines: [], caveats: [], qualifications: [] }
     }
     throw error
   }

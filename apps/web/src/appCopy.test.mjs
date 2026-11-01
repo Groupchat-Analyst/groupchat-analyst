@@ -313,6 +313,111 @@ for (const scenario of SCENARIOS) {
   }
 }
 
+const HALF_TIME_FACT = {
+  es: '• Northbridge: 1 gol',
+  fr: '• Northbridge : 1 but',
+  de: '• Northbridge: 1 Tor',
+  ar: '• نورثبريدج: هدف',
+}
+const HALF_TIME_FACT_HEADING = {
+  es: 'Datos clave',
+  fr: 'Faits clés',
+  de: 'Wichtige Fakten',
+  ar: 'الحقائق الأساسية',
+}
+
+for (const language of ['es', 'fr', 'de', 'ar']) {
+  test(`half-time card text has localized key facts and no English fact line in ${language}`, async () => {
+    const app = mountApp({ datasetId: NORTHBRIDGE, language })
+    try {
+      await selectTime(app, '1-45-3')
+      await ask(app, 'Northbridge scored before half-time.')
+      const { card } = await copyBoth(app)
+      assertInOrder(card, [HALF_TIME_FACT_HEADING[language], HALF_TIME_FACT[language]])
+      assert.doesNotMatch(card, /\b1 goal\b/u)
+      assert.doesNotMatch(card, /Selected recorded moments|Key facts|Verdict:|Limitation:/u)
+      assert.doesNotMatch(card, /Synthetic data/u)
+    } finally {
+      app.window.close()
+    }
+  })
+}
+
+const ARABIC_POSSESSION_LIMITATION = 'قيد: يُحسب الاستحواذ من فترات سيطرة مقتطعة؛ ويُستثنى الوقت المتنازع عليه والكرة خارج الملعب.'
+
+test('comparison limitation and card footer render in Arabic from typed facts', async () => {
+  const app = mountApp({ datasetId: NORTHBRIDGE, language: 'ar' })
+  try {
+    await selectTime(app, '2-57-0')
+    await ask(app, 'Northbridge had more possession than Eastport.')
+    await selectTime(app, '2-58-0')
+    const recheck = await until(() => app.document.querySelector('.check-again button'), 'check again')
+    recheck.click()
+    await until(() => app.document.querySelector('.what-changed .change-caveat'), 'comparison limitation')
+    const caveats = [...app.document.querySelectorAll('.what-changed .change-caveat')].map((node) => node.textContent)
+    assert.ok(caveats.includes(ARABIC_POSSESSION_LIMITATION), caveats.join('\n'))
+    assert.ok(!caveats.some((text) => /Limitation|clipped|calculated/u.test(text)))
+    const preview = [...app.document.querySelectorAll('.change-share .share-block')].map((node) => node.textContent)
+    assert.ok(preview.includes(ARABIC_POSSESSION_LIMITATION), preview.join('\n'))
+    const footer = preview.find((text) => text.startsWith('بيانات اصطناعية · مباراة خيالية'))
+    assert.ok(footer, preview.join('\n'))
+    assert.ok(footer.endsWith('تم تفسيره بالقواعد المحلية'), footer)
+    assert.doesNotMatch(footer, /Synthetic|read by|Original match/u)
+  } finally {
+    app.window.close()
+  }
+})
+
+const UNDERSTOOD = {
+  es: 'Northbridge · goles · Goles de la primera parte, comprobados en el 45+3′',
+  fr: 'Northbridge · buts · Buts de la première mi-temps, vérifiés à 45+3′',
+  de: 'Northbridge · Tore · Tore der ersten Halbzeit, geprüft bei 45+3′',
+  ar: 'نورثبريدج · أهداف · أهداف الشوط الأول، فُحصت عند 45+3′',
+}
+
+for (const language of ['es', 'fr', 'de', 'ar']) {
+  test(`Checked against renders typed focus and scope in ${language}`, async () => {
+    const app = mountApp({ datasetId: NORTHBRIDGE, language })
+    try {
+      await selectTime(app, '1-45-3')
+      await ask(app, 'Northbridge scored before half-time.')
+      const line = await until(
+        () => [...app.document.querySelectorAll('.msg-note')].find((node) => node.querySelector('strong')),
+        'checked against',
+      )
+      assert.ok(line.textContent.includes(UNDERSTOOD[language]), line.textContent)
+    } finally {
+      app.window.close()
+    }
+  })
+}
+
+const NETWORK_ERROR = {
+  en: 'The analysis service could not be reached. You can try again or use local rules.',
+  es: 'No se pudo conectar con el servicio de análisis. Puedes intentarlo de nuevo o usar las reglas locales.',
+  fr: 'Le service d’analyse est injoignable. Vous pouvez réessayer ou utiliser les règles locales.',
+  de: 'Der Analysedienst war nicht erreichbar. Du kannst es erneut versuchen oder lokale Regeln verwenden.',
+  ar: 'تعذّر الوصول إلى خدمة التحليل. يمكنك المحاولة مرة أخرى أو استخدام القواعد المحلية.',
+}
+
+for (const language of LANGUAGES) {
+  test(`request failure message is typed and localized in ${language}`, async () => {
+    const app = mountApp({ datasetId: NORTHBRIDGE, language })
+    try {
+      await selectTime(app, '2-57-0')
+      app.window.fetch = async () => { throw new app.window.TypeError('Failed to fetch') }
+      const textarea = await until(() => app.document.getElementById('opinion-input'), 'opinion box')
+      setValue(app.window, textarea, 'Northbridge had more possession than Eastport.')
+      await sleep(20)
+      app.document.querySelector('.check-button').click()
+      const note = await until(() => app.document.querySelector('.msg-error .msg-note:last-of-type, .msg-error details .msg-note'), 'request error')
+      assert.equal(note.textContent, NETWORK_ERROR[language])
+    } finally {
+      app.window.close()
+    }
+  })
+}
+
 test('switching language leaves a saved earlier answer and comparison figures unchanged and makes no requests', async () => {
   const app = mountApp({ datasetId: NORTHBRIDGE, language: 'en' })
   try {
