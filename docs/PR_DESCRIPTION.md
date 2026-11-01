@@ -1,26 +1,44 @@
-# Post-deadline public-AI access repair
+﻿# Complete multilingual responses and player clarification across all fixtures
 
 ## Summary
 
-This focused repair is based on current `Origin/main` and does not change or deploy the currently hosted version. It removes the judge-code gate and makes anonymous Foundry interpretation the default when enabled by server configuration. The public route remains fail-closed behind the shared durable Azure Table allowance.
+Based on `Origin/main` `e22e76a2a4d415d2107101e8e4956804c7fec2a0` (PR #11). Fixes the hosted failures where native-language and Foundry player questions produced repeated English clarification text without buttons, and extends structured, locale-driven presentation to the clarification, comparison and status surfaces. Public anonymous AI, the explicit local-rules option, the `FoundryJudging` allowance, credentials and the signing key are unchanged.
 
 ## Changes
 
-- Ordinary analysis and explicit rechecks select Foundry server-side when `FOUNDRY_PUBLIC_ENABLED=true`; clients cannot enable AI with a request header or provider field.
-- Remove the judge-code panel, client-held credential, access header, and access-verification API route.
-- Preserve explicit local-rules selection. When AI is disabled, unconfigured, exhausted, or its allowance storage is unavailable, the UI gives a localized explanation and local-rules option.
-- Reserve the durable `FoundryJudging` allowance before every outbound attempt. Preserve its existing row and counts; do not reset it during startup. Failed attempts count and automatic model retries remain disabled.
-- Keep the owner-authorized limits at 200 shared attempts, 200 per client, and an 8,760-hour fixed UTC window. Preserve the existing completion-token maximum and server-only credentials/signing key.
-- Keep clarification continuation, language changes, replay navigation, squad browsing and sharing from issuing additional interpreter requests.
+- **One player-resolution path for both providers.** After interpretation, unresolved or wrongly shaped claims are reconciled against the selected fixture's roster by application code. Generic clarification prose, paraphrases and incomplete categories from Foundry now yield structured choices and a signed continuation, as local rules do. Provider prose never decides behaviour.
+- **Structured claim state.** `ClaimResult.resolution` is one of `player-choice`, `player-not-in-fixture`, `unsupported-wording`, `needs-clarification`, rendered from locale resources (`resolutionLocale.ts`, `claimState.ts`). Clarification renders once; it is not repeated as a limitation; provider wording is kept only in a labelled details block.
+- **Native question families** (`playerQuestions.ts`): performance and pass-completion questions in English, Spanish, French, German and Arabic ("How did / was / was … good", etc.), bounded and explicit. Exact full names and aliases win over fuzzy matches; Gomes/Gomez and Martin/Martínez stay distinct; a team qualifier only resolves a candidate when it identifies one. A name absent from the fixture gives a localized missing-player state; players are never borrowed from another fixture.
+- **Stale-state invalidation.** A foreign-team override now drops candidates, `resolution` and the signed continuation, so a superseded claim cannot expose buttons or accept a continuation.
+- **Sharing.** Copy, card, download, native share and previews are hidden while any claim is unresolved (`hasUnresolvedClaims`), and shown after resolution.
+- **Localization.** Comparison ("What changed") not-comparable states, fallback replies, loading, "Moving to …", clock status and attribution strings are now template-driven in all five languages (`comparisonLocale.ts`); the same templates generate and translate the English, so they cannot drift.
+- **Saved responses.** Responses without `resolution` fall back to their signed continuation, or to a generic localized clarification; evidence and original wording are preserved and nothing is guessed.
 
 ## Verification
 
-- API: **385/385 tests pass**, including TypeScript build and real Azure Table client integration against local Azurite.
-- Azurite: **7/7 checks pass**, including updates, exhaustion, a real ETag conflict, two independent processes, restart persistence, storage failure, and failed outbound-attempt counting with stubbed Foundry transport.
-- Web: **160/160 tests pass**; TypeScript build, production build and lint pass. Vite reports an existing minified bundle-size warning.
-- `git diff --check` passes.
-- All provider requests are stubbed. No live Foundry call, deployment, Azure change or credential change was made. Hosted Azure Table/Foundry behavior remains unverified.
+Automated (offline, stubbed providers):
 
+- API: **398/398** pass, including the actual Azure Table client against local Azurite (emulator, not Azure).
+- Web: **168/168** pass; TypeScript/production builds and lint pass (existing Vite bundle-size warning). `git diff --check` clean.
+- Matrix: 4 fixtures × 5 languages × local and stubbed-Foundry (generic prose, paraphrase, incomplete category) × 1′ / 58′ / 90+4′; both candidate selections per ambiguity with zero additional interpreter calls; Gomes/Gomez, Martin/Martínez, absent players, pronouns/noun phrases, unsupported wording, mixed (one resolved + one pending) claims, foreign-team override, legacy responses, comparison template translation.
+
+Browser (local-rules API, Vite dev server, desktop Chromium; **no Foundry**):
+
+- All five languages: pending Bruno question → localized choice with two buttons, no share controls; selecting a candidate made exactly one `resolve-player` request and revealed share controls.
+- Arabic at 390 px and 320 px: RTL, no horizontal overflow; switching language with a pending choice preserved the choice and an unsent draft.
+- Keyboard: focus and Enter on a candidate button; Spanish populated Analyst view with no English fragments.
+- Original fixture 57′→58′ comparison in Arabic and German showed (and was fixed for) untranslated comparison sentences.
+- A downloaded Arabic card (2160×1692) was inspected: correct shaping, RTL alignment, original wording, scope and provider footer.
+- Static pages (home, matches, four fixtures) scanned in es/fr/de/ar: no English fragments.
+
+## Remaining limitations and unverified
+
+- **Hosted Foundry, hosted Azure Table and the deployed site are not verified.** Foundry behaviour is covered only by stubs and replayed captures.
+- Application-owned prose outside the clarification/comparison/status surfaces (statistic and player answers, evidence descriptions) still uses the existing dictionary/regex localization over English text; it is not yet generated from structured fields. Treat full structured generation as incomplete.
+- The Arabic/other-language statistical question families beyond performance and pass completions are not extended (e.g. an Arabic shots question is reported as unsupported in a localized state).
+- Compound questions that are not split by the interpreter (e.g. "… and … ?" in one sentence) remain a single claim.
+- Browser checks used desktop Chromium viewport emulation only: no real device, no iPhone native share, no screen reader, no native-speaker review. Clipboard copy could not be exercised in the automation browser; copy text relies on the same builders as the card (unit-tested), not a browser clipboard read. Only Arabic and a subset of languages were rendered as downloaded cards.
+- Not exercised in a browser: Redmere/Westhaven/Return populated Analyst views in every language (covered by API/web matrix tests only).
 ## Production settings
 
 Configure these only in the Static Web App's **Production backend environment variables**. Keep the existing signing key unchanged and server-only. Preserve the existing `FoundryJudging` table and counts. Do not configure or use a judge access code.
@@ -51,3 +69,4 @@ Configure these only in the Static Web App's **Production backend environment va
 5. In hosted smoke checks, confirm anonymous analysis is labelled Foundry, local rules can be selected explicitly, and unavailable/exhausted allowance fails closed with a localized local-rules option. Keep local, built-preview and hosted results distinct.
 
 No merge, deployment, Azure change, credential change or live model call was performed for this repair.
+

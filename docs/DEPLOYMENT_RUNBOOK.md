@@ -1,17 +1,17 @@
 # Release and deployment runbook
 
-Status: **post-deadline public-AI access repair prepared, not deployed**. It is a separate repair based on the current `Origin/main`; it does not change the currently deployed version. Anonymous Foundry analysis is enabled only by backend configuration and is protected by the shared durable Azure Table allowance. No deployment, live model request, Azure resource change or credential change has occurred. Deploying this repair requires a separate owner decision.
+Status: **multilingual response and player-clarification repair prepared, not deployed**. It is a separate branch based on `Origin/main` `e22e76a`; anonymous Foundry analysis remains controlled only by backend configuration and the shared durable Azure Table allowance, which this repair does not change. No deployment, live model request, Azure change, allowance reset or credential change has occurred. Deploying requires a separate owner decision.
 
 ## Candidate and workflow
 
 | Item | Value |
 | --- | --- |
 | PR base | `main` |
-| Repair branch | `repair/public-ai-access` |
-| Base commit | `0f4eb271bcff5a534878eea2c052d27b929210d0` |
-| Candidate commit | See the repair branch head and focused PR |
-| `Origin/main` at last fetch | `0f4eb271bcff5a534878eea2c052d27b929210d0` |
-| Branch relation | Created from current `Origin/main`; no merge, rebase or reset |
+| Repair branch | `repair/i18n-player-resolution` |
+| Base commit | `e22e76a2a4d415d2107101e8e4956804c7fec2a0` |
+| Final application commit | `652b013a33e9fc0fdf2c3879978b69d5532b3be0` (docs-only commits may follow on the branch head; they do not change application code) |
+| Superseded | `738fcc4` is an earlier checkpoint and must **not** be the deployment target |
+| Branch relation | Created from `Origin/main`; no merge, rebase or reset |
 | Workflow | `.github/workflows/shared-preview.yml` |
 | Trigger | `workflow_dispatch` only; job runs only when dispatched from `main` |
 | Source pin | `actions/checkout` checks out `${{ github.sha }}` |
@@ -91,6 +91,17 @@ Microsoft documents that Static Web Apps API application settings are configured
 
 4. Preserve Foundry endpoint/key/deployment credentials and the signing key as server-only values. No judge code is required or embedded in the frontend.
 5. After changing backend settings, allow the API runtime to restart and verify setting names/presence without recording values. Keep `FOUNDRY_PUBLIC_ENABLED=false` until backend storage access has been verified; then set it to `true` and restart the API. This change is an anonymous public route, so the 200-request shared allowance remains the fail-closed limit.
+
+## Deploying the multilingual repair (intended revision and SHA verification)
+
+The workflow deploys exactly the commit the run was started on; **re-running an older workflow run, or dispatching an older ref, never selects newer code.**
+
+1. After review, the authorized owner merges the PR into `main` and records the merge commit `M`. Confirm `git merge-base --is-ancestor 652b013a33e9fc0fdf2c3879978b69d5532b3be0 M` succeeds (the final application commit is contained in `M`).
+2. Start a **new** run: Actions → *Deploy shared preview* → *Run workflow* → branch `main` (do not use "Re-run" on an earlier run).
+3. In the new run's summary, confirm the event/head SHA equals `M`. In the *Checkout* step log, confirm the checked-out `HEAD` equals `M` (the workflow pins `ref: ${{ github.sha }}`). Stop if either differs, or if the run is a re-run of an earlier attempt.
+4. Confirm the checked-out tree contains the repair: `apps/shared/src/claimState.ts`, `apps/shared/src/comparisonLocale.ts` and `apps/shared/src/playerQuestions.ts` exist.
+5. No backend setting changes are required; do not reset the `FoundryJudging` table or rotate `PLAYER_RESOLUTION_SIGNING_KEY`. Clarification continuations issued before the deployment may be rejected if the signing configuration changes; they are otherwise unaffected.
+6. After deployment, run the hosted acceptance checklist below, including a native-language player question (for example German "Wie hat Bruno gespielt?") with AI enabled; a hosted Foundry check is **not yet verified** and uses allowance attempts.
 
 ## Post-deadline access repair release sequence
 
