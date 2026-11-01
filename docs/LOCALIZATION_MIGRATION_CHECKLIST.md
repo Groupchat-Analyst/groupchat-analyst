@@ -31,10 +31,10 @@ Legend: `[x]` done and tested, `[ ]` outstanding.
 
 - [x] Real `App.tsx` copy action tested (jsdom + esbuild, stubbed fetch/clipboard) with independently written literals (`apps/web/src/appCopy.test.mjs`).
 - [x] Fresh downloaded cards generated and inspected in all five languages at the final application commit (390 px).
-- [~] Browser matrix: 4 fixtures × 5 languages, populated responses, local rules only. Fan/Analyst toggle and the Foundry stub path are covered by offline API/web matrix tests, not re-run in the browser at this revision.
-- [~] Arabic at 390 px (card) and 320 px (57′→58′ comparison) checked. Keyboard selection and accessible names were not re-run in the browser at this revision; earlier-revision browser checks and unit tests cover them.
-- [x] Original 57′→58′ shots-on-target comparison: Arabic-written input in the browser at 320 px; English-in-Arabic and the other languages in API/web tests.
+- [x] Browser matrix at `db54841`: 4 fixtures × es/fr/de/ar Fan/Analyst on local rules; Foundry path via the offline stub (choices, resolved, clarification, transport error, 429 allowance) in all five languages.
+- [x] Arabic at 390 px and 320 px: keyboard (focus + Enter) candidate selection, accessible names (no unnamed controls), RTL, no overflow, possession card regenerated.
+- [x] Original 57′→58′ comparison via Check again in all five languages plus English-in-Arabic; values, attribution, preserved snapshot, zero requests on language switch.
 - [x] Regression: incidental English narrative changes cannot alter structured output.
 - [x] Audit of remaining `translateNarrative` uses documented in `PR_DESCRIPTION.md`.
-- [x] API (457, incl. Azurite), web (229), build, web lint, `git diff --check`. API lint: not applicable.
-- [x] PR description and deployment runbook updated to the final application commit.
+- [x] API (457, incl. Azurite), web (231), build, web lint, `git diff --check`. API lint: not applicable.
+- [x] PR description and deployment runbook updated to the final application commit `db54841`.
