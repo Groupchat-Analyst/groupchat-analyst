@@ -58,7 +58,7 @@ const PASS_PATTERNS: Pattern[] = [
   pattern(`^¿?cu[aá]ntos\\s+pases\\s+(?:complet[oó]|ha\\s+completado|acert[oó])\\s+${NAME}${END}`),
   pattern(`^combien\\s+de\\s+passes\\s+${NAME}\\s+a-t-il\\s+(?:r[eé]ussi|r[eé]ussies|compl[eé]t[eé]|compl[eé]t[eé]es)${END}`),
   pattern(`^combien\\s+de\\s+passes\\s+a\\s+r[eé]ussi\\s+${NAME}${END}`),
-  pattern(`^wie\\s+viele\\s+p[aä]sse\\s+hat\\s+${NAME}\\s+(?:abgeschlossen|komplettiert|erfolgreich\\s+gespielt|gespielt)${END}`),
+  pattern(`^wie\\s+viele\\s+p[aä]sse\\s+hat\\s+${NAME}\\s+(?:abgeschlossen|komplettiert|vervollst[aä]ndigt|angebracht|erfolgreich\\s+gespielt|gespielt)${END}`),
   pattern(`^كم\\s+(?:عدد\\s+)?(?:تمريرة|التمريرات|تمريرات)(?:\\s+التي)?\\s+(?:أكمل|أكملها|أتم|أتمها|أكملت)\\s+${NAME}${END}`),
 ]
 

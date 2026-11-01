@@ -33,6 +33,7 @@ import {
   formatCountWithNoun,
   formatFactualComparison,
   formatNumber,
+  formatPercent,
 } from '../../shared/src/factualPresentation'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
@@ -441,7 +442,7 @@ function localizedPlayerPerformance(
           value: valueFor('pass-completion-percentage') === null ||
             valueFor('pass-completion-percentage') === undefined
             ? translateText('Not available', language)
-            : `${formatNumber(valueFor('pass-completion-percentage') as number, language)}%`,
+            : formatPercent(valueFor('pass-completion-percentage') as number, language),
         },
         language,
       ),
@@ -475,10 +476,10 @@ function localizedStatisticValue(
     return `${translateText('Not available', language)} · ${metricLabel(metric, language)}`
   }
   if (metric === 'pass-completion-percentage') {
-    return `${formatNumber(value, language)}% ${translateText('pass completion', language)}`
+    return `${formatPercent(value, language)} ${translateText('pass completion', language)}`
   }
   if (metric === 'possession-percentage') {
-    return `${formatNumber(value, language)}% ${translateText('possession', language)}`
+    return `${formatPercent(value, language)} ${translateText('possession', language)}`
   }
   if (metric === 'minutes-played') {
     return formatLocalizedMessage(
@@ -546,7 +547,7 @@ function localizedStatistics(
       value === null
         ? translateText('Not available', language)
         : isPercent
-          ? `${formatNumber(value, language)}%`
+          ? formatPercent(value, language)
           : formatCountWithNoun(metric, value, language)
     return {
       answer: formatFactualComparison(factual, language),
@@ -1033,7 +1034,7 @@ function ClaimCard({
                   <h4>{trace.team}{trace.area ? ` · ${trace.area.replaceAll('-', ' ')}` : ''}</h4>
                   <p>{trace.metric === 'possession-losses-by-area'
                     ? `${trace.value === null ? 'Not available' : formatNumber(trace.value, language)} turnovers`
-                    : `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : `${formatNumber(trace.value, language)}%`})` : ''}`}</p>
+                    : `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : formatPercent(trace.value, language)})` : ''}`}</p>
                   <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
@@ -1048,7 +1049,7 @@ function ClaimCard({
                     {trace.metric === 'minutes-played'
                       ? `${formatNumber(trace.value ?? 0, language)} ${translateText('elapsed minutes', language)}`
                       : trace.metric === 'pass-completion-percentage'
-                      ? `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)} (${trace.value === null ? 'rate not available' : `${formatNumber(trace.value, language)}%`})`
+                      ? `${formatNumber(trace.numerator, language)}/${formatNumber(trace.denominator, language)} (${trace.value === null ? 'rate not available' : formatPercent(trace.value, language)})`
                       : trace.metric === 'pass-completions'
                         ? `${formatNumber(trace.numerator, language)} completions among ${formatNumber(trace.denominator, language)} attempts`
                         : `${formatNumber(trace.value ?? trace.numerator, language)} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
@@ -1171,7 +1172,7 @@ function EvidenceFoundationPanel({
                 <strong>
                   {metrics.possessionPercentage === null
                     ? 'Not available'
-                    : `${num(metrics.possessionPercentage)}%`}
+                    : formatPercent(metrics.possessionPercentage, language)}
                 </strong>
                 <span>possession · {num(metrics.possessionMinutes)} minutes</span>
               </p>
@@ -1179,7 +1180,7 @@ function EvidenceFoundationPanel({
                 <strong>
                   {metrics.passCompletionPercentage === null
                     ? 'Not available'
-                    : `${num(metrics.passCompletionPercentage)}%`}
+                    : formatPercent(metrics.passCompletionPercentage, language)}
                 </strong>
                 <span>
                   passes complete · {num(metrics.completedPasses)}/{num(metrics.passAttempts)}

@@ -15,6 +15,7 @@ import {
   comparisonMetricName,
   formatCountWithNoun,
   formatNumber,
+  formatPercent,
   type ComparisonMetric,
 } from './factualPresentation.ts'
 import type { AppLanguage } from './localization.ts'
@@ -101,9 +102,9 @@ const EN = {
   'understood.entity': 'A claim about {focus} for {entity}, checked against the recorded synthetic match data.',
   'understood.plain': 'A claim about {focus}, checked against the recorded synthetic match data.',
   'hist.claim': 'Claim: “{quote}”.',
-  'hist.possession': 'Recorded possession over the checked window: {team} {value}% to {opponent} {opponentValue}%, from {minutes} of controlled play (contested and out-of-play time excluded).',
+  'hist.possession': 'Recorded possession over the checked window: {team} {value} to {opponent} {opponentValue}, from {minutes} of controlled play (contested and out-of-play time excluded).',
   'hist.runOfPlay': 'Possession share alone does not establish the run of play.',
-  'dom.shares': '{team} had {value}% of recorded possession to {opponent}’s {opponentValue}%.',
+  'dom.shares': '{team} had {value} of recorded possession to {opponent}’s {opponentValue}.',
   'dom.supports': 'This leans toward the claim, but possession share alone cannot establish dominance.',
   'dom.challenges': 'This leans against the claim, but possession share alone cannot settle it.',
   'dom.level': 'Possession is level, so it neither supports nor challenges the claim.',
@@ -139,7 +140,7 @@ const EN = {
   'actions.one': '1 action',
   'actions.other': '{count} actions',
   'ctx.keeper': 'Shots on target are shown as context only; they do not measure the goalkeeper.',
-  'ctx.possession': 'Possession context: {team} {value}% to {opponent} {opponentValue}%. This is context, not a measure of the claim.',
+  'ctx.possession': 'Possession context: {team} {value} to {opponent} {opponentValue}. This is context, not a measure of the claim.',
   'ctx.possessionNone': 'Possession shares are not available for context.',
   'ctx.pressure': 'Selected pressure observations: {team} {observations}, {opponent} {opponentObservations}. This is a partial sample used as context only.',
   'shape.defensive-shape': 'Defensive shape and positioning are not recorded.',
@@ -193,7 +194,7 @@ const EN = {
   'lim.coachingAll': 'Counted across all recorded passes, not only build-up phases. Teams: {subject}. Recorded possession losses (incomplete-pass endpoints): {total}. The locations do not establish tactical causes.',
   'lim.topic': 'This is a broad judgement about {topic}; the recorded figures are context and do not give a verdict.',
   'lim.playerSparse': '{player} has few recorded actions, so these figures are thin evidence.',
-  'lim.possessionShare': 'Recorded possession ({team} {value}% to {opponent} {opponentValue}%) is one measure and cannot settle a broad judgement by itself.',
+  'lim.possessionShare': 'Recorded possession ({team} {value} to {opponent} {opponentValue}) is one measure and cannot settle a broad judgement by itself.',
   'lim.missingData': 'Missing data prevents a firm conclusion on “{quote}”.',
   'lim.contextOnly': 'The figures shown are context for “{quote}”, not a verdict.',
   'lim.noRelevant': 'No relevant recorded events were found in this window.',
@@ -274,9 +275,9 @@ const ES: Dict = {
   'understood.entity': 'Una afirmación sobre {focus} de {entity}, comprobada con los datos sintéticos registrados del partido.',
   'understood.plain': 'Una afirmación sobre {focus}, comprobada con los datos sintéticos registrados del partido.',
   'hist.claim': 'Afirmación: «{quote}».',
-  'hist.possession': 'Posesión registrada en el periodo comprobado: {team} {value}% frente a {opponent} {opponentValue}%, sobre {minutes} de juego controlado (sin contar el juego disputado ni el balón fuera de juego).',
+  'hist.possession': 'Posesión registrada en el periodo comprobado: {team} {value} frente a {opponent} {opponentValue}, sobre {minutes} de juego controlado (sin contar el juego disputado ni el balón fuera de juego).',
   'hist.runOfPlay': 'El porcentaje de posesión por sí solo no establece el desarrollo del juego.',
-  'dom.shares': '{team} tuvo el {value}% de la posesión registrada frente al {opponentValue}% de {opponent}.',
+  'dom.shares': '{team} tuvo el {value} de la posesión registrada frente al {opponentValue} de {opponent}.',
   'dom.supports': 'Esto apunta en el sentido de la afirmación, pero el porcentaje de posesión por sí solo no puede establecer dominio.',
   'dom.challenges': 'Esto apunta en contra de la afirmación, pero el porcentaje de posesión por sí solo no la resuelve.',
   'dom.level': 'La posesión está igualada, así que ni respalda ni cuestiona la afirmación.',
@@ -312,7 +313,7 @@ const ES: Dict = {
   'actions.one': '1 acción',
   'actions.other': '{count} acciones',
   'ctx.keeper': 'Los tiros a puerta se muestran solo como contexto; no miden al portero.',
-  'ctx.possession': 'Contexto de posesión: {team} {value}% frente a {opponent} {opponentValue}%. Es contexto, no una medida de la afirmación.',
+  'ctx.possession': 'Contexto de posesión: {team} {value} frente a {opponent} {opponentValue}. Es contexto, no una medida de la afirmación.',
   'ctx.possessionNone': 'No hay porcentajes de posesión disponibles como contexto.',
   'ctx.pressure': 'Observaciones de presión seleccionadas: {team} {observations}, {opponent} {opponentObservations}. Es una muestra parcial usada solo como contexto.',
   'shape.defensive-shape': 'La forma defensiva y el posicionamiento no se registran.',
@@ -366,7 +367,7 @@ const ES: Dict = {
   'lim.coachingAll': 'Recuento sobre todos los pases registrados, no solo de la fase de construcción. Equipos: {subject}. Pérdidas de posesión registradas (finales de pase fallido): {total}. Las ubicaciones no establecen causas tácticas.',
   'lim.topic': 'Es un juicio general sobre {topic}; las cifras registradas son contexto y no dan un veredicto.',
   'lim.playerSparse': '{player} tiene pocas acciones registradas, así que estas cifras son una evidencia escasa.',
-  'lim.possessionShare': 'La posesión registrada ({team} {value}% frente a {opponent} {opponentValue}%) es una medida y no puede resolver por sí sola un juicio general.',
+  'lim.possessionShare': 'La posesión registrada ({team} {value} frente a {opponent} {opponentValue}) es una medida y no puede resolver por sí sola un juicio general.',
   'lim.missingData': 'La falta de datos impide una conclusión firme sobre «{quote}».',
   'lim.contextOnly': 'Las cifras mostradas son contexto para «{quote}», no un veredicto.',
   'lim.noRelevant': 'No se encontraron eventos registrados relevantes en esta ventana.',
@@ -444,9 +445,9 @@ const FR: Dict = {
   'understood.entity': 'Une affirmation sur {focus} pour {entity}, vérifiée avec les données synthétiques enregistrées du match.',
   'understood.plain': 'Une affirmation sur {focus}, vérifiée avec les données synthétiques enregistrées du match.',
   'hist.claim': 'Affirmation : « {quote} ».',
-  'hist.possession': 'Possession enregistrée sur la période vérifiée : {team} {value}% contre {opponent} {opponentValue}%, sur {minutes} de jeu contrôlé (jeu disputé et ballon hors jeu exclus).',
+  'hist.possession': 'Possession enregistrée sur la période vérifiée : {team} {value} contre {opponent} {opponentValue}, sur {minutes} de jeu contrôlé (jeu disputé et ballon hors jeu exclus).',
   'hist.runOfPlay': 'Le taux de possession seul n’établit pas le déroulement du jeu.',
-  'dom.shares': '{team} a eu {value}% de la possession enregistrée contre {opponentValue}% pour {opponent}.',
+  'dom.shares': '{team} a eu {value} de la possession enregistrée contre {opponentValue} pour {opponent}.',
   'dom.supports': 'Cela va dans le sens de l’affirmation, mais le taux de possession seul ne peut pas établir une domination.',
   'dom.challenges': 'Cela va à l’encontre de l’affirmation, mais le taux de possession seul ne peut pas trancher.',
   'dom.level': 'La possession est à égalité ; elle ne confirme ni ne contredit l’affirmation.',
@@ -482,7 +483,7 @@ const FR: Dict = {
   'actions.one': '1 action',
   'actions.other': '{count} actions',
   'ctx.keeper': 'Les tirs cadrés sont affichés à titre de contexte seulement ; ils ne mesurent pas le gardien.',
-  'ctx.possession': 'Contexte de possession : {team} {value}% contre {opponent} {opponentValue}%. C’est un contexte, pas une mesure de l’affirmation.',
+  'ctx.possession': 'Contexte de possession : {team} {value} contre {opponent} {opponentValue}. C’est un contexte, pas une mesure de l’affirmation.',
   'ctx.possessionNone': 'Les parts de possession ne sont pas disponibles comme contexte.',
   'ctx.pressure': 'Observations de pressing sélectionnées : {team} {observations}, {opponent} {opponentObservations}. Il s’agit d’un échantillon partiel utilisé comme contexte seulement.',
   'shape.defensive-shape': 'L’organisation défensive et le placement ne sont pas enregistrés.',
@@ -536,7 +537,7 @@ const FR: Dict = {
   'lim.coachingAll': 'Décompte sur toutes les passes enregistrées, pas seulement les phases de construction. Équipes : {subject}. Pertes de balle enregistrées (passes manquées) : {total}. Les emplacements n’établissent pas de causes tactiques.',
   'lim.topic': 'Il s’agit d’un jugement général (sujet : {topic}) ; les chiffres enregistrés sont un contexte et ne donnent pas de verdict.',
   'lim.playerSparse': '{player} a peu d’actions enregistrées ; ces chiffres constituent donc un élément de preuve mince.',
-  'lim.possessionShare': 'La possession enregistrée ({team} {value}% contre {opponent} {opponentValue}%) est une mesure parmi d’autres et ne peut pas trancher seule un jugement général.',
+  'lim.possessionShare': 'La possession enregistrée ({team} {value} contre {opponent} {opponentValue}) est une mesure parmi d’autres et ne peut pas trancher seule un jugement général.',
   'lim.missingData': 'Le manque de données empêche une conclusion ferme sur « {quote} ».',
   'lim.contextOnly': 'Les chiffres affichés sont un contexte pour « {quote} », pas un verdict.',
   'lim.noRelevant': 'Aucun événement enregistré pertinent n’a été trouvé dans cette fenêtre.',
@@ -614,9 +615,9 @@ const DE: Dict = {
   'understood.entity': 'Eine Behauptung zu {focus} von {entity}, geprüft anhand der erfassten synthetischen Spieldaten.',
   'understood.plain': 'Eine Behauptung zu {focus}, geprüft anhand der erfassten synthetischen Spieldaten.',
   'hist.claim': 'Aussage: „{quote}“.',
-  'hist.possession': 'Erfasster Ballbesitz im geprüften Zeitraum: {team} {value}% gegenüber {opponent} {opponentValue}%, aus {minutes} kontrolliertem Spiel (umkämpfte und Aus-Zeiten ausgenommen).',
+  'hist.possession': 'Erfasster Ballbesitz im geprüften Zeitraum: {team} {value} gegenüber {opponent} {opponentValue}, aus {minutes} kontrolliertem Spiel (umkämpfte und Aus-Zeiten ausgenommen).',
   'hist.runOfPlay': 'Der Ballbesitzanteil allein belegt den Spielverlauf nicht.',
-  'dom.shares': '{team} hatte {value}% des erfassten Ballbesitzes gegenüber {opponentValue}% bei {opponent}.',
+  'dom.shares': '{team} hatte {value} des erfassten Ballbesitzes gegenüber {opponentValue} bei {opponent}.',
   'dom.supports': 'Das spricht eher für die Aussage, doch der Ballbesitzanteil allein kann Dominanz nicht belegen.',
   'dom.challenges': 'Das spricht eher gegen die Aussage, doch der Ballbesitzanteil allein kann sie nicht klären.',
   'dom.level': 'Der Ballbesitz ist ausgeglichen und stützt die Aussage daher weder noch stellt er sie infrage.',
@@ -652,7 +653,7 @@ const DE: Dict = {
   'actions.one': '1 Aktion',
   'actions.other': '{count} Aktionen',
   'ctx.keeper': 'Schüsse aufs Tor werden nur als Kontext gezeigt; sie messen den Torhüter nicht.',
-  'ctx.possession': 'Ballbesitz-Kontext: {team} {value}% gegenüber {opponent} {opponentValue}%. Das ist Kontext, kein Maß für die Aussage.',
+  'ctx.possession': 'Ballbesitz-Kontext: {team} {value} gegenüber {opponent} {opponentValue}. Das ist Kontext, kein Maß für die Aussage.',
   'ctx.possessionNone': 'Ballbesitzanteile sind als Kontext nicht verfügbar.',
   'ctx.pressure': 'Ausgewählte Pressing-Beobachtungen: {team} {observations}, {opponent} {opponentObservations}. Das ist eine Teilstichprobe und dient nur als Kontext.',
   'shape.defensive-shape': 'Defensivformation und Positionierung werden nicht erfasst.',
@@ -706,7 +707,7 @@ const DE: Dict = {
   'lim.coachingAll': 'Gezählt über alle erfassten Pässe, nicht nur in der Aufbauphase. Teams: {subject}. Erfasste Ballverluste (missglückte Pässe): {total}. Die Orte belegen keine taktischen Ursachen.',
   'lim.topic': 'Das ist ein allgemeines Urteil über {topic}; die erfassten Zahlen sind Kontext und ergeben kein Urteil.',
   'lim.playerSparse': 'Für {player} sind nur wenige Aktionen erfasst, daher sind diese Zahlen ein dünner Beleg.',
-  'lim.possessionShare': 'Der erfasste Ballbesitz ({team} {value}% gegenüber {opponent} {opponentValue}%) ist eine Messgröße und kann ein allgemeines Urteil nicht allein klären.',
+  'lim.possessionShare': 'Der erfasste Ballbesitz ({team} {value} gegenüber {opponent} {opponentValue}) ist eine Messgröße und kann ein allgemeines Urteil nicht allein klären.',
   'lim.missingData': 'Fehlende Daten verhindern ein sicheres Fazit zu „{quote}“.',
   'lim.contextOnly': 'Die gezeigten Zahlen sind Kontext zu „{quote}“, kein Urteil.',
   'lim.noRelevant': 'In diesem Zeitfenster wurden keine relevanten erfassten Ereignisse gefunden.',
@@ -784,9 +785,9 @@ const AR: Dict = {
   'understood.entity': 'ادعاء بشأن {focus} لدى {entity}، جرى فحصه مقابل بيانات المباراة الاصطناعية المسجّلة.',
   'understood.plain': 'ادعاء بشأن {focus}، جرى فحصه مقابل بيانات المباراة الاصطناعية المسجّلة.',
   'hist.claim': 'الادعاء: «{quote}».',
-  'hist.possession': 'الاستحواذ المسجّل في الفترة المفحوصة: {team} {value}% مقابل {opponent} {opponentValue}%، من {minutes} من اللعب المسيطَر عليه (باستثناء اللعب المتنازع عليه والكرة خارج الملعب).',
+  'hist.possession': 'الاستحواذ المسجّل في الفترة المفحوصة: {team} {value} مقابل {opponent} {opponentValue}، من {minutes} من اللعب المسيطَر عليه (باستثناء اللعب المتنازع عليه والكرة خارج الملعب).',
   'hist.runOfPlay': 'نسبة الاستحواذ وحدها لا تثبت مجريات اللعب.',
-  'dom.shares': 'استحوذ {team} على {value}% من الاستحواذ المسجّل مقابل {opponentValue}% لـ{opponent}.',
+  'dom.shares': 'استحوذ {team} على {value} من الاستحواذ المسجّل مقابل {opponentValue} لـ{opponent}.',
   'dom.supports': 'يميل هذا إلى تأييد الادعاء، لكن نسبة الاستحواذ وحدها لا تثبت الهيمنة.',
   'dom.challenges': 'يميل هذا إلى معارضة الادعاء، لكن نسبة الاستحواذ وحدها لا تحسمه.',
   'dom.level': 'الاستحواذ متعادل، فلا يؤيد الادعاء ولا يعارضه.',
@@ -822,7 +823,7 @@ const AR: Dict = {
   'actions.one': 'إجراء واحد',
   'actions.other': '{count} إجراءات',
   'ctx.keeper': 'تُعرض التسديدات على المرمى للسياق فقط؛ فهي لا تقيس أداء الحارس.',
-  'ctx.possession': 'سياق الاستحواذ: {team} {value}% مقابل {opponent} {opponentValue}%. هذا سياق وليس مقياساً للادعاء.',
+  'ctx.possession': 'سياق الاستحواذ: {team} {value} مقابل {opponent} {opponentValue}. هذا سياق وليس مقياساً للادعاء.',
   'ctx.possessionNone': 'نسب الاستحواذ غير متاحة للسياق.',
   'ctx.pressure': 'ملاحظات الضغط المختارة: {team} {observations}، {opponent} {opponentObservations}. هذه عيّنة جزئية تُستخدم للسياق فقط.',
   'shape.defensive-shape': 'الشكل الدفاعي والتمركز غير مسجّلين.',
@@ -875,7 +876,7 @@ const AR: Dict = {
   'lim.coachingAll': 'العدّ على كل التمريرات المسجّلة، وليس مراحل بناء اللعب فقط. الفرق: {subject}. مرات فقدان الكرة المسجّلة (تمريرات غير ناجحة): {total}. المواقع لا تثبت أسباباً تكتيكية.',
   'lim.topic': 'هذا حكم عام عن {topic}؛ الأرقام المسجّلة سياق ولا تعطي حكماً.',
   'lim.playerSparse': 'إجراءات {player} المسجّلة قليلة، لذلك هذه الأرقام دليل ضعيف.',
-  'lim.possessionShare': 'الاستحواذ المسجّل ({team} {value}% مقابل {opponent} {opponentValue}%) مقياس واحد ولا يستطيع وحده حسم حكم عام.',
+  'lim.possessionShare': 'الاستحواذ المسجّل ({team} {value} مقابل {opponent} {opponentValue}) مقياس واحد ولا يستطيع وحده حسم حكم عام.',
   'lim.missingData': 'نقص البيانات يمنع استنتاجاً حاسماً بشأن «{quote}».',
   'lim.contextOnly': 'الأرقام المعروضة سياق لـ«{quote}» وليست حكماً.',
   'lim.noRelevant': 'لم تُعثر على أحداث مسجّلة ذات صلة في هذه الفترة.',
@@ -917,7 +918,7 @@ function text(language: AppLanguage, key: string, values: Record<string, string>
 }
 
 const clockText = (clock: MatchClock) => formatMatchClock(clock)
-const percent = (value: number, language: AppLanguage) => `${formatNumber(value, language)}%`
+const percent = (value: number, language: AppLanguage) => formatPercent(value, language)
 const joinList = (items: string[], language: AppLanguage) => items.join(language === 'ar' ? '، ' : ', ')
 
 const COUNT_METRICS: ReadonlySet<string> = new Set<ComparisonMetric>([
@@ -1054,9 +1055,9 @@ function renderTopicContext(context: TopicContext, ctx: PresentationContext, lan
         ? text(language, 'ctx.possessionNone')
         : text(language, 'ctx.possession', {
             team: team(context.shares.team),
-            value: formatNumber(context.shares.value, language),
+            value: formatPercent(context.shares.value, language),
             opponent: team(context.shares.opponent),
-            opponentValue: formatNumber(context.shares.opponentValue, language),
+            opponentValue: formatPercent(context.shares.opponentValue, language),
           })
     case 'pressure-sample':
       return text(language, 'ctx.pressure', {
@@ -1150,9 +1151,9 @@ function renderAnswerText(answer: AnswerFact, ctx: PresentationContext, language
         const p = answer.possession
         parts.push(text(language, 'hist.possession', {
           team: team(p.team),
-          value: formatNumber(p.value, language),
+          value: formatPercent(p.value, language),
           opponent: team(p.opponent),
-          opponentValue: formatNumber(p.opponentValue, language),
+          opponentValue: formatPercent(p.opponentValue, language),
           minutes: countText('minutes-played', p.minutes, language),
         }))
       }
@@ -1175,9 +1176,9 @@ function renderAnswerText(answer: AnswerFact, ctx: PresentationContext, language
       return sentence([
         text(language, 'dom.shares', {
           team: team(answer.team),
-          value: formatNumber(answer.value, language),
+          value: formatPercent(answer.value, language),
           opponent: team(answer.opponent),
-          opponentValue: formatNumber(answer.opponentValue, language),
+          opponentValue: formatPercent(answer.opponentValue, language),
         }),
         text(language, aspectKey),
       ])
@@ -1302,9 +1303,9 @@ export function renderLimitationFact(
       case 'possession-share-limit':
         return text(language, 'lim.possessionShare', {
           team: team(limitation.team),
-          value: formatNumber(limitation.value, language),
+          value: formatPercent(limitation.value, language),
           opponent: team(limitation.opponent),
-          opponentValue: formatNumber(limitation.opponentValue, language),
+          opponentValue: formatPercent(limitation.opponentValue, language),
         })
       case 'missing-data-prevents-conclusion': return text(language, 'lim.missingData', { quote: limitation.quote })
       case 'context-only': return text(language, 'lim.contextOnly', { quote: limitation.quote })

@@ -189,8 +189,9 @@ test('French Analyst pass completion uses the French decimal separator on screen
   analyst.click()
   await sleep(100)
   const screen = app.document.body.textContent
-  assert.match(screen, /16,7%/u)
-  assert.doesNotMatch(screen, /16\.7%/u)
+  assert.match(screen, /16,7\u202f%/u)
+  assert.doesNotMatch(screen, /16\.7/u)
+  assert.doesNotMatch(screen, /16,7%/u)
   assert.match(screen, /1 passe réussie sur 6/u)
   assert.doesNotMatch(screen, /1 passes réussies/u)
 
@@ -202,8 +203,10 @@ test('French Analyst pass completion uses the French decimal separator on screen
   await until(() => app.writes.length > 1, 'copy card')
   for (const text of app.writes) {
     assert.doesNotMatch(text, /16\.7/u)
+    assert.doesNotMatch(text, /16,7%/u)
     assert.match(text, /1 passe réussie sur 6/u)
   }
+  assert.ok(app.writes.some((text) => /16,7\u202f%/u.test(text)), 'copied text carries the French percentage spacing')
   app.window.close()
 })
 

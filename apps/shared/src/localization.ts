@@ -1,6 +1,7 @@
 import { resolutionTranslations } from './resolutionLocale.ts'
 import { translateComparisonMessage } from './comparisonLocale.ts'
 import { EXAMPLE_SHOWS, EXAMPLE_TEXT } from './exampleLocale.ts'
+import { canonicalizeNativeClaim } from './nativeClaimGrammar.ts'
 
 export type AppLanguage = 'en' | 'es' | 'fr' | 'de' | 'ar'
 
@@ -2078,10 +2079,12 @@ function canonicalizeLocalizedStatisticFamily(text: string): string | undefined 
 }
 export function canonicalizeSupportedFootballOpinion(opinion: string): string {
   const trimmed = opinion.trim()
-  const compoundParts = trimmed.split(/\s+(?:but|however|pero|mais|aber|لكن|بل)\s+(?=(?:Northbridge|Eastport)\b)/iu)
+  const compoundParts = trimmed.split(/[,،]?\s+(?:but|however|pero|mais|aber|لكن|بل)\s+(?=\S)/iu)
   if (compoundParts.length > 1) {
-    return compoundParts.map((part) => canonicalizeSupportedFootballOpinion(part.replace(/[,.!?؟]+$/u, '')).replace(/[,.!?؟]+$/u, '')).join(' but ')
+    return compoundParts.map((part) => canonicalizeSupportedFootballOpinion(part.replace(/[,.!?؟،]+$/u, '')).replace(/[,.!?؟،]+$/u, '')).join(' but ')
   }
+  const nativeClause = canonicalizeNativeClaim(trimmed.replace(/^[¿¡\s]+|[.!?؟¿]+$/gu, ''))
+  if (nativeClause) return nativeClause
   const localizedStatistic = canonicalizeLocalizedStatisticFamily(trimmed)
   if (localizedStatistic) return localizedStatistic
   for (const { pattern, canonical } of localizedFootballOpinions) {

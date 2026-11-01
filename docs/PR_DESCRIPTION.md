@@ -1,4 +1,24 @@
-﻿# Complete multilingual responses and player clarification across all fixtures
+﻿# Localised examples, locale number formatting and native-language local rules
+
+## This branch (`repair/localised-examples-and-formatting`, based on `ac15800`)
+
+Fixes confirmed display issues and makes the local-rule interpreter genuinely understand every translated built-in example.
+
+- **Fixture examples.** Composer text and the accessible help (`title`) of every fixture example are localised in es/fr/de/ar (`exampleLocale.ts`, `localizedExampleShows`).
+- **Plurals and numbers.** French singular for 0 and 1 ("1 passe réussie sur 6"). Numbers and percentages use the selected locale via `formatNumber` / `formatPercent` on screen, in copy and on cards, with CLDR spacing: `16,7 %` (U+202F) in French, `54,5 %` (U+00A0) in German and Spanish, `16.7%` in English and Arabic.
+- **Earlier-answer label** shows the clock once.
+- **Homepage disclosures (five languages).** The blanket "No AI model connected" and "local rules only" claims are replaced: AI reads questions when enabled, the application checks claims against recorded evidence, local rules remain available, matches are fictional with no live feed, and "no AI involved" is scoped to the prewritten homepage illustration. The privacy paragraph was checked against the API, Foundry and allowance storage: only the opinion, minute/period, match and input language are sent; Foundry receives the opinion only when AI is used; the server keeps a hashed network identifier and request counts, not the opinion. Loading the page or changing language makes no API call (browser-verified).
+- **Native-language local rules.** New `nativeClaimGrammar.ts`: a small per-language lexicon (verbs, quantifiers, metric nouns, "on target", negation, "before the goal", "every … shot", "has scored", passing/sloppy/poor) that rewrites a clause to the existing canonical English form, which then flows through the unchanged interpreter, team/player resolution and evidence code. Team and player names pass through verbatim, so Arabic aliases and signed player continuations behave as before; there is no per-example answer. Compounds ("… pero/mais/aber/لكن …") now split for any fixture's team names, not just the Original fixture's. German pass verbs `vervollständigt`/`angebracht` were added. Negated comparisons are left to the existing negation-aware tables.
+- **Acceptance matrix** (`apps/api/tests/translated-examples-acceptance.test.mjs`): all 80 translated examples (20 catalogue examples × es/fr/de/ar) run through the real `analyzeOpinion` at their own fixture and clock and are deep-compared with the English baseline on intent, entities, assessment, statistics, player statistics/calculations, evidence availability, evidence record IDs and roles, calculations, presentation descriptors, player resolution candidates and selected time/period. Prose and per-request tokens are excluded. Five grammatical variations and a negative test (unsupported wording stays unsupported) are included. Legitimate outcomes are preserved: the "before the goal" examples still ask which goal (clarification), Haaland's passing stays insufficient evidence, distance is still unavailable.
+
+### Limitations
+
+- The grammar is bounded to the documented claim families; other wording gets the localized unsupported/clarification state rather than a guess. German genitive "-s" is stripped for passing claims (a name ending in "s" needs an apostrophe).
+- Hosted Foundry/Azure verification, real-device sharing and native-speaker/independent accessibility review remain pending. No live model calls were made.
+
+---
+
+# Complete multilingual responses and player clarification across all fixtures (earlier work, already merged)
 
 ## Summary
 
