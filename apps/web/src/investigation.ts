@@ -12,10 +12,13 @@ import type { SubmissionContext } from './matchday.ts'
 import { COMPARISON_MESSAGES } from '../../shared/src/comparisonLocale.ts'
 import type {
   ChangeCaveat,
+  ChangeContext,
   ChangeFigure,
   ChangePair,
   ComparisonFacts,
 } from '../../shared/src/changeLocale.ts'
+import { renderChangeCardLabels, renderComparisonFacts } from '../../shared/src/changeLocale.ts'
+import type { AppLanguage } from '../../shared/src/localization.ts'
 import {
   ASSESSMENT_LABELS,
   sourceFooter,
@@ -556,6 +559,58 @@ export function buildChangeCard(
 
 export function changeCardText(card: ChangeCard): string {
   return blocksToText(card.blocks)
+}
+
+/**
+ * The "what changed" card rendered from typed comparison facts. Blocks flagged `localized` are final
+ * text in the reader's language; the unflagged footer and qualification blocks are legacy English.
+ */
+export function buildLocalizedChangeCard(
+  take: string,
+  later: AnswerSnapshot,
+  comparison: Comparison,
+  ctx: ChangeContext,
+  language: AppLanguage,
+): ChangeCard | null {
+  if (comparison.status !== 'comparable' || !comparison.facts) return null
+  const { facts } = comparison
+  const labels = renderChangeCardLabels(language)
+  const rendered = renderComparisonFacts(facts, ctx, language)
+  const blocks: CardBlock[] = [{ kind: 'brand', text: labels.brand, localized: true }]
+  const extended = facts.pairs.length > 1
+  if (extended) blocks.push({ kind: 'notice', text: labels.extended(facts.pairs.length), localized: true })
+  blocks.push(
+    { kind: 'label', text: labels.original, localized: true },
+    { kind: 'take', text: `“${take}”` },
+    { kind: 'scope', text: labels.checked(facts.earlier.clock, facts.later.clock), localized: true },
+    { kind: 'answer', text: rendered.headline, localized: true },
+  )
+  facts.pairs.forEach((pair, index) => {
+    if (facts.pairs.length > 1) {
+      blocks.push({ kind: 'heading', text: `${index + 1}. ${pair.quote}`, localized: true })
+    }
+    blocks.push(
+      { kind: 'bullet', text: labels.bullet(facts.earlier, pair.before), localized: true },
+      { kind: 'bullet', text: labels.bullet(facts.later, pair.after), localized: true },
+    )
+    const figures = labels.figures(pair, ctx)
+    if (figures.length > 0) {
+      blocks.push({ kind: 'label', text: labels.decisiveFigures, localized: true })
+      for (const text of figures) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+    if (pair.addedRecordIds.length > 0) {
+      blocks.push({ kind: 'label', text: labels.newMoments, localized: true })
+      for (const text of labels.records(pair.addedRecordIds, 'added', ctx)) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+    if (pair.removedRecordIds.length > 0) {
+      blocks.push({ kind: 'label', text: labels.noLongerInWindow, localized: true })
+      for (const text of labels.records(pair.removedRecordIds, 'removed', ctx)) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+  })
+  for (const caveat of rendered.caveats) blocks.push({ kind: 'note', text: labels.note(caveat), localized: true })
+  for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
+  blocks.push({ kind: 'footer', text: sourceFooter(later.analysis) })
+  return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
 
 /** What each snapshot says, for display beside a comparison that cannot be reduced to one line. */

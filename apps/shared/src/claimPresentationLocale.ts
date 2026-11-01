@@ -64,6 +64,7 @@ const EN = {
   'v.unsupported': 'Unsupported answer type',
   unsupported: 'This answer type is not supported by this version of the app, so it cannot be shown here.',
   legacy: 'This answer was saved before structured answers existed. The original English source is shown below; player and team identities are not inferred.',
+  legacySource: 'Original English source',
   notRecorded: 'not recorded',
   bothTeams: 'both teams',
   'metric.physical-condition': 'Physical condition',
@@ -227,6 +228,7 @@ const ES: Dict = {
   'v.unsupported': 'Tipo de respuesta no compatible',
   unsupported: 'Esta versión de la aplicación no admite este tipo de respuesta, así que no puede mostrarse aquí.',
   legacy: 'Esta respuesta se guardó antes de que existieran las respuestas estructuradas. Abajo se muestra el texto original en inglés; no se deducen identidades de jugadores ni de equipos.',
+  legacySource: 'Texto original en inglés',
   notRecorded: 'no registrado',
   bothTeams: 'ambos equipos',
   'metric.physical-condition': 'El estado físico',
@@ -387,6 +389,7 @@ const FR: Dict = {
   'v.unsupported': 'Type de réponse non pris en charge',
   unsupported: 'Cette version de l’application ne prend pas en charge ce type de réponse ; elle ne peut donc pas être affichée ici.',
   legacy: 'Cette réponse a été enregistrée avant l’existence des réponses structurées. Le texte source d’origine en anglais est affiché ci-dessous ; les identités des joueurs et des équipes ne sont pas déduites.',
+  legacySource: 'Texte source d’origine en anglais',
   notRecorded: 'non enregistré',
   bothTeams: 'les deux équipes',
   'metric.physical-condition': 'La condition physique',
@@ -547,6 +550,7 @@ const DE: Dict = {
   'v.unsupported': 'Nicht unterstützter Antworttyp',
   unsupported: 'Dieser Antworttyp wird von dieser Version der App nicht unterstützt und kann hier nicht angezeigt werden.',
   legacy: 'Diese Antwort wurde gespeichert, bevor es strukturierte Antworten gab. Unten steht der englische Originaltext; Identitäten von Spielern und Teams werden nicht abgeleitet.',
+  legacySource: 'Englischer Originaltext',
   notRecorded: 'nicht erfasst',
   bothTeams: 'beide Teams',
   'metric.physical-condition': 'Die körperliche Verfassung',
@@ -707,6 +711,7 @@ const AR: Dict = {
   'v.unsupported': 'نوع إجابة غير مدعوم',
   unsupported: 'هذا النوع من الإجابات غير مدعوم في هذا الإصدار من التطبيق، لذلك لا يمكن عرضه هنا.',
   legacy: 'حُفظت هذه الإجابة قبل وجود الإجابات المهيكلة. يظهر النص الأصلي بالإنجليزية أدناه، ولا يتم استنتاج هويات اللاعبين أو الفرق.',
+  legacySource: 'النص الأصلي بالإنجليزية',
   notRecorded: 'غير مسجّل',
   bothTeams: 'كلا الفريقين',
   'metric.physical-condition': 'الحالة البدنية',
@@ -1368,4 +1373,9 @@ export function renderAssessmentLabel(
 /** State shown for a saved response without `presentation`; nothing is inferred from its English text. */
 export function renderLegacyCompatibility(language: AppLanguage): string {
   return text(language, 'legacy')
+}
+
+/** Label placed before the untouched English text of a response saved without `presentation`. */
+export function renderLegacySourceLabel(language: AppLanguage): string {
+  return text(language, 'legacySource')
 }

@@ -54,14 +54,22 @@ import {
   blocksToText,
   describeEvidence,
   describePeriodLabel,
-  isRoutineLimitation,
   isUnsupportedJudgement,
   selectRelevantEvidence,
   shareCardBlocks,
+  type ShareCardLabels,
   type ShareCardModel,
 } from './presentation'
 import {
-  buildChangeCard,
+  answerText,
+  claimViews,
+  renderResultPresentation,
+  type AnswerText,
+  type ClaimView,
+} from './localizedPresentation'
+import { renderAssessmentLabel, renderLegacyCompatibility, renderLegacySourceLabel } from '../../shared/src/claimPresentationLocale'
+import {
+  buildLocalizedChangeCard,
   changeCardText,
   compareSnapshots,
   createSnapshot,
@@ -72,6 +80,8 @@ import {
   type ChangeCard,
   type Comparison,
 } from './investigation'
+import { renderComparisonFacts, type ChangeContext } from '../../shared/src/changeLocale'
+import { presentationContext } from './localizedPresentation'
 import { createBlocksImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
 import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
@@ -861,6 +871,11 @@ function ClaimCard({
   const contextOnly = isUnsupportedJudgement(result)
   const playerPresentation = localizedPlayerPerformance(result, datasetId, language)
   const statisticPresentation = localizedStatistics(result, datasetId, language)
+  const rendered = renderResultPresentation(result, datasetId, language)
+  const badgeText = rendered?.verdict ?? renderAssessmentLabel(result.assessment, language)
+  const limitationText = rendered
+    ? rendered.limitations.join(' ')
+    : playerPresentation?.limitation ?? statisticPresentation?.limitation ?? ''
   return (
     <LocalizedMarkup>
     <article className="claim-result" aria-labelledby={titleId}>
@@ -871,8 +886,10 @@ function ClaimCard({
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
+          data-original-source="true"
+          dir="auto"
         >
-          {result.assessment}
+          {badgeText}
         </span>
         {contextOnly && result.statistics.length > 0 && (
           <p className="context-only-note">{CONTEXT_ONLY_LABEL}</p>
@@ -922,7 +939,10 @@ function ClaimCard({
         )}
       </div>
       <p className="assessment-limitation">
-        <strong>Limitations:</strong> {playerPresentation?.limitation ?? statisticPresentation?.limitation ?? result.limitation}
+        <strong>Limitations:</strong>{' '}
+        {result.presentation || playerPresentation || statisticPresentation
+          ? <span data-original-source="true" dir="auto">{limitationText}{rendered?.note ? ` ${rendered.note}` : ''}</span>
+          : <span data-original-source="true" dir="auto">{renderLegacyCompatibility(language)} {renderLegacySourceLabel(language)}: {result.limitation}</span>}
       </p>
 
       <details className="claim-evidence-details">
@@ -931,7 +951,7 @@ function ClaimCard({
           <p><span>Subject</span><strong>{claim.playerSubject?.name ?? claim.subject ?? 'Needs clarification'}</strong></p>
           <p><span>What we understood</span><strong>{localizedClaimMeaning(result, datasetId, language)}</strong></p>
           <p><span>Request type</span><strong>{claim.intent.replaceAll('-', ' ')}</strong></p>
-          <p><span>Selected period</span><strong>{describePeriodLabel(result.periodLabel)}</strong></p>
+          <p><span>Selected period</span><strong data-original-source="true" dir="auto">{rendered?.scope || describePeriodLabel(result.periodLabel)}</strong></p>
           {claim.historicalEventAnchor && <p><span>Historical anchor</span><strong>{claim.historicalEventAnchor.relationship}</strong></p>}
         </div>
       {claim.clarificationNeeds.length === 0 && (
@@ -1323,6 +1343,24 @@ function usePreparedImage(enabled: boolean, key: string | null, image: ShareCard
   return enabled && prepared && prepared.key === key ? prepared : null
 }
 
+function changeContext(
+  earlier: AnswerSnapshot,
+  later: AnswerSnapshot,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): ChangeContext {
+  const describe = (id: string, snapshot: AnswerSnapshot) => {
+    const reference = snapshot.analysis.claims
+      .flatMap(({ evidence }) => evidence)
+      .find(({ reference }) => reference.id === id)?.reference
+    return reference ? localizedEvidenceDescription(reference, snapshot.analysis, datasetId, language) : id
+  }
+  return {
+    ...presentationContext(datasetId, language),
+    describeRecord: (id, change) => describe(id, change === 'added' ? later : earlier),
+  }
+}
+
 function WhatChanged({
   comparison,
   view,
@@ -1345,19 +1383,35 @@ function WhatChanged({
   const { earlier, later, result } = comparison
   const { language } = useLocalization()
   const separate = result.status !== 'comparable'
-  const earlierPlayerPresentation = earlier.analysis.claims.length === 1
-    ? localizedPlayerPerformance(earlier.analysis.claims[0], datasetId, language)
-    : undefined
-  const earlierStatisticPresentation = earlier.analysis.claims.length === 1
-    ? localizedStatistics(earlier.analysis.claims[0], datasetId, language)
-    : undefined
   const earlierCheckedAgainst = localizedCheckedAgainst(earlier.analysis, datasetId, language)
+  const earlierViews = analysisViews(earlier.analysis, datasetId, language)
+  const laterViews = analysisViews(later.analysis, datasetId, language)
+  const legacy = [...earlierViews, ...laterViews].some(({ kind }) => kind === 'legacy') || !result.facts
+  const earlierAnswer = answerText(
+    earlierViews,
+    earlierViews.some(({ kind }) => kind === 'legacy') ? snapshotReply(earlier) : undefined,
+    language,
+  )
+  const rendered = legacy
+    ? null
+    : renderComparisonFacts(result.facts, changeContext(earlier, later, datasetId, language), language)
+  const nameOf = presentationContext(datasetId, language).nameOf
+  const earlierScope = formatMatchClock(earlier.context.selectedClock) + ' · ' + translateText(earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes', language)
   return (
     <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
       <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
-      <p className="change-headline">{result.headline}</p>
-      {result.lines.map((line) => <p className="change-line" key={line}>{line}</p>)}
+      {rendered ? (
+        <>
+          <p className="change-headline" data-original-source="true" dir="auto">{rendered.headline}</p>
+          {rendered.lines.map((line) => <p className="change-line" key={line} data-original-source="true" dir="auto">{line}</p>)}
+        </>
+      ) : (
+        <>
+          <p className="change-headline" data-original-source="true" dir="auto">{renderLegacyCompatibility(language)}</p>
+          <p className="change-line" data-original-source="true" dir="auto">{renderLegacySourceLabel(language)}: {result.headline}</p>
+        </>
+      )}
       {view === 'analyst' && !separate && (
         <div className="change-analyst">
           <p><strong>Windows</strong> {result.earlierTime}: {result.earlierWindow} · {result.laterTime}: {result.laterWindow}</p>
@@ -1367,26 +1421,26 @@ function WhatChanged({
               <table className="change-table">
                 <thead><tr><th scope="col">Figure</th><th scope="col">{result.earlierTime}</th><th scope="col">{result.laterTime}</th></tr></thead>
                 <tbody>
-                  {pair.figures.map((figure) => (
-                    <tr key={`${figure.entity}-${figure.metric}`}><th scope="row">{figure.entity} · {figure.label}</th><td>{figure.before ?? 'n/a'}</td><td>{figure.after ?? 'n/a'}</td></tr>
+                  {pair.facts.figures.map((figure) => (
+                    <tr key={`${figure.entity.kind === 'team' ? figure.entity.team : figure.entity.id}-${figure.metric}`}>
+                      <th scope="row" data-original-source="true" dir="auto">{nameOf(figure.entity)} · {metricLabel(figure.metric, language, figure.after ?? undefined)}</th>
+                      <td>{figure.before ?? 'n/a'}</td>
+                      <td>{figure.after ?? 'n/a'}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
-              <p><strong>Assessments</strong> {result.earlierTime}: {pair.beforeLabel} · {result.laterTime}: {pair.afterLabel}</p>
+              <p><strong>Assessments</strong> {result.earlierTime}: <span data-original-source="true" dir="auto">{renderAssessmentLabel(pair.facts.before, language)}</span> · {result.laterTime}: <span data-original-source="true" dir="auto">{renderAssessmentLabel(pair.facts.after, language)}</span></p>
             </div>
           ))}
           <p className="change-note">Calculation traces and coverage are in the claim details below.</p>
         </div>
       )}
-      {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
+      {(rendered?.caveats ?? []).map((caveat) => <p className="change-caveat" key={caveat} data-original-source="true" dir="auto">{caveat}</p>)}
       {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
-        <summary>{translateNarrative(`Earlier answer · ${result.earlierTime} · ${earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}`, language)}</summary>
-        <p className="server-summary">
-          {earlierPlayerPresentation?.answer ??
-            earlierStatisticPresentation?.answer ??
-            translateNarrative(snapshotReply(earlier), language)}
-        </p>
+        <summary>{translateText('Earlier answer', language)} · {result.earlierTime} · <span data-original-source="true" dir="auto">{earlierScope}</span></summary>
+        <p className="server-summary" data-original-source="true" dir="auto">{earlierAnswer.text}</p>
         {earlierCheckedAgainst.length > 0 && <p className="checked-against"><strong>Checked against</strong> {earlierCheckedAgainst.join(language === 'ar' ? '؛ ' : '; ')}</p>}
         <p className="change-note">{translateText(earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation', language)} · {translateText('Fictional match', language)}</p>
       </details>
@@ -1400,7 +1454,7 @@ function WhatChanged({
           </div>
           <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
             {changeCard.blocks.map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined} data-original-source={block.localized ? 'true' : undefined} dir={block.localized ? 'auto' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
@@ -1426,26 +1480,55 @@ function localizedShareModel(
   const statisticPresentation = analysis?.claims.length === 1
     ? localizedStatistics(analysis.claims[0], datasetId, language)
     : undefined
+  const views = analysis ? analysisViews(analysis, datasetId, language) : undefined
+  const answer = analysis && views
+    ? answerText(views, views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined, language)
+    : undefined
+  const onlyView = views?.length === 1 ? views[0] : undefined
+  const labels: ShareCardLabels = {
+    verdict: (verdict) => `${translateText('Verdict:', language)} ${verdict}`,
+    limitation: (text) => `${translateText('Limitation:', language)} ${text}`,
+    source: (text) => `${renderLegacySourceLabel(language)}: ${text}`,
+  }
   return {
     ...model,
-    scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language),
-    answer: playerPresentation?.answer ?? statisticPresentation?.answer ??
-      localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
-    claims: model.claims.map((claim) => ({
-      ...claim,
-      text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
-      verdict: claim.verdict ? localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language) : null,
-      facts: model.claims.length === 1 && (playerPresentation || statisticPresentation)
-        ? playerPresentation?.facts ?? statisticPresentation?.facts ?? claim.facts
-        : claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      moments: (playerPresentation || statisticPresentation) && analysis?.claims.length === 1
-        ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
-        : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      limitations: model.claims.length === 1 && (playerPresentation || statisticPresentation)
-        ? [playerPresentation?.limitation ?? statisticPresentation?.limitation ?? translateText('Statistics only, no verdict', language)].filter(Boolean)
-        : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-    })),
+    labels,
+    ...(onlyView?.kind === 'presentation' && onlyView.scope
+      ? { scope: onlyView.scope, scopeLocalized: true }
+      : { scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language) }),
+    ...(answer
+      ? {
+          answer: answer.legacy ? answer.legacyNotice ?? '' : answer.text,
+          answerLocalized: true,
+          ...(answer.legacy && answer.legacySource ? { legacySource: answer.legacySource } : {}),
+        }
+      : { answer: localizeMatchText(translateNarrative(model.answer, language), datasetId, language) }),
+    claims: model.claims.map((claim, index) => {
+      const view = views?.[index]
+      const result = analysis?.claims[index]
+      return {
+        ...claim,
+        rendered: view !== undefined,
+        text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
+        verdict: claim.verdict === null || !result
+          ? claim.verdict && localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language)
+          : view?.kind === 'presentation'
+            ? view.verdict
+            : renderAssessmentLabel(result.assessment, language),
+        facts: model.claims.length === 1 && (playerPresentation || statisticPresentation)
+          ? playerPresentation?.facts ?? statisticPresentation?.facts ?? claim.facts
+          : claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        moments: (playerPresentation || statisticPresentation) && analysis?.claims.length === 1
+          ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
+          : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        limitations: view?.kind === 'presentation' || view?.kind === 'structured'
+          ? view.limitations
+          : view?.kind === 'legacy'
+            ? []
+            : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      }
+    }),
     footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
   }
 }
@@ -1457,37 +1540,37 @@ function localizedShareCardBlocks(
 ) {
   return shareCardBlocks(model).map((block) => ({
     ...block,
-    text: block.kind === 'take'
+    text: block.kind === 'take' || block.localized
       ? block.text
       : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
   }))
+}
+
+function analysisViews(
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): ClaimView[] {
+  return claimViews(
+    analysis,
+    (result) => claimResolution(result) !== undefined,
+    (result) => {
+      const existing = localizedPlayerPerformance(result, datasetId, language) ??
+        localizedStatistics(result, datasetId, language)
+      return existing && { answer: existing.answer, limitation: existing.limitation }
+    },
+    datasetId,
+    language,
+  )
 }
 
 function localizedAnswerText(
   analysis: AnalysisResponse,
   datasetId: string,
   language: ReturnType<typeof useLocalization>['language'],
-): { text: string; structured: boolean } {
-  const pending = (result: ClaimResult) => claimResolution(result) !== undefined
-  const replies = analysis.claims
-    .filter((result) => !pending(result))
-    .map((result) =>
-      localizedPlayerPerformance(result, datasetId, language)?.answer ??
-      localizedStatistics(result, datasetId, language)?.answer ??
-      (result.reply ? translateNarrative(result.reply, language) : undefined),
-    )
-    .filter((reply): reply is string => Boolean(reply))
-  const allStructured = analysis.claims.length > 0 &&
-    analysis.claims.every(
-      (result) =>
-        pending(result) ||
-        localizedPlayerPerformance(result, datasetId, language) !== undefined ||
-        localizedStatistics(result, datasetId, language) !== undefined,
-    )
-  const anyPending = analysis.claims.some(pending)
-  return anyPending || allStructured
-    ? { text: replies.join(' '), structured: true }
-    : { text: canonicalReply(analysis), structured: false }
+): AnswerText {
+  const views = analysisViews(analysis, datasetId, language)
+  return answerText(views, views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined, language)
 }
 
 // One question and its reply, frozen at the minute and period it was asked.
@@ -1517,44 +1600,18 @@ function TurnMessages({
   const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
   const states = new Map(analysis.claims.map((result) => [result.claim.id, claimResolution(result)]))
   const isPending = (result: ClaimResult) => states.get(result.claim.id) !== undefined
-  const anyPending = analysis.claims.some(isPending)
-  const playerPresentations = new Map(
-    analysis.claims.map((result) => [
-      result.claim.id,
-      localizedPlayerPerformance(result, datasetId, language),
-    ]),
-  )
-  const statisticPresentations = new Map(
-    analysis.claims.map((result) => [
-      result.claim.id,
-      localizedStatistics(result, datasetId, language),
-    ]),
-  )
   const evidenceClaims = analysis.claims
     .map((result, index) => ({ result, index }))
     .filter(({ result }) => !isPending(result))
-  const answeredReplies = analysis.claims
-    .filter((result) => !isPending(result))
-    .map((result) =>
-      playerPresentations.get(result.claim.id)?.answer ??
-      statisticPresentations.get(result.claim.id)?.answer ??
-      (result.reply ? translateNarrative(result.reply, language) : undefined),
-    )
-    .filter((reply): reply is string => Boolean(reply))
-  const allRepliesStructured = analysis.claims.length > 0 &&
-    analysis.claims.every(
-      (result) =>
-        isPending(result) ||
-        playerPresentations.get(result.claim.id) !== undefined ||
-        statisticPresentations.get(result.claim.id) !== undefined,
-    )
-  const visibleReply = anyPending
-    ? answeredReplies.join(' ')
-    : allRepliesStructured
-      ? answeredReplies.join(' ')
-      : canonicalReply(analysis)
+  const views = analysisViews(analysis, datasetId, language)
+  const answer = answerText(
+    views,
+    views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined,
+    language,
+  )
+  const visibleReply = answer.text
   // Clarification is rendered once, from the structured state; provider prose is never guidance.
-  const notes = analysis.claims.flatMap((result) => {
+  const notes = analysis.claims.flatMap((result, index) => {
     const state = states.get(result.claim.id)
     if (state) {
       return [{
@@ -1563,20 +1620,17 @@ function TurnMessages({
         title: 'Clarification:',
       }]
     }
-    const structured = playerPresentations.get(result.claim.id) ??
-      statisticPresentations.get(result.claim.id)
-    if (structured) {
-      return structured.limitation
-        ? [{ key: `${result.claim.id}-limitation`, text: structured.limitation, title: 'Limitation:' }]
+    const claimView = views[index]
+    if (claimView.kind === 'presentation') {
+      const text = [...claimView.limitations, ...(claimView.note ? [claimView.note] : [])].join(' ')
+      return text ? [{ key: `${result.claim.id}-limitation`, text, title: 'Limitation:' }] : []
+    }
+    if (claimView.kind === 'structured') {
+      return claimView.limitations.length > 0
+        ? [{ key: `${result.claim.id}-limitation`, text: claimView.limitations.join(' '), title: 'Limitation:' }]
         : []
     }
-    return isRoutineLimitation(result)
-      ? []
-      : [{
-          key: `${result.claim.id}-limitation`,
-          text: result.limitation,
-          title: 'Limitation:',
-        }]
+    return []
   })
   const providerWording = analysis.provider === 'foundry'
     ? analysis.claims.flatMap((result) =>
@@ -1593,24 +1647,22 @@ function TurnMessages({
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
         <p className="msg-label">Groupchat Analyst · {scope}</p>
         {visibleReply && (
-          <p className="msg-text">
-            {playerChoices.length > 0 || allRepliesStructured
-              ? visibleReply
-              : translateNarrative(visibleReply, language)}
-          </p>
+          <p className="msg-text" data-original-source="true" dir="auto">{visibleReply}</p>
         )}
         {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
           <ul className="msg-claims" aria-label="Claims in this opinion">
             {evidenceClaims.map(({ result, index }) => (
               <li key={result.claim.id}>
-                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}>{result.assessment}</span>
-                <span>Claim {index + 1}: {result.claim.text}</span>
+                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`} data-original-source="true" dir="auto">
+                  {views[index].kind === 'presentation' ? (views[index] as { verdict: string }).verdict : renderAssessmentLabel(result.assessment, language)}
+                </span>
+                <span>Claim {index + 1}: <span data-original-opinion="true" dir="auto">{result.claim.text}</span></span>
               </li>
             ))}
           </ul>
         )}
         {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join(language === 'ar' ? '؛ ' : '; ')}</p>}
-        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{translateText(item.title, language)}</strong> {item.text}</p>)}
+        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{translateText(item.title, language)}</strong> <span data-original-source="true" dir="auto">{item.text}</span></p>)}
         {providerWording.length > 0 && (
           <details className="msg-note">
             <summary>{formatLocalizedMessage(RESOLUTION_MESSAGES.providerWording, {}, language)}</summary>
@@ -1726,13 +1778,19 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const changeCard = useMemo<ChangeCard | null>(
     () => {
       if (!comparison) return null
-      const card = buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result)
+      const card = buildLocalizedChangeCard(
+        comparison.later.context.opinion,
+        comparison.later,
+        comparison.result,
+        changeContext(comparison.earlier, comparison.later, datasetId, language),
+        language,
+      )
       if (!card) return null
       return {
         ...card,
         blocks: card.blocks.map((block) => ({
           ...block,
-          text: block.kind === 'take'
+          text: block.kind === 'take' || block.localized
             ? block.text
             : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
         })),
@@ -2081,11 +2139,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     if (!analysis) return
     try {
       const answer = localizedAnswerText(analysis, datasetId, language)
-      await navigator.clipboard.writeText(
-        answer.structured
-          ? answer.text
-          : localizeMatchText(translateNarrative(answer.text, language), datasetId, language),
-      )
+      await navigator.clipboard.writeText(answer.text)
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -2202,7 +2256,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           <summary>Preview share card</summary>
           <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
             {localizedShareCardBlocks(shareModel, language, datasetId).map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined} data-original-source={block.localized ? 'true' : undefined} dir={block.localized ? 'auto' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
