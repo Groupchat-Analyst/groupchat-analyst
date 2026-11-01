@@ -9,6 +9,7 @@ import {
   type MatchClock,
 } from '../../shared/src/matchClock.ts'
 import type { SubmissionContext } from './matchday.ts'
+import { COMPARISON_MESSAGES } from '../../shared/src/comparisonLocale.ts'
 import {
   ASSESSMENT_LABELS,
   sourceFooter,
@@ -350,6 +351,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
   const earlierTime = formatMatchClock(earlier.context.selectedClock)
   const laterTime = formatMatchClock(later.context.selectedClock)
   const qualifications = combinedQualifications(earlier, later, earlierTime, laterTime)
+  const separately = COMPARISON_MESSAGES.separately.replace('{earlier}', earlierTime).replace('{later}', laterTime)
   const base = {
     earlierTime,
     laterTime,
@@ -368,8 +370,8 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     return {
       ...base,
       status: 'not-comparable',
-      headline: "These two checks used different match data, so I'm not lining them up.",
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
+      headline: COMPARISON_MESSAGES.differentData,
+      lines: [separately],
       caveats: [`The ${earlierTime} check used ${first}; the ${laterTime} check used ${second}. Figures from different data can't be compared like for like.`],
     }
   }
@@ -377,21 +379,21 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     return {
       ...base,
       status: 'different-interpretation',
-      headline: 'The two checks interpret this opinion differently, so they cannot be compared directly.',
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
-      caveats: ['The interpreted claims differ, so no like-for-like change is reported.'],
+      headline: COMPARISON_MESSAGES.differentInterpretation,
+      lines: [separately],
+      caveats: [COMPARISON_MESSAGES.differentClaims],
     }
   }
   if (!sameWindowKind(earlier.context, later.context) || a.some((r, i) => !isAssessed(r) || !isAssessed(b[i]))) {
     return {
       ...base,
       status: 'not-comparable',
-      headline: "I can't line these two checks up like for like.",
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
+      headline: COMPARISON_MESSAGES.notComparable,
+      lines: [separately],
       caveats: [
         sameWindowKind(earlier.context, later.context)
-          ? 'At least one check could not be assessed, so there is nothing to compare.'
-          : 'The checks used different evidence periods.',
+          ? COMPARISON_MESSAGES.notAssessed
+          : COMPARISON_MESSAGES.differentPeriods,
       ],
     }
   }

@@ -10,7 +10,7 @@ import {
   localizedPlayerName,
   localizedTeamMonogram,
 } from '../../shared/src/displayNames'
-import { translateText } from '../../shared/src/localization'
+import { translateNarrative, translateText } from '../../shared/src/localization'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -158,12 +158,12 @@ export function MatchHeader({
           <span className="clock-value" dir="ltr">{displayedLabel ?? requestedLabel}</span>
           <span className="clock-state">
             {error
-              ? 'Showing the last loaded moment'
+              ? translateText('Showing the last loaded moment', language)
               : isPending
-                ? `Moving to ${requestedLabel}…`
+                ? translateNarrative(`Moving to ${requestedLabel}…`, language)
                 : displayed
-                  ? 'Match time'
-                  : 'Loading…'}
+                  ? translateText('Match time', language)
+                  : translateText('Loading…', language)}
           </span>
         </div>
       </div>
@@ -269,7 +269,7 @@ export function MatchHeader({
           </p>
         ) : (
           <p className="latest-body is-quiet">
-            {status === 'loading' && !displayed ? 'Loading the match…' : 'Nothing has been recorded yet.'}
+            {translateText(status === 'loading' && !displayed ? 'Loading the match…' : 'Nothing has been recorded yet.', language)}
           </p>
         )}
         <p className="latest-note">One recorded event — it does not show who is on top.</p>

@@ -1,4 +1,5 @@
 import { resolutionTranslations } from './resolutionLocale.ts'
+import { translateComparisonMessage } from './comparisonLocale.ts'
 
 export type AppLanguage = 'en' | 'es' | 'fr' | 'de' | 'ar'
 
@@ -2290,6 +2291,9 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   if (language === 'en') return text
   const exact = translateText(text, language)
   if (exact !== text) return exact
+
+  const structured = translateComparisonMessage(text, language)
+  if (structured !== null) return structured
 
   const movingTo = text.match(/^Moving to (.+)…$/u)
   if (movingTo) {

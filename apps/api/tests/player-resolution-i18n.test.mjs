@@ -275,3 +275,17 @@ test('unsupported wording that names an identifiable player keeps the player in 
     }
   }
 })
+
+test('a foreign-team override exposes no stale player candidates or continuation', async () => {
+  for (const opinion of ['How did Bruno play against Westhaven?', 'How did Bruno play and did Westhaven have more possession than Redmere?']) {
+    const response = await analyzeOpinion(request(ORIGINAL, opinion, CLOCKS[1].selectedClock, 'en'))
+    const text = JSON.stringify(response)
+    assert.ok(!text.includes('playerResolution'), opinion)
+    assert.ok(!text.includes('player-choice'), opinion)
+    assert.equal(response.playerResolutionContinuation, undefined, opinion)
+    for (const claim of response.claims) {
+      assert.equal(claim.resolution, undefined)
+      assert.equal(claim.assessment === 'unrecognized language' || claim.assessment !== 'clarification needed', true)
+    }
+  }
+})

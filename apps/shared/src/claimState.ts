@@ -32,3 +32,8 @@ export function resolutionMessage(resolution: ClaimResolution, language: AppLang
       return formatLocalizedMessage(RESOLUTION_MESSAGES.unclear, {}, language)
   }
 }
+
+/** True while any claim still awaits a choice or clarification; such replies are not shareable answers. */
+export function hasUnresolvedClaims(claims: readonly ClaimResult[]): boolean {
+  return claims.some((result) => claimResolution(result) !== undefined)
+}

@@ -2740,11 +2740,12 @@ export async function analyzeOpinion(
     const foreignMarkers = Object.keys(slotted.foreign).map((slot) => `__foreign_${slot}__`)
     const names = foreignMarkers.join(' and ')
     const fanReply = `${names} ${foreignMarkers.length === 1 ? 'is' : 'are'} not part of ${teams[0]} v ${teams[1]}. I have not attributed this opinion to either team or selected team-specific evidence.`
+    const { playerResolutionContinuation: _stale, ...responseWithoutContinuation } = response
     const unsupported = {
-      ...response,
+      ...responseWithoutContinuation,
       fanReply,
       summary: `${fanReply}\n\nSelected period: ${response.selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`,
-      claims: response.claims.map((result) => ({
+      claims: response.claims.map(({ playerResolution: _choices, resolution: _state, ...result }) => ({
         ...result,
         claim: {
           ...result.claim,

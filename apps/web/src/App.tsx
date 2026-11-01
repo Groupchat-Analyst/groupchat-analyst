@@ -73,7 +73,7 @@ import {
   type AppLanguage,
 } from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
-import { claimResolution, resolutionMessage } from '../../shared/src/claimState'
+import { claimResolution, hasUnresolvedClaims, resolutionMessage } from '../../shared/src/claimState'
 import { RESOLUTION_MESSAGES } from '../../shared/src/resolutionLocale'
 import { LanguageSelector, LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
@@ -1336,7 +1336,7 @@ function WhatChanged({
             translateNarrative(snapshotReply(earlier), language)}
         </p>
         {earlierCheckedAgainst.length > 0 && <p className="checked-against"><strong>Checked against</strong> {earlierCheckedAgainst.join(language === 'ar' ? '؛ ' : '; ')}</p>}
-        <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
+        <p className="change-note">{translateText(earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation', language)} · {translateText('Fictional match', language)}</p>
       </details>
       {changeCard && (
         <details className="share-preview change-share">
@@ -1636,7 +1636,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   )
   // Any unresolved claim (choice, absent player, unclear wording) is not a completed, shareable answer.
   const hasPlayerChoices = Boolean(
-    analysis?.claims.some((result) => claimResolution(result) !== undefined),
+    analysis ? hasUnresolvedClaims(analysis.claims) : false,
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(
@@ -2067,7 +2067,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
         </div>
       )}
-      {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
+      {demo === 'moving' && <p className="demo-note" role="status">{translateNarrative('Moving to 58′…', language)}</p>}
       {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
       {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} datasetId={datasetId} />}
       {opinion.trim() !== submittedOpinion && (
@@ -2225,7 +2225,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                     </div>
                     {isLoadingSubmit && (
                       <div className="msg msg-bot" role="status">
-                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />Checking the match…</p>
+                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />{translateText('Checking the match…', language)}</p>
                       </div>
                     )}
                     {requestError && !isLoadingSubmit && (
