@@ -416,6 +416,10 @@ function parseRunningDistanceComparison(
   }
 }
 
+// "How did <name> play?" mirrors the existing "How did <name> perform?"; pronouns need a referent first.
+const openPlayQuestion =
+  /\bhow\s+(?:did|has|does|is)\s+(?!(?:he|she|they|it|we|you|i|him|her|them|this|that|the|a|an)\b)[\p{L}'’.-]+(?:\s+[\p{L}'’.-]+){0,2}\s+play(?:ed|ing|s)?\b/iu
+
 function meaningCategory(text: string): ClaimMeaningCategory {
   if (
     /\b(?:where|why)\b/i.test(text) &&
@@ -430,7 +434,8 @@ function meaningCategory(text: string): ClaimMeaningCategory {
   ) {
     return 'historical-circumstance'
   }
-  if (/\b(?:control(?:led)?|possession|dominat(?:ed|es)?|luck(?:y)?|deserv(?:ed)?|played|perform(?:ed|ance)?|comfortable|better|worse)\b/i.test(text)) {
+  if (/\b(?:control(?:led)?|possession|dominat(?:ed|es)?|luck(?:y)?|deserv(?:ed)?|played|perform(?:ed|ance)?|comfortable|better|worse)\b/i.test(text) ||
+    openPlayQuestion.test(text)) {
     return 'performance-judgement'
   }
   if (/\b(?:shot|shots|goal|goals|pass|passes|scored|ran|further|farther|distance)\b/i.test(text)) {
