@@ -20,8 +20,8 @@ Based on `Origin/main` `e22e76a2a4d415d2107101e8e4956804c7fec2a0` (PR #11). Fixe
 
 Automated (offline, stubbed providers):
 
-- API: **444/444** pass, including the actual Azure Table client against local Azurite (emulator, not Azure).
-- Web: **177/177** pass (includes 57′→58′ typed comparison in all five languages, native Arabic question, incidental-English invariance); TypeScript/production builds and lint pass (existing Vite bundle-size warning). `git diff --check` clean.
+- API: **457/457** pass, including the actual Azure Table client against local Azurite (emulator, not Azure). The API has no lint script (not applicable).
+- Web: **229/229** pass, including the real-`App.tsx` copy/export integration tests (jsdom + esbuild, stubbed fetch/clipboard) and typed-presentation tests (includes 57′→58′ typed comparison in all five languages, native Arabic question, incidental-English invariance); TypeScript/production builds and lint pass (existing Vite bundle-size warning). `git diff --check` clean.
 - Matrix: 4 fixtures × 5 languages × local and stubbed-Foundry (generic prose, paraphrase, incomplete category) × 1′ / 58′ / 90+4′; both candidate selections per ambiguity with zero additional interpreter calls; Gomes/Gomez, Martin/Martínez, absent players, pronouns/noun phrases, unsupported wording, mixed (one resolved + one pending) claims, foreign-team override, legacy responses, comparison template translation.
 
 Browser (local-rules API, Vite dev server, desktop Chromium; **no Foundry**):
@@ -30,17 +30,20 @@ Browser (local-rules API, Vite dev server, desktop Chromium; **no Foundry**):
 - Arabic at 390 px and 320 px: RTL, no horizontal overflow; switching language with a pending choice preserved the choice and an unsent draft.
 - Keyboard: focus and Enter on a candidate button; Spanish populated Analyst view with no English fragments.
 - Original fixture 57′→58′ comparison in Arabic and German showed (and was fixed for) untranslated comparison sentences.
-- A downloaded Arabic card (2160×1692) was inspected: correct shaping, RTL alignment, original wording, scope and provider footer.
+- Final-revision downloaded cards (390 px viewport, local rules, Original fixture, 1′) were generated and inspected in all five languages: correct Arabic shaping and RTL, localized original-wording label, verdict, key facts and footer, no wrapping defects.
+- Final revision, 9 responses per language across all four fixtures (local rules, default view) scanned in en/es/fr/de/ar for English fragments: none found; resolved answers show share controls, pending choices do not.
+- Final revision, Arabic at 320 px, Arabic-written question: 57′ contradicted (2–2) → 58′ supported (Eastport 2→3, Northbridge 2), localized comparison and new-record line, no horizontal overflow.
 - Static pages (home, matches, four fixtures) scanned in es/fr/de/ar: no English fragments.
 
 ## Remaining limitations and unverified
 
 - **Hosted Foundry, hosted Azure Table and the deployed site are not verified.** Foundry behaviour is covered only by stubs and replayed captures.
-- **Response localisation is NOT fully structured.** Migrated to typed facts: factual comparisons, player-performance answers, statistic-request answers, and evidence descriptions for passes, shots, recoveries, pressure, turnovers, possession intervals and other events. Still on the legacy English-prose path (`translateNarrative` over server English): count-assertion answers (“every/no … shot”), goal-before-half-time, historical-circumstance/run-of-play, subjective/tactical-topic replies, coaching, unavailable-data and insufficient-evidence `reply`/`limitation` text, share-card claim verdict/limitation lines for those claims, and the “What changed” earlier-answer text. These keep working but remain English-source translation; no typed reason/limitation codes were added to the API contract.
+- **Typed presentation for the migrated families (see `docs/LOCALIZATION_MIGRATION_CHECKLIST.md`).** Every `ClaimResult` now carries `presentation` (`claimPresentation.ts`): answer code, entity refs, `MatchClock`s (45+3′ preserved), counts/zero-vs-null, scope, limitation codes (28) and reason codes (17). Populated in `service.ts` where the decision is made, never parsed from English. `claimPresentationLocale.ts` renders it in five languages for count assertions, half-time, historical/run-of-play, possession dominance, topic/tactical, player-broad, coaching, unavailable-metric, subjective-unsettled and insufficient replies, limitations, "What we understood"/"Checked against", share-card verdict/limitation/key-fact lines, and request errors (`requestErrorLocale.ts`). "What changed" (headline, lines, caveats, qualifications, card labels/footer) renders from typed `Comparison.facts` (`changeLocale.ts`); earlier answers render from saved snapshots, so language changes do not recalculate them. Fan, Analyst, copy reply, card text, preview and image share one source (`localizedPresentation.ts`).
+- **Legacy/source-only uses of the old English translator remain** (documented, none used for newly generated reply, verdict, limitation or earlier-answer text): responses saved without `presentation` (localized compatibility notice + English source labelled as source), `claim.meaning.description` fallbacks for those, change cards for legacy snapshots, static UI notes/labels, catalogue example titles, the evidence-reference heading, `localizedEvidenceDetail` default, and the Arabic counted `metricLabel`.
+- Some Arabic phrasing is functional rather than idiomatic and needs native-speaker review; dataset labels are embedded verbatim; the typed "focus" line is coarse.
 - Compound questions: supported connectors are split into separate claims; other compositions fall back to the existing single-claim/clarification behaviour.
-- Arabic card shaping was inspected only for the earlier Arabic card; cards in all five languages were not re-inspected for this change.
-- Browser checks used desktop Chromium viewport emulation only: no real device, no iPhone native share, no screen reader, no native-speaker review. Clipboard copy could not be exercised in the automation browser; copy text relies on the same builders as the card (unit-tested), not a browser clipboard read. Only Arabic and a subset of languages were rendered as downloaded cards.
-- Not exercised in a browser: Redmere/Westhaven/Return populated Analyst views in every language (covered by API/web matrix tests only).
+- Browser checks used desktop Chromium viewport emulation only: no real device, no iPhone native share, no screen reader, no independent accessibility or native-speaker review. The automation browser blocks the clipboard, so copy was verified instead by the real `App.tsx` jsdom integration test capturing the `navigator.clipboard.writeText` argument against hand-written literals (en/es/fr/de/ar), not by a browser clipboard read.
+- Browser matrix used the local-rules provider only. The Foundry path is covered offline by stubbed transports (API/web matrix), not in the browser and not live.
 ## Production settings
 
 Configure these only in the Static Web App's **Production backend environment variables**. Keep the existing signing key unchanged and server-only. Preserve the existing `FoundryJudging` table and counts. Do not configure or use a judge access code.
