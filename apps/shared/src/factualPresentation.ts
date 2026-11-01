@@ -320,10 +320,10 @@ export function comparisonFactsFromResult(
 
 const POSSESSION_NOTE: Record<AppLanguage, string> = {
   en: "Possession only counts recorded controlled time, so it doesn't show territorial control or overall performance.",
-  es: 'La posesi�n solo cuenta el tiempo de control registrado, as� que no muestra el control territorial ni el rendimiento global.',
-  fr: 'La possession ne compte que le temps de contr�le enregistr� ; elle ne montre ni le contr�le du terrain ni la performance globale.',
-  de: 'Ballbesitz z�hlt nur erfasste Kontrollzeit und zeigt weder Raumkontrolle noch die Gesamtleistung.',
-  ar: '????? ????????? ??? ??????? ??????? ???? ???? ?? ????? ??????? ??? ???????? ??? ?????? ?????.',
+  es: 'La posesión solo cuenta el tiempo de control registrado, así que no muestra el control territorial ni el rendimiento global.',
+  fr: 'La possession ne compte que le temps de contrôle enregistré ; elle ne montre ni le contrôle du terrain ni la performance globale.',
+  de: 'Ballbesitz zählt nur erfasste Kontrollzeit und zeigt weder Raumkontrolle noch die Gesamtleistung.',
+  ar: 'يحتسب الاستحواذ وقت السيطرة المسجّل فقط، لذا لا يعكس السيطرة على المساحات ولا الأداء العام.',
 }
 
 export function comparisonLimitation(

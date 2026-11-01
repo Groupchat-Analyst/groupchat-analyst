@@ -29,6 +29,7 @@ import {
 import {
   comparisonFactsFromResult,
   comparisonLimitation,
+  comparisonMetricName,
   formatCountWithNoun,
   formatFactualComparison,
   formatNumber,
@@ -838,7 +839,14 @@ function localizedClaimMeaning(
     ? renderPresentationUnderstood(result.presentation, presentationContext(datasetId, language), language)
     : null
   if (typedUnderstood !== null) return typedUnderstood
-  return localizeMatchText(
+  if (result.presentation && language !== 'en') {
+    const facts = comparisonFactsFromResult(
+      result,
+      (team) => localizeMatchText(team, datasetId, language),
+      (player) => localizedPlayerName(datasetId, player.id, player.name, language),
+    )
+    if (facts) return `${facts.subject.name} · ${facts.opponent.name} · ${comparisonMetricName(facts.metric, language)}`
+  }  return localizeMatchText(
     translateNarrative(claim.meaning.description, language),
     datasetId,
     language,
@@ -894,12 +902,7 @@ function ClaimCard({
             {result.statistics.map((statistic) => (
               <p key={`${statistic.team}-${statistic.metric}`}>
                 <strong>{statistic.team}</strong>
-                <span>
-                  {statistic.value === null
-                    ? 'Not available'
-                    : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
-                </span>
+                <span>{localizedStatisticValue(statistic.value, statistic.metric, language)}</span>
               </p>
             ))}
           </div>
@@ -914,12 +917,7 @@ function ClaimCard({
                         statistic.playerName,
                         language,
                       )}</strong>
-                <span>
-                  {statistic.value === null
-                    ? 'Not available'
-                    : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
-                </span>
+                <span>{localizedStatisticValue(statistic.value, statistic.metric, language)}</span>
               </p>
             ))}
           </div>
@@ -946,7 +944,9 @@ function ClaimCard({
           <p><span>Subject</span><strong>{claim.playerSubject?.name ?? claim.subject ?? 'Needs clarification'}</strong></p>
           <p><span>What we understood</span><strong>{localizedClaimMeaning(result, datasetId, language)}</strong></p>
           <p><span>Request type</span><strong>{claim.intent.replaceAll('-', ' ')}</strong></p>
-          <p><span>Selected period</span><strong data-original-source="true" dir="auto">{rendered?.scope || describePeriodLabel(result.periodLabel)}</strong></p>
+          <p><span>Selected period</span><strong data-original-source="true" dir="auto">{rendered?.scope || (result.presentation
+            ? renderPresentationScope(result.presentation.scope, presentationContext(datasetId, language), language)
+            : translateNarrative(describePeriodLabel(result.periodLabel), language))}</strong></p>
           {claim.historicalEventAnchor && <p><span>Historical anchor</span><strong>{claim.historicalEventAnchor.relationship}</strong></p>}
         </div>
       {claim.clarificationNeeds.length === 0 && (
@@ -1033,7 +1033,7 @@ function ClaimCard({
                   <p>{trace.metric === 'possession-losses-by-area'
                     ? `${trace.value ?? 'Not available'} turnovers`
                     : `${trace.numerator}/${trace.denominator}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : `${trace.value}%`})` : ''}`}</p>
-                  <p>{trace.denominatorDescription}</p>
+                  <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
                     <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
@@ -1052,7 +1052,7 @@ function ClaimCard({
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
                         : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
                   </p>
-                  <p>{trace.denominatorDescription}</p>
+                  <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
                     <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
