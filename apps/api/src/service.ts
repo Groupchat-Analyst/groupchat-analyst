@@ -2804,6 +2804,18 @@ function mentionsAlias(text: string, alias: string): boolean {
   )
 }
 
+/** Structural test shared by local and Foundry claims; the topic classifier only refines it. */
+function isPlayerPerformanceClaim(claim: InterpretedClaim): boolean {
+  if (
+    claim.intent !== 'subjective-judgement' ||
+    claim.meaning.category !== 'performance-judgement'
+  ) {
+    return false
+  }
+  const topic = classifyOpinion(claim.text)?.topic
+  return topic !== 'physical-condition' && topic !== 'prediction'
+}
+
 function playerCandidatesForClaim(
   claim: InterpretedClaim,
   opinion: string,
@@ -2811,15 +2823,7 @@ function playerCandidatesForClaim(
   naming: TeamNaming,
   datasetId: string,
 ): PlayerResolutionOption[] {
-  const performanceTopic =
-    claim.intent === 'subjective-judgement' &&
-    claim.meaning.category === 'performance-judgement'
-      ? classifyOpinion(claim.text)?.topic
-      : undefined
-  const isPlayerPerformanceClarification =
-    performanceTopic !== undefined &&
-    performanceTopic !== 'physical-condition' &&
-    performanceTopic !== 'prediction'
+  const isPlayerPerformanceClarification = isPlayerPerformanceClaim(claim)
   if (
     claim.subject !== null ||
     claim.playerSubject !== null ||
@@ -3085,19 +3089,16 @@ export async function resolvePlayerSelection(
   const resolvedClaims = validated.claims.map((claim, index) =>
     {
       if (index !== claimIndex) return claim
-      const performanceTopic =
-        claim.intent === 'subjective-judgement'
-          ? classifyOpinion(claim.text)?.topic
-          : undefined
+      const performanceTopic = isPlayerPerformanceClaim(claim)
+        ? classifyOpinion(claim.text)?.topic
+        : undefined
       return {
           ...claim,
           subject: player.team,
           playerSubject: player,
-          requiredEvidence:
-            performanceTopic && performanceTopic !== 'physical-condition' &&
-            performanceTopic !== 'prediction'
-              ? evidenceForTopic(performanceTopic, true)
-              : claim.requiredEvidence,
+          requiredEvidence: performanceTopic
+            ? evidenceForTopic(performanceTopic, true)
+            : claim.requiredEvidence,
           meaning: {
             ...claim.meaning,
             description: claim.playerMetric
