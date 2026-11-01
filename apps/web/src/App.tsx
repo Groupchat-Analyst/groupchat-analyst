@@ -20,13 +20,33 @@ import {
   type MatchClock,
   type MatchTeam,
 } from '../../shared/src/matchClock'
+import {
+  formatLegacyEvidence,
+  formatOtherEventEvidence,
+  formatPossessionEvidence,
+  formatTurnoverEvidence,
+} from '../../shared/src/evidenceLocale'
+import {
+  comparisonFactsFromResult,
+  comparisonLimitation,
+  comparisonMetricName,
+  formatCountWithNoun,
+  formatFactualComparison,
+  formatNumber,
+} from '../../shared/src/factualPresentation'
 import { MatchHeader, type KeyMoment } from './MatchHeader'
 import { PassMap } from './PassMap'
 import {
   AnalysisRequestError,
   AnalysisTimeoutError,
+  ANALYSIS_TIMEOUT_MS,
   requestAnalysis,
 } from './analysisClient'
+import {
+  renderRequestError,
+  requestErrorFact,
+  type RequestErrorFact,
+} from '../../shared/src/requestErrorLocale'
 import {
   createAnalysisRequest,
   createSubmissionContext,
@@ -41,14 +61,23 @@ import {
   blocksToText,
   describeEvidence,
   describePeriodLabel,
-  isRoutineLimitation,
   isUnsupportedJudgement,
   selectRelevantEvidence,
   shareCardBlocks,
+  type ShareCardLabels,
   type ShareCardModel,
 } from './presentation'
 import {
-  buildChangeCard,
+  answerText,
+  claimViews,
+  renderResultPresentation,
+  type AnswerText,
+  type ClaimView,
+} from './localizedPresentation'
+import { renderAssessmentLabel, renderLegacyCompatibility, renderLegacySourceLabel, renderPresentationFocus, renderPresentationScope, renderPresentationUnderstood, renderStatisticFact } from '../../shared/src/claimPresentationLocale'
+import type { EntityRef } from '../../shared/src/claimPresentation'
+import {
+  buildLocalizedChangeCard,
   changeCardText,
   compareSnapshots,
   createSnapshot,
@@ -59,6 +88,8 @@ import {
   type ChangeCard,
   type Comparison,
 } from './investigation'
+import { renderChangeCardFooter, renderChangeCardLabels, renderComparisonFacts, type ChangeContext } from '../../shared/src/changeLocale'
+import { presentationContext } from './localizedPresentation'
 import { createBlocksImage, svgToPngBlob, type ShareCardImage } from './shareCardImage'
 import { DEMO_CLOCK, DEMO_ENTRY_LABEL, DEMO_NEXT_CLOCK, DEMO_TAKE, demoStep, isRelevantAnswer } from './guidedDemo'
 import { imageKey, shareReceipts, supportsFileShare, type PreparedImage } from './nativeShare'
@@ -70,9 +101,10 @@ import {
   localizedExample,
   translateNarrative,
   translateText,
-  type AppLanguage,
 } from '../../shared/src/localization'
 import { localizeMatchText, localizedPlayerName } from '../../shared/src/displayNames'
+import { claimResolution, hasUnresolvedClaims, resolutionMessage } from '../../shared/src/claimState'
+import { RESOLUTION_MESSAGES } from '../../shared/src/resolutionLocale'
 import { LanguageSelector, LocalizedMarkup } from './localization'
 import { useLocalization } from './localizationContext'
 import './App.css'
@@ -104,30 +136,13 @@ type SubmittedRequest = {
   operation: RequestOperation
 }
 
-const publicAiErrorMessages: Readonly<Record<string, string>> = {
-  foundry_not_configured:
-    'AI interpretation is unavailable. Use local rules instead.',
-  foundry_allowance_unavailable:
-    'The AI request allowance could not be checked. No model request was made. Use local rules instead or try again later.',
-  foundry_allowance_exhausted:
-    'The shared AI request allowance is exhausted. Use local rules instead.',
-  foundry_client_allowance_exhausted:
-    'The AI request allowance for this network is exhausted. Use local rules instead or try again later.',
-  foundry_interpretation_failed:
-    'AI interpretation failed. This attempt used one allowance. Try again or use local rules instead.',
-  analysis_timeout:
-    'The check timed out. The request may still be processing. Try again when ready, or use local rules.',
-}
+class ClientRequestFailure extends Error {
+  readonly kind: 'incomplete' | 'different-match'
 
-function localizeAnalysisError(
-  message: string,
-  code: string,
-  language: AppLanguage,
-): string {
-  return translateNarrative(
-    code ? publicAiErrorMessages[code] ?? message : message,
-    language,
-  )
+  constructor(kind: 'incomplete' | 'different-match', message: string) {
+    super(message)
+    this.kind = kind
+  }
 }
 
 function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOption {
@@ -141,6 +156,21 @@ function isPlayerResolutionOption(value: unknown): value is PlayerResolutionOpti
     'team' in value &&
     typeof value.team === 'string'
   )
+}
+
+function isClaimResolution(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || !('status' in value)) return false
+  switch (value.status) {
+    case 'needs-clarification':
+      return true
+    case 'player-not-in-fixture':
+      return 'name' in value && typeof value.name === 'string'
+    case 'player-choice':
+    case 'unsupported-wording':
+      return 'players' in value && Array.isArray(value.players) && value.players.every(isPlayerResolutionOption)
+    default:
+      return false
+  }
 }
 
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
@@ -187,6 +217,7 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
         'playerCalculations' in claim &&
         Array.isArray(claim.playerCalculations) &&
         (!('reply' in claim) || typeof claim.reply === 'string') &&
+        (!('resolution' in claim) || isClaimResolution(claim.resolution)) &&
         (!('playerResolution' in claim) ||
           (typeof claim.playerResolution === 'object' &&
             claim.playerResolution !== null &&
@@ -502,6 +533,28 @@ function localizedStatistics(
   datasetId: string,
   language: ReturnType<typeof useLocalization>['language'],
 ): { answer: string; facts: string[]; limitation: string } | undefined {
+  const factual = comparisonFactsFromResult(
+    result,
+    (team) => localizeMatchText(team, datasetId, language),
+    (player) => localizedPlayerName(datasetId, player.id, player.name, language),
+  )
+  if (factual) {
+    const metric = factual.metric
+    const isPercent = metric === 'possession-percentage' || metric === 'pass-completion-percentage'
+    const show = (value: number | null) =>
+      value === null
+        ? translateText('Not available', language)
+        : isPercent
+          ? `${formatNumber(value, language)}%`
+          : formatCountWithNoun(metric, value, language)
+    return {
+      answer: formatFactualComparison(factual, language),
+      facts: [factual.subject, factual.opponent].map(
+        (side) => `${side.name} · ${show(side.value)}`,
+      ),
+      limitation: comparisonLimitation(factual, language),
+    }
+  }
   if (
     result.claim.intent !== 'statistical-request' ||
     result.assessment !== 'statistics provided'
@@ -575,6 +628,11 @@ function localizedCheckedAgainst(
             )
           : subject
         : translateText('Both teams', language)
+      const typed = result.presentation
+      const names = presentationContext(datasetId, language)
+      const periodText = typed
+        ? renderPresentationScope(typed.scope, names, language)
+        : translateNarrative(describePeriodLabel(result.periodLabel), language)
       if (isUnsupportedJudgement(result)) {
         return [
           who,
@@ -582,7 +640,7 @@ function localizedCheckedAgainst(
             'defensive shape and positioning (not recorded, so no verdict)',
             language,
           ),
-          translateNarrative(describePeriodLabel(result.periodLabel), language),
+          periodText,
         ].join(' · ')
       }
       const metrics = comparison
@@ -591,21 +649,18 @@ function localizedCheckedAgainst(
             ...result.statistics.map(({ metric }) => metric),
             ...result.playerStatistics.map(({ metric }) => metric),
           ])]
+      const typedFocus = typed ? renderPresentationFocus(typed.answer, language) : null
       const what = metrics.length > 0
         ? metrics
             .slice(0, 3)
             .map((metric) => metricLabel(metric, language))
             .join(language === 'ar' ? '، ' : ', ')
-        : localizeMatchText(
+        : typedFocus ?? localizeMatchText(
             translateNarrative(claim.meaning.description, language),
             datasetId,
             language,
           )
-      return [
-        who,
-        what,
-        translateNarrative(describePeriodLabel(result.periodLabel), language),
-      ].join(' · ')
+      return [who, what, periodText].join(' · ')
     })
 }
 
@@ -714,14 +769,31 @@ function localizedEvidenceDescription(
       language,
     )
   }
-  return localizeMatchText(
-    translateNarrative(
-      describeEvidence(reference.description, foundation.players),
+  const turnover = foundation.turnoverRecords.find(({ id }) => id === reference.id)
+  if (turnover) {
+    return formatTurnoverEvidence(
+      { time: reference.time, team, player: nameFor(turnover.playerId), passId: turnover.lostPassId },
       language,
-    ),
-    datasetId,
-    language,
-  )
+    )
+  }
+  const interval = foundation.possessionIntervals.find(({ id }) => id === reference.id)
+  if (interval) {
+    return formatPossessionEvidence(
+      { time: reference.time, team, minutes: interval.durationMinutes, status: interval.status },
+      language,
+    )
+  }
+  if (event?.type === 'other') {
+    return language === 'en'
+      ? describeEvidence(reference.description, foundation.players)
+      : formatOtherEventEvidence({ time: reference.time, team }, language)
+  }
+  return language === 'en'
+    ? describeEvidence(reference.description, foundation.players)
+    : formatLegacyEvidence(
+        { time: reference.time, team, source: reference.description },
+        language,
+      )
 }
 
 function localizedClaimMeaning(
@@ -763,7 +835,18 @@ function localizedClaimMeaning(
       )
     }
   }
-  return localizeMatchText(
+  const typedUnderstood = result.presentation
+    ? renderPresentationUnderstood(result.presentation, presentationContext(datasetId, language), language)
+    : null
+  if (typedUnderstood !== null) return typedUnderstood
+  if (result.presentation && language !== 'en') {
+    const facts = comparisonFactsFromResult(
+      result,
+      (team) => localizeMatchText(team, datasetId, language),
+      (player) => localizedPlayerName(datasetId, player.id, player.name, language),
+    )
+    if (facts) return `${facts.subject.name} · ${facts.opponent.name} · ${comparisonMetricName(facts.metric, language)}`
+  }  return localizeMatchText(
     translateNarrative(claim.meaning.description, language),
     datasetId,
     language,
@@ -791,6 +874,11 @@ function ClaimCard({
   const contextOnly = isUnsupportedJudgement(result)
   const playerPresentation = localizedPlayerPerformance(result, datasetId, language)
   const statisticPresentation = localizedStatistics(result, datasetId, language)
+  const rendered = renderResultPresentation(result, datasetId, language)
+  const badgeText = rendered?.verdict ?? renderAssessmentLabel(result.assessment, language)
+  const limitationText = rendered
+    ? rendered.limitations.join(' ')
+    : playerPresentation?.limitation ?? statisticPresentation?.limitation ?? ''
   return (
     <LocalizedMarkup>
     <article className="claim-result" aria-labelledby={titleId}>
@@ -801,8 +889,10 @@ function ClaimCard({
       <div className="assessment-summary">
         <span
           className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}
+          data-original-source="true"
+          dir="auto"
         >
-          {result.assessment}
+          {badgeText}
         </span>
         {contextOnly && result.statistics.length > 0 && (
           <p className="context-only-note">{CONTEXT_ONLY_LABEL}</p>
@@ -812,12 +902,7 @@ function ClaimCard({
             {result.statistics.map((statistic) => (
               <p key={`${statistic.team}-${statistic.metric}`}>
                 <strong>{statistic.team}</strong>
-                <span>
-                  {statistic.value === null
-                    ? 'Not available'
-                    : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
-                </span>
+                <span>{localizedStatisticValue(statistic.value, statistic.metric, language)}</span>
               </p>
             ))}
           </div>
@@ -832,12 +917,7 @@ function ClaimCard({
                         statistic.playerName,
                         language,
                       )}</strong>
-                <span>
-                  {statistic.value === null
-                    ? 'Not available'
-                    : `${statistic.value}${statistic.metric.includes('percentage') ? '%' : ''}`}{' '}
-                  {metricLabel(statistic.metric, language, statistic.value ?? undefined)}
-                </span>
+                <span>{localizedStatisticValue(statistic.value, statistic.metric, language)}</span>
               </p>
             ))}
           </div>
@@ -852,7 +932,10 @@ function ClaimCard({
         )}
       </div>
       <p className="assessment-limitation">
-        <strong>Limitations:</strong> {playerPresentation?.limitation ?? statisticPresentation?.limitation ?? result.limitation}
+        <strong>Limitations:</strong>{' '}
+        {result.presentation || playerPresentation || statisticPresentation
+          ? <span data-original-source="true" dir="auto">{limitationText}{rendered?.note ? ` ${rendered.note}` : ''}</span>
+          : <span data-original-source="true" dir="auto">{renderLegacyCompatibility(language)} {renderLegacySourceLabel(language)}: {result.limitation}</span>}
       </p>
 
       <details className="claim-evidence-details">
@@ -861,7 +944,9 @@ function ClaimCard({
           <p><span>Subject</span><strong>{claim.playerSubject?.name ?? claim.subject ?? 'Needs clarification'}</strong></p>
           <p><span>What we understood</span><strong>{localizedClaimMeaning(result, datasetId, language)}</strong></p>
           <p><span>Request type</span><strong>{claim.intent.replaceAll('-', ' ')}</strong></p>
-          <p><span>Selected period</span><strong>{describePeriodLabel(result.periodLabel)}</strong></p>
+          <p><span>Selected period</span><strong data-original-source="true" dir="auto">{rendered?.scope || (result.presentation
+            ? renderPresentationScope(result.presentation.scope, presentationContext(datasetId, language), language)
+            : translateNarrative(describePeriodLabel(result.periodLabel), language))}</strong></p>
           {claim.historicalEventAnchor && <p><span>Historical anchor</span><strong>{claim.historicalEventAnchor.relationship}</strong></p>}
         </div>
       {claim.clarificationNeeds.length === 0 && (
@@ -948,7 +1033,7 @@ function ClaimCard({
                   <p>{trace.metric === 'possession-losses-by-area'
                     ? `${trace.value ?? 'Not available'} turnovers`
                     : `${trace.numerator}/${trace.denominator}${trace.metric.includes('percentage') ? ` (${trace.value === null ? 'rate not available' : `${trace.value}%`})` : ''}`}</p>
-                  <p>{trace.denominatorDescription}</p>
+                  <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
                     <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
@@ -967,7 +1052,7 @@ function ClaimCard({
                         ? `${trace.numerator} completions among ${trace.denominator} attempts`
                         : `${trace.value ?? trace.numerator} ${metricLabel(trace.metric, language, trace.value ?? trace.numerator)}`}
                   </p>
-                  <p>{trace.denominatorDescription}</p>
+                  <p>{language === 'en' ? trace.denominatorDescription : <><span>{translateText('Original wording', language)} (EN): </span><span data-original-source="true" lang="en" dir="ltr">{trace.denominatorDescription}</span></>}</p>
                   <details className="technical-record"><summary>Technical record · IDs</summary>
                     <p>Numerator IDs: {trace.numeratorRecordIds.join(', ') || 'none'}</p>
                     <p>Denominator IDs: {trace.denominatorRecordIds.join(', ') || 'none'}</p>
@@ -1030,7 +1115,7 @@ function PlayerResolutionPicker({
             <p>{translateText('Player selection failed.', language)}</p>
             <details className="msg-evidence">
               <summary>{translateText('Details', language)}</summary>
-              <p>{translateNarrative(requestError, language)}</p>
+              <p>{requestError}</p>
             </details>
             <button className="secondary-button" type="button" onClick={onRetry}>
               {translateText('Try again', language)}
@@ -1253,6 +1338,24 @@ function usePreparedImage(enabled: boolean, key: string | null, image: ShareCard
   return enabled && prepared && prepared.key === key ? prepared : null
 }
 
+function changeContext(
+  earlier: AnswerSnapshot,
+  later: AnswerSnapshot,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): ChangeContext {
+  const describe = (id: string, snapshot: AnswerSnapshot) => {
+    const reference = snapshot.analysis.claims
+      .flatMap(({ evidence }) => evidence)
+      .find(({ reference }) => reference.id === id)?.reference
+    return reference ? localizedEvidenceDescription(reference, snapshot.analysis, datasetId, language) : id
+  }
+  return {
+    ...presentationContext(datasetId, language),
+    describeRecord: (id, change) => describe(id, change === 'added' ? later : earlier),
+  }
+}
+
 function WhatChanged({
   comparison,
   view,
@@ -1275,19 +1378,35 @@ function WhatChanged({
   const { earlier, later, result } = comparison
   const { language } = useLocalization()
   const separate = result.status !== 'comparable'
-  const earlierPlayerPresentation = earlier.analysis.claims.length === 1
-    ? localizedPlayerPerformance(earlier.analysis.claims[0], datasetId, language)
-    : undefined
-  const earlierStatisticPresentation = earlier.analysis.claims.length === 1
-    ? localizedStatistics(earlier.analysis.claims[0], datasetId, language)
-    : undefined
   const earlierCheckedAgainst = localizedCheckedAgainst(earlier.analysis, datasetId, language)
+  const earlierViews = analysisViews(earlier.analysis, datasetId, language)
+  const laterViews = analysisViews(later.analysis, datasetId, language)
+  const legacy = [...earlierViews, ...laterViews].some(({ kind }) => kind === 'legacy') || !result.facts
+  const earlierAnswer = answerText(
+    earlierViews,
+    earlierViews.some(({ kind }) => kind === 'legacy') ? snapshotReply(earlier) : undefined,
+    language,
+  )
+  const rendered = legacy
+    ? null
+    : renderComparisonFacts(result.facts, changeContext(earlier, later, datasetId, language), language)
+  const nameOf = presentationContext(datasetId, language).nameOf
+  const earlierScope = formatMatchClock(earlier.context.selectedClock) + ' · ' + translateText(earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes', language)
   return (
     <LocalizedMarkup>
     <section className="what-changed" aria-labelledby="what-changed-title">
       <h3 id="what-changed-title">What changed <span>{result.earlierTime} → {result.laterTime}</span></h3>
-      <p className="change-headline">{result.headline}</p>
-      {result.lines.map((line) => <p className="change-line" key={line}>{line}</p>)}
+      {rendered ? (
+        <>
+          <p className="change-headline" data-original-source="true" dir="auto">{rendered.headline}</p>
+          {rendered.lines.map((line) => <p className="change-line" key={line} data-original-source="true" dir="auto">{line}</p>)}
+        </>
+      ) : (
+        <>
+          <p className="change-headline" data-original-source="true" dir="auto">{renderLegacyCompatibility(language)}</p>
+          <p className="change-line" data-original-source="true" dir="auto">{renderLegacySourceLabel(language)}: {result.headline}</p>
+        </>
+      )}
       {view === 'analyst' && !separate && (
         <div className="change-analyst">
           <p><strong>Windows</strong> {result.earlierTime}: {result.earlierWindow} · {result.laterTime}: {result.laterWindow}</p>
@@ -1297,28 +1416,32 @@ function WhatChanged({
               <table className="change-table">
                 <thead><tr><th scope="col">Figure</th><th scope="col">{result.earlierTime}</th><th scope="col">{result.laterTime}</th></tr></thead>
                 <tbody>
-                  {pair.figures.map((figure) => (
-                    <tr key={`${figure.entity}-${figure.metric}`}><th scope="row">{figure.entity} · {figure.label}</th><td>{figure.before ?? 'n/a'}</td><td>{figure.after ?? 'n/a'}</td></tr>
+                  {pair.facts.figures.map((figure) => (
+                    <tr key={`${figure.entity.kind === 'team' ? figure.entity.team : figure.entity.id}-${figure.metric}`}>
+                      <th scope="row" data-original-source="true" dir="auto">{nameOf(figure.entity)} · {metricLabel(figure.metric, language, figure.after ?? undefined)}</th>
+                      <td>{figure.before ?? 'n/a'}</td>
+                      <td>{figure.after ?? 'n/a'}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
-              <p><strong>Assessments</strong> {result.earlierTime}: {pair.beforeLabel} · {result.laterTime}: {pair.afterLabel}</p>
+              <p><strong>Assessments</strong> {result.earlierTime}: <span data-original-source="true" dir="auto">{renderAssessmentLabel(pair.facts.before, language)}</span> · {result.laterTime}: <span data-original-source="true" dir="auto">{renderAssessmentLabel(pair.facts.after, language)}</span></p>
             </div>
           ))}
           <p className="change-note">Calculation traces and coverage are in the claim details below.</p>
         </div>
       )}
-      {result.caveats.map((caveat) => <p className="change-caveat" key={caveat}>{caveat}</p>)}
-      {result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
+      {(rendered?.caveats ?? []).map((caveat) => <p className="change-caveat" key={caveat} data-original-source="true" dir="auto">{caveat}</p>)}
+      {rendered && result.facts.qualifications
+        ? rendered.qualifications.map((text) => (
+            <p className="change-caveat" key={text} data-original-source="true" dir="auto">{renderChangeCardLabels(language).limitation(text)}</p>
+          ))
+        : result.qualifications.map((text) => <p className="change-caveat" key={text}>Limitation: {text}</p>)}
       <details className="earlier-answer" open={separate}>
-        <summary>{translateNarrative(`Earlier answer · ${result.earlierTime} · ${earlier.context.period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'}`, language)}</summary>
-        <p className="server-summary">
-          {earlierPlayerPresentation?.answer ??
-            earlierStatisticPresentation?.answer ??
-            translateNarrative(snapshotReply(earlier), language)}
-        </p>
+        <summary>{translateText('Earlier answer', language)} · {result.earlierTime} · <span data-original-source="true" dir="auto">{earlierScope}</span></summary>
+        <p className="server-summary" data-original-source="true" dir="auto">{earlierAnswer.text}</p>
         {earlierCheckedAgainst.length > 0 && <p className="checked-against"><strong>Checked against</strong> {earlierCheckedAgainst.join(language === 'ar' ? '؛ ' : '; ')}</p>}
-        <p className="change-note">{earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation'} · synthetic match</p>
+        <p className="change-note">{translateText(earlier.analysis.provider === 'local' ? 'Local rules · no model connection' : 'Foundry · server-side interpretation', language)} · {translateText('Fictional match', language)}</p>
       </details>
       {changeCard && (
         <details className="share-preview change-share">
@@ -1330,7 +1453,7 @@ function WhatChanged({
           </div>
           <section className={`share-card${changeCard.extended ? ' is-extended' : ''}`} aria-label="What-changed card preview">
             {changeCard.blocks.map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined} data-original-source={block.localized ? 'true' : undefined} dir={block.localized ? 'auto' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
@@ -1342,6 +1465,18 @@ function WhatChanged({
 
 function scopePeriod(period: AnalysisPeriod): string {
   return period === 'match-so-far' ? 'Match so far' : 'Last 10 minutes'
+}
+
+function catalogMatchLabel(
+  datasetId: string,
+  version: string | undefined,
+  language: ReturnType<typeof useLocalization>['language'],
+): string | undefined {
+  const entry = findCatalogEntry(datasetId)
+  if (!entry || !version) return undefined
+  const teams = localizeMatchText(translateNarrative(`${entry.teams[0]} v ${entry.teams[1]}`, language), datasetId, language)
+  const fixture = localizeMatchText(translateNarrative(`${entry.name} v${version}`, language), datasetId, language)
+  return `${teams} · ${fixture}`
 }
 
 function localizedShareModel(
@@ -1356,27 +1491,81 @@ function localizedShareModel(
   const statisticPresentation = analysis?.claims.length === 1
     ? localizedStatistics(analysis.claims[0], datasetId, language)
     : undefined
+  const views = analysis ? analysisViews(analysis, datasetId, language) : undefined
+  const answer = analysis && views
+    ? answerText(views, views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined, language)
+    : undefined
+  const onlyView = views?.length === 1 ? views[0] : undefined
+  const labels: ShareCardLabels = {
+    verdict: (verdict) => `${translateText('Verdict:', language)} ${verdict}`,
+    limitation: (text) => `${translateText('Limitation:', language)} ${text}`,
+    source: (text) => `${renderLegacySourceLabel(language)}: ${text}`,
+  }
   return {
     ...model,
-    scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language),
-    answer: playerPresentation?.answer ?? statisticPresentation?.answer ??
-      localizeMatchText(translateNarrative(model.answer, language), datasetId, language),
-    claims: model.claims.map((claim) => ({
-      ...claim,
-      text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
-      verdict: claim.verdict ? localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language) : null,
-      facts: model.claims.length === 1 && (playerPresentation || statisticPresentation)
-        ? playerPresentation?.facts ?? statisticPresentation?.facts ?? claim.facts
-        : claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      moments: (playerPresentation || statisticPresentation) && analysis?.claims.length === 1
-        ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
-        : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-      limitations: model.claims.length === 1 && (playerPresentation || statisticPresentation)
-        ? [playerPresentation?.limitation ?? statisticPresentation?.limitation ?? translateText('Statistics only, no verdict', language)]
-        : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
-    })),
-    footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined,
+    labels,
+    ...(onlyView?.kind === 'presentation' && onlyView.scope
+      ? { scope: onlyView.scope, scopeLocalized: true }
+      : { scope: localizeMatchText(translateNarrative(model.scope, language), datasetId, language) }),
+    ...(answer
+      ? {
+          answer: answer.legacy ? answer.legacyNotice ?? '' : answer.text,
+          answerLocalized: true,
+          ...(answer.legacy && answer.legacySource ? { legacySource: answer.legacySource } : {}),
+        }
+      : { answer: localizeMatchText(translateNarrative(model.answer, language), datasetId, language) }),
+    claims: model.claims.map((claim, index) => {
+      const view = views?.[index]
+      const result = analysis?.claims[index]
+      return {
+        ...claim,
+        rendered: view !== undefined,
+        text: localizeMatchText(translateNarrative(claim.text, language), datasetId, language),
+        verdict: claim.verdict === null || !result
+          ? claim.verdict && localizeMatchText(translateNarrative(claim.verdict, language), datasetId, language)
+          : view?.kind === 'presentation'
+            ? view.verdict
+            : renderAssessmentLabel(result.assessment, language),
+        facts: model.claims.length === 1 && (playerPresentation || statisticPresentation)
+          ? playerPresentation?.facts ?? statisticPresentation?.facts ?? claim.facts
+          : claim.facts.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        moments: (playerPresentation || statisticPresentation) && analysis?.claims.length === 1
+          ? localizedPlayerMoments(analysis.claims[0], analysis, datasetId, language)
+          : claim.moments.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        counter: claim.counter.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+        ...(view?.kind === 'presentation' && analysis && claim.factData && claim.momentRefs && claim.counterRefs
+          ? (() => {
+              const names = presentationContext(datasetId, language)
+              return {
+                linesRendered: true,
+                facts: claim.factData
+                  .map((fact) => renderStatisticFact(names.nameOf(fact.entity as EntityRef), fact.metric, fact.value, language))
+                  .filter((line): line is string => line !== null),
+                moments: claim.momentRefs.map((reference) => localizedEvidenceDescription(reference, analysis, datasetId, language)),
+                counter: claim.counterRefs.map((reference) => localizedEvidenceDescription(reference, analysis, datasetId, language)),
+              }
+            })()
+          : {}),
+        limitations: view?.kind === 'presentation' || view?.kind === 'structured'
+          ? view.limitations
+          : view?.kind === 'legacy'
+            ? []
+            : claim.limitations.map((text) => localizeMatchText(translateNarrative(text, language), datasetId, language)),
+      }
+    }),
+    ...(analysis && model.footer
+      ? {
+          footerLocalized: true,
+          footer: renderChangeCardFooter(
+            {
+              matchLabel: catalogMatchLabel(datasetId, analysis.evidenceFoundation.dataset?.version, language),
+              reader: analysis.provider === 'local' ? 'local' : 'foundry',
+              playerSelected: (analysis.selectedPlayers?.length ?? 0) > 0,
+            },
+            language,
+          ),
+        }
+      : { footer: model.footer ? localizeMatchText(translateNarrative(model.footer, language), datasetId, language) : undefined }),
   }
 }
 
@@ -1387,10 +1576,37 @@ function localizedShareCardBlocks(
 ) {
   return shareCardBlocks(model).map((block) => ({
     ...block,
-    text: block.kind === 'take'
+    text: block.kind === 'take' || block.localized
       ? block.text
       : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
   }))
+}
+
+function analysisViews(
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): ClaimView[] {
+  return claimViews(
+    analysis,
+    (result) => claimResolution(result) !== undefined,
+    (result) => {
+      const existing = localizedPlayerPerformance(result, datasetId, language) ??
+        localizedStatistics(result, datasetId, language)
+      return existing && { answer: existing.answer, limitation: existing.limitation }
+    },
+    datasetId,
+    language,
+  )
+}
+
+function localizedAnswerText(
+  analysis: AnalysisResponse,
+  datasetId: string,
+  language: ReturnType<typeof useLocalization>['language'],
+): AnswerText {
+  const views = analysisViews(analysis, datasetId, language)
+  return answerText(views, views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined, language)
 }
 
 // One question and its reply, frozen at the minute and period it was asked.
@@ -1418,55 +1634,45 @@ function TurnMessages({
   const scope = `${formatMatchClock(context.selectedClock)} · ${scopePeriod(context.period)}`
   const checked = localizedCheckedAgainst(analysis, datasetId, language)
   const playerChoices = analysis.claims.filter(({ playerResolution }) => playerResolution)
-  const playerPresentations = new Map(
-    analysis.claims.map((result) => [
-      result.claim.id,
-      localizedPlayerPerformance(result, datasetId, language),
-    ]),
-  )
-  const statisticPresentations = new Map(
-    analysis.claims.map((result) => [
-      result.claim.id,
-      localizedStatistics(result, datasetId, language),
-    ]),
-  )
+  const states = new Map(analysis.claims.map((result) => [result.claim.id, claimResolution(result)]))
+  const isPending = (result: ClaimResult) => states.get(result.claim.id) !== undefined
   const evidenceClaims = analysis.claims
     .map((result, index) => ({ result, index }))
-    .filter(({ result }) => !result.playerResolution)
-  const answeredReplies = analysis.claims
-    .filter(({ playerResolution }) => !playerResolution)
-    .map((result) =>
-      playerPresentations.get(result.claim.id)?.answer ??
-      statisticPresentations.get(result.claim.id)?.answer ??
-      (result.reply ? translateNarrative(result.reply, language) : undefined),
-    )
-    .filter((reply): reply is string => Boolean(reply))
-  const allRepliesStructured = analysis.claims.length > 0 &&
-    analysis.claims.every(
-      (result) =>
-        result.playerResolution ||
-        playerPresentations.get(result.claim.id) !== undefined ||
-        statisticPresentations.get(result.claim.id) !== undefined,
-    )
-  const visibleReply = playerChoices.length > 0
-    ? answeredReplies.join(' ')
-    : allRepliesStructured
-      ? answeredReplies.join(' ')
-      : canonicalReply(analysis)
-  const notes = analysis.claims.flatMap((result) => [
-    ...(!result.playerResolution
-      ? result.claim.clarificationNeeds.map((need) => ({ key: `${result.claim.id}-${need}`, text: need, title: 'Clarification' }))
-      : []),
-    ...(!result.playerResolution && !isRoutineLimitation(result)
-      ? [{
-          key: `${result.claim.id}-limitation`,
-          text: playerPresentations.get(result.claim.id)?.limitation ??
-            statisticPresentations.get(result.claim.id)?.limitation ??
-            result.limitation,
-          title: 'Limitation',
-        }]
-      : []),
-  ])
+    .filter(({ result }) => !isPending(result))
+  const views = analysisViews(analysis, datasetId, language)
+  const answer = answerText(
+    views,
+    views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined,
+    language,
+  )
+  const visibleReply = answer.text
+  // Clarification is rendered once, from the structured state; provider prose is never guidance.
+  const notes = analysis.claims.flatMap((result, index) => {
+    const state = states.get(result.claim.id)
+    if (state) {
+      return [{
+        key: `${result.claim.id}-clarification`,
+        text: localizeMatchText(resolutionMessage(state, language), datasetId, language),
+        title: 'Clarification:',
+      }]
+    }
+    const claimView = views[index]
+    if (claimView.kind === 'presentation') {
+      const text = [...claimView.limitations, ...(claimView.note ? [claimView.note] : [])].join(' ')
+      return text ? [{ key: `${result.claim.id}-limitation`, text, title: 'Limitation:' }] : []
+    }
+    if (claimView.kind === 'structured') {
+      return claimView.limitations.length > 0
+        ? [{ key: `${result.claim.id}-limitation`, text: claimView.limitations.join(' '), title: 'Limitation:' }]
+        : []
+    }
+    return []
+  })
+  const providerWording = analysis.provider === 'foundry'
+    ? analysis.claims.flatMap((result) =>
+        isPending(result) ? result.claim.clarificationNeeds : [],
+      )
+    : []
   return (
     <LocalizedMarkup>
     <>
@@ -1477,24 +1683,28 @@ function TurnMessages({
       <div className="msg msg-bot" ref={messageRef} tabIndex={-1}>
         <p className="msg-label">Groupchat Analyst · {scope}</p>
         {visibleReply && (
-          <p className="msg-text">
-            {playerChoices.length > 0 || allRepliesStructured
-              ? visibleReply
-              : translateNarrative(visibleReply, language)}
-          </p>
+          <p className="msg-text" data-original-source="true" dir="auto">{visibleReply}</p>
         )}
         {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
           <ul className="msg-claims" aria-label="Claims in this opinion">
             {evidenceClaims.map(({ result, index }) => (
               <li key={result.claim.id}>
-                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`}>{result.assessment}</span>
-                <span>Claim {index + 1}: {result.claim.text}</span>
+                <span className={`assessment-badge ${result.assessment.replaceAll(' ', '-')}`} data-original-source="true" dir="auto">
+                  {views[index].kind === 'presentation' ? (views[index] as { verdict: string }).verdict : renderAssessmentLabel(result.assessment, language)}
+                </span>
+                <span>Claim {index + 1}: <span data-original-opinion="true" dir="auto">{result.claim.text}</span></span>
               </li>
             ))}
           </ul>
         )}
         {checked.length > 0 && <p className="msg-note"><strong>Checked against</strong> {checked.join(language === 'ar' ? '؛ ' : '; ')}</p>}
-        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{item.title}:</strong> {item.text}</p>)}
+        {notes.map((item) => <p className="msg-note" key={item.key}><strong>{translateText(item.title, language)}</strong> <span data-original-source="true" dir="auto">{item.text}</span></p>)}
+        {providerWording.length > 0 && (
+          <details className="msg-note">
+            <summary>{formatLocalizedMessage(RESOLUTION_MESSAGES.providerWording, {}, language)}</summary>
+            {providerWording.map((text) => <p key={text} dir="auto">{text}</p>)}
+          </details>
+        )}
         {analysis.claims.length === 0 && <p className="msg-note"><strong>Limitation:</strong> The request was not interpreted as a supported claim. Try naming a team or player and the part of the match you mean.</p>}
         {playerChoices.map((result) => (
           <PlayerResolutionPicker
@@ -1570,7 +1780,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const analysis = shown?.analysis ?? null
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState('')
-  const [requestErrorCode, setRequestErrorCode] = useState('')
+  const [requestErrorFactState, setRequestErrorFact] = useState<RequestErrorFact | null>(null)
   const [localRulesOnly, setLocalRulesOnly] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [shareMessage, setShareMessage] = useState('')
@@ -1580,7 +1790,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   const resolutionRequestId = useRef<number | null>(null)
   const answerRef = useRef<HTMLDivElement>(null)
   const localizedRequestError = requestError
-    ? localizeAnalysisError(requestError, requestErrorCode, language)
+    ? renderRequestError(requestErrorFactState ?? { code: 'unknown' }, language)
     : ''
   const isLoadingSubmit = isLoading && submittedRequest !== null
   const submittedContext = shown?.context
@@ -1596,20 +1806,28 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
         analysis.playerResolutionContinuation) &&
       isLaterClock(displayedClock, shown.context.selectedClock),
   )
+  // Any unresolved claim (choice, absent player, unclear wording) is not a completed, shareable answer.
   const hasPlayerChoices = Boolean(
-    analysis?.claims.some(({ playerResolution }) => playerResolution),
+    analysis ? hasUnresolvedClaims(analysis.claims) : false,
   )
   const comparison = comparisonState && comparisonState.later === shown ? comparisonState : null
   const changeCard = useMemo<ChangeCard | null>(
     () => {
       if (!comparison) return null
-      const card = buildChangeCard(comparison.later.context.opinion, comparison.earlier, comparison.later, comparison.result)
+      const card = buildLocalizedChangeCard(
+        comparison.later.context.opinion,
+        comparison.later,
+        comparison.result,
+        changeContext(comparison.earlier, comparison.later, datasetId, language),
+        language,
+        catalogMatchLabel(datasetId, comparison.later.analysis.evidenceFoundation.dataset?.version, language) ?? '',
+      )
       if (!card) return null
       return {
         ...card,
         blocks: card.blocks.map((block) => ({
           ...block,
-          text: block.kind === 'take'
+          text: block.kind === 'take' || block.localized
             ? block.text
             : localizeMatchText(translateNarrative(block.text, language), datasetId, language),
         })),
@@ -1710,8 +1928,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           signal: controller.signal,
           localRulesOnly: active.localRulesOnly,
         })
-        if (!isAnalysisResponse(payload)) throw new Error('The analysis service returned an incomplete answer.')
-        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new Error('The analysis service answered for a different match, so the reply was not shown.')
+        if (!isAnalysisResponse(payload)) throw new ClientRequestFailure('incomplete', 'The analysis service returned an incomplete answer.')
+        if (payload.evidenceFoundation.dataset?.id !== active.context.datasetId) throw new ClientRequestFailure('different-match', 'The analysis service answered for a different match, so the reply was not shown.')
         if (isLatestRequest(requestId, analysisRequestId.current)) {
           if (active.operation.kind === 'resolve-player' && active.baseline) {
             const snapshot = createSnapshot(
@@ -1748,21 +1966,23 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           !controller.signal.aborted &&
           isLatestRequest(requestId, analysisRequestId.current)
         ) {
-          setRequestErrorCode(
-            error instanceof AnalysisRequestError
-              ? error.code ?? ''
-              : error instanceof AnalysisTimeoutError
-                ? 'analysis_timeout'
-                : '',
+          setRequestErrorFact(
+            requestErrorFact(
+              error instanceof ClientRequestFailure
+                ? { kind: error.kind }
+                : error instanceof AnalysisRequestError
+                  ? { kind: 'server', code: error.code }
+                  : error instanceof AnalysisTimeoutError
+                    ? { kind: 'timeout', timeoutSeconds: Math.round(ANALYSIS_TIMEOUT_MS / 1000) }
+                    : error instanceof TypeError
+                      ? { kind: 'network' }
+                      : { kind: 'other' },
+            ),
           )
           setRequestError(
-            error instanceof AnalysisRequestError
+            error instanceof Error
               ? error.message
-              : error instanceof TypeError
-                ? 'The analysis service could not be reached. You can try again or use local rules.'
-                : error instanceof Error
-                  ? error.message
-                  : 'The analysis service could not be reached. You can try again or use local rules.',
+              : 'The analysis service could not be reached. You can try again or use local rules.',
           )
         }
       } finally {
@@ -1957,9 +2177,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   async function copyAssessment() {
     if (!analysis) return
     try {
-      await navigator.clipboard.writeText(
-        localizeMatchText(translateNarrative(canonicalReply(analysis), language), datasetId, language),
-      )
+      const answer = localizedAnswerText(analysis, datasetId, language)
+      await navigator.clipboard.writeText(answer.text)
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -2028,7 +2247,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           <button className="secondary-button" type="button" onClick={() => replay.seek(DEMO_NEXT_CLOCK)}>Move to 58′<ArrowIcon /></button>
         </div>
       )}
-      {demo === 'moving' && <p className="demo-note" role="status">Moving to 58′…</p>}
+      {demo === 'moving' && <p className="demo-note" role="status">{translateNarrative('Moving to 58′…', language)}</p>}
       {demo === 'ready-to-recheck' && <p className="demo-note" role="status">The replay is at 58′. Use “Check again” to ask the same opinion against the new evidence.</p>}
       {comparison && <WhatChanged comparison={comparison} view={view} changeCard={hasPlayerChoices ? null : changeCard} onCopy={copyChangeCard} onDownload={downloadChangeCard} onShare={hasPlayerChoices || !canNativeShare ? null : () => void shareCard('change')} shareReady={preparedChange !== null && changeShare !== null && preparedChange.key === changeShare.key} datasetId={datasetId} />}
       {opinion.trim() !== submittedOpinion && (
@@ -2076,7 +2295,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           <summary>Preview share card</summary>
           <section className={`share-card${shareModel.extended ? ' is-extended' : ''}`} aria-label="Shareable card preview">
             {localizedShareCardBlocks(shareModel, language, datasetId).map((block, index) => (
-              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
+              <p key={index} className={`share-block share-${block.kind}`} data-original-opinion={block.kind === 'take' ? 'true' : undefined} data-original-source={block.localized ? 'true' : undefined} dir={block.localized ? 'auto' : undefined}>{block.kind === 'bullet' && <span aria-hidden="true">• </span>}{block.text}</p>
             ))}
           </section>
         </details>
@@ -2186,7 +2405,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                     </div>
                     {isLoadingSubmit && (
                       <div className="msg msg-bot" role="status">
-                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />Checking the match…</p>
+                        <p className="msg-text"><span className="loading-dot" aria-hidden="true" />{translateText('Checking the match…', language)}</p>
                       </div>
                     )}
                     {requestError && !isLoadingSubmit && (

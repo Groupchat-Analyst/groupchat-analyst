@@ -9,6 +9,18 @@ import {
   type MatchClock,
 } from '../../shared/src/matchClock.ts'
 import type { SubmissionContext } from './matchday.ts'
+import { COMPARISON_MESSAGES } from '../../shared/src/comparisonLocale.ts'
+import type {
+  ChangeCaveat,
+  ChangeContext,
+  ChangeCoverage,
+  ChangeFigure,
+  ChangePair,
+  ChangeQualification,
+  ComparisonFacts,
+} from '../../shared/src/changeLocale.ts'
+import { renderChangeCardFooter, renderChangeCardLabels, renderComparisonFacts } from '../../shared/src/changeLocale.ts'
+import type { AppLanguage } from '../../shared/src/localization.ts'
 import {
   ASSESSMENT_LABELS,
   sourceFooter,
@@ -88,16 +100,23 @@ export function checkedAgainst(analysis: Pick<AnalysisResponse, 'claims'>): stri
   })
 }
 
-type Figure = { entity: string; team: string; metric: string; value: number | null }
+type Figure = {
+  entity: string
+  team: string
+  metric: string
+  value: number | null
+  playerId?: string
+}
 
 function figuresOf(result: ClaimResult): Figure[] {
   return [
     ...result.statistics.map(({ team, metric, value }) => ({ entity: team, team, metric, value })),
-    ...result.playerStatistics.map(({ playerName, team, metric, value }) => ({
+    ...result.playerStatistics.map(({ playerId, playerName, team, metric, value }) => ({
       entity: playerName,
       team,
       metric,
       value,
+      playerId,
     })),
   ]
 }
@@ -145,6 +164,8 @@ export type PairChange = {
   removed: string[]
   /** Whether the listed record changes account for the change in the counted figures. */
   accounting: 'complete' | 'partial' | 'incomplete' | 'rate' | 'unchanged'
+  /** Typed, language-free facts for localized rendering; the English fields above are legacy. */
+  facts: ChangePair
 }
 
 export type Comparison = {
@@ -161,6 +182,8 @@ export type Comparison = {
   /** Material data qualifications from both snapshots; time-specific ones are labelled. */
   qualifications: string[]
   pairs: PairChange[]
+  /** Typed facts for localized rendering with renderComparisonFacts. */
+  facts: ComparisonFacts
 }
 
 const COUNT_EVIDENCE: Record<string, string> = {
@@ -217,6 +240,55 @@ function combinedQualifications(
 function datasetOf(snapshot: AnswerSnapshot): string {
   const { id, version } = snapshot.analysis.evidenceFoundation.dataset
   return `${id}@${version}`
+}
+
+/** Typed counterpart of qualificationsOf, built only from typed fields; never from the English text. */
+function typedQualificationsOf(snapshot: AnswerSnapshot): ChangeQualification['detail'][] {
+  const { analysis } = snapshot
+  const found = new Map<string, ChangeQualification['detail']>()
+  const add = (detail: ChangeQualification['detail']) => found.set(JSON.stringify(detail), detail)
+  for (const result of analysis.claims) {
+    if (result.claim.clarificationNeeds.length > 0) add({ code: 'clarification-needed' })
+    const routine = isRoutineLimitation(result)
+    for (const limitation of result.presentation?.limitations ?? []) {
+      if (routine && (limitation.code === 'descriptive-statistics-only' || limitation.code === 'comparison-generic')) continue
+      add(limitation)
+    }
+    for (const item of result.evidenceAvailability) {
+      if (!item.available) add({ code: 'unavailable-evidence', kind: item.kind })
+    }
+    for (const [kind, flag] of COVERAGE_FLAGS) {
+      if (result.claim.requiredEvidence.includes(kind as never) && !analysis.evidenceFoundation[flag]) {
+        add({
+          code: 'coverage-partial',
+          coverage: kind as ChangeCoverage,
+          missingPeriods: [...analysis.evidenceFoundation.missingCoveragePeriods],
+        })
+      }
+    }
+  }
+  return [...found.values()]
+}
+
+/** Undefined when any saved claim predates typed presentations, so callers show the legacy compatibility state. */
+function typedQualifications(earlier: AnswerSnapshot, later: AnswerSnapshot): ChangeQualification[] | undefined {
+  const claims = [...earlier.analysis.claims, ...later.analysis.claims]
+  if (claims.some((result) => result.presentation === undefined)) return undefined
+  const before = typedQualificationsOf(earlier)
+  const after = typedQualificationsOf(later)
+  const key = (detail: ChangeQualification['detail']) => JSON.stringify(detail)
+  const afterKeys = new Set(after.map(key))
+  const beforeKeys = new Set(before.map(key))
+  const sameClock = formatMatchClock(earlier.context.selectedClock) === formatMatchClock(later.context.selectedClock)
+  return [
+    ...before.filter((detail) => afterKeys.has(key(detail))).map((detail) => ({ detail })),
+    ...before
+      .filter((detail) => !afterKeys.has(key(detail)))
+      .map((detail) => ({ detail, at: earlier.context.selectedClock })),
+    ...after
+      .filter((detail) => !beforeKeys.has(key(detail)))
+      .map((detail) => (sameClock ? { detail } : { detail, at: later.context.selectedClock })),
+  ]
 }
 
 const STATE_PHRASE: Record<ClaimResult['assessment'], [string, string]> = {
@@ -301,7 +373,28 @@ function pairChange(
       else accounting = netMatches && everyRecordAttributed ? 'complete' : 'partial'
     }
   }
+  const afterFigures = figuresOf(after)
+  const typedFigures: ChangeFigure[] = figures.map((figure, index) => {
+    const source = afterFigures[index]
+    return {
+      entity: source.playerId === undefined
+        ? { kind: 'team', team: source.team }
+        : { kind: 'player', id: source.playerId, name: source.entity, team: source.team },
+      metric: figure.metric,
+      before: figure.before,
+      after: figure.after,
+    }
+  })
   return {
+    facts: {
+      quote: after.claim.text,
+      before: before.assessment,
+      after: after.assessment,
+      figures: typedFigures,
+      addedRecordIds: added.map(({ id }) => id),
+      removedRecordIds: removed.map(({ id }) => id),
+      accounting,
+    },
     text: after.claim.text,
     before: before.assessment,
     after: after.assessment,
@@ -347,9 +440,18 @@ function windowOf(snapshot: AnswerSnapshot): string {
 
 /** Deterministic comparison of two returned answers. It never calls a model and never asserts a cause. */
 export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot): Comparison {
+  const comparison = compareCore(earlier, later)
+  const qualifications = typedQualifications(earlier, later)
+  return qualifications === undefined
+    ? comparison
+    : { ...comparison, facts: { ...comparison.facts, qualifications } }
+}
+
+function compareCore(earlier: AnswerSnapshot, later: AnswerSnapshot): Comparison {
   const earlierTime = formatMatchClock(earlier.context.selectedClock)
   const laterTime = formatMatchClock(later.context.selectedClock)
   const qualifications = combinedQualifications(earlier, later, earlierTime, laterTime)
+  const separately = COMPARISON_MESSAGES.separately.replace('{earlier}', earlierTime).replace('{later}', laterTime)
   const base = {
     earlierTime,
     laterTime,
@@ -360,45 +462,63 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
   }
   const a = earlier.analysis.claims
   const b = later.analysis.claims
+  const checks = {
+    earlier: { clock: earlier.context.selectedClock, period: earlier.context.period },
+    later: { clock: later.context.selectedClock, period: later.context.period },
+  }
+  const factsOf = (
+    status: ComparisonFacts['status'],
+    caveats: ChangeCaveat[],
+    extra: Partial<ComparisonFacts> = {},
+  ): ComparisonFacts => ({ version: 1, status, ...checks, pairs: [], caveats, ...extra })
   if (datasetOf(earlier) !== datasetOf(later)) {
     const [first, second] = [earlier, later].map((snapshot) => {
       const { label, version } = snapshot.analysis.evidenceFoundation.dataset
       return `${label.split('.')[0]} (version ${version})`
     })
+    const [one, two] = [earlier, later].map(({ analysis }) => {
+      const { label, version } = analysis.evidenceFoundation.dataset
+      return { label: label.split('.')[0], version }
+    })
     return {
       ...base,
       status: 'not-comparable',
-      headline: "These two checks used different match data, so I'm not lining them up.",
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
+      headline: COMPARISON_MESSAGES.differentData,
+      lines: [separately],
       caveats: [`The ${earlierTime} check used ${first}; the ${laterTime} check used ${second}. Figures from different data can't be compared like for like.`],
+      facts: factsOf('not-comparable', [{ code: 'different-data', earlier: one, later: two }], { reason: 'different-data' }),
     }
   }
   if (a.length === 0 || a.length !== b.length || a.some((result, i) => claimKey(result) !== claimKey(b[i]))) {
     return {
       ...base,
       status: 'different-interpretation',
-      headline: 'The two checks interpret this opinion differently, so they cannot be compared directly.',
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
-      caveats: ['The interpreted claims differ, so no like-for-like change is reported.'],
+      headline: COMPARISON_MESSAGES.differentInterpretation,
+      lines: [separately],
+      caveats: [COMPARISON_MESSAGES.differentClaims],
+      facts: factsOf('different-interpretation', [{ code: 'different-claims' }], { reason: 'different-interpretation' }),
     }
   }
   if (!sameWindowKind(earlier.context, later.context) || a.some((r, i) => !isAssessed(r) || !isAssessed(b[i]))) {
+    const samePeriod = sameWindowKind(earlier.context, later.context)
     return {
       ...base,
       status: 'not-comparable',
-      headline: "I can't line these two checks up like for like.",
-      lines: [`Here are the two answers separately: the ${earlierTime} check and the ${laterTime} check.`],
-      caveats: [
-        sameWindowKind(earlier.context, later.context)
-          ? 'At least one check could not be assessed, so there is nothing to compare.'
-          : 'The checks used different evidence periods.',
-      ],
+      headline: COMPARISON_MESSAGES.notComparable,
+      lines: [separately],
+      caveats: [samePeriod ? COMPARISON_MESSAGES.notAssessed : COMPARISON_MESSAGES.differentPeriods],
+      facts: factsOf(
+        'not-comparable',
+        [{ code: samePeriod ? 'not-assessed' : 'different-periods' }],
+        { reason: samePeriod ? 'not-assessed' : 'different-periods' },
+      ),
     }
   }
 
   const pairs = a.map((result, index) => pairChange(earlier, later, result, b[index]))
   const lines: string[] = []
   const caveats: string[] = []
+  const typedCaveats: ChangeCaveat[] = []
   const multiple = pairs.length > 1
   for (const pair of pairs) {
     const [, nowPhrase] = STATE_PHRASE[pair.after]
@@ -414,12 +534,20 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     if (pair.added.length > 0) lines.push(`New in the records: ${pair.added.map(trimStop).join('; ')}.`)
     if (pair.removed.length > 0) lines.push(`No longer in the window: ${pair.removed.map(trimStop).join('; ')}.`)
     const caveat = ACCOUNTING_CAVEAT[pair.accounting]
-    if (caveat) caveats.push(multiple ? `${caveat} (“${pair.text}”)` : caveat)
+    if (caveat) {
+      caveats.push(multiple ? `${caveat} (“${pair.text}”)` : caveat)
+      if (pair.accounting !== 'unchanged') {
+        typedCaveats.push(multiple
+          ? { code: 'accounting', accounting: pair.accounting, quote: pair.text }
+          : { code: 'accounting', accounting: pair.accounting })
+      }
+    }
   }
   if (earlier.context.period === 'last-10-minutes') {
     caveats.push(
       `Rolling windows: ${base.earlierWindow} against ${base.laterWindow}, so earlier moments can drop out.`,
     )
+    typedCaveats.push({ code: 'rolling-windows' })
   }
   const headline = multiple
     ? `${pairs.length} claims rechecked: here's how each one moved.`
@@ -431,6 +559,7 @@ export function compareSnapshots(earlier: AnswerSnapshot, later: AnswerSnapshot)
     lines: multiple ? lines : lines.slice(1),
     caveats,
     pairs,
+    facts: factsOf('comparable', typedCaveats, { pairs: pairs.map(({ facts }) => facts) }),
   }
 }
 
@@ -489,6 +618,79 @@ export function buildChangeCard(
 
 export function changeCardText(card: ChangeCard): string {
   return blocksToText(card.blocks)
+}
+
+/**
+ * The "what changed" card rendered from typed comparison facts. Blocks flagged `localized` are final
+ * text in the reader's language; the unflagged footer and qualification blocks are legacy English.
+ */
+export function buildLocalizedChangeCard(
+  take: string,
+  later: AnswerSnapshot,
+  comparison: Comparison,
+  ctx: ChangeContext,
+  language: AppLanguage,
+  /** Localized "Northbridge v Eastport · Original match v3.0.0" ('' when the dataset is unknown); absent keeps the legacy English footer. */
+  matchLabel?: string,
+): ChangeCard | null {
+  if (comparison.status !== 'comparable' || !comparison.facts) return null
+  const { facts } = comparison
+  const labels = renderChangeCardLabels(language)
+  const rendered = renderComparisonFacts(facts, ctx, language)
+  const blocks: CardBlock[] = [{ kind: 'brand', text: labels.brand, localized: true }]
+  const extended = facts.pairs.length > 1
+  if (extended) blocks.push({ kind: 'notice', text: labels.extended(facts.pairs.length), localized: true })
+  blocks.push(
+    { kind: 'label', text: labels.original, localized: true },
+    { kind: 'take', text: `“${take}”` },
+    { kind: 'scope', text: labels.checked(facts.earlier.clock, facts.later.clock), localized: true },
+    { kind: 'answer', text: rendered.headline, localized: true },
+  )
+  facts.pairs.forEach((pair, index) => {
+    if (facts.pairs.length > 1) {
+      blocks.push({ kind: 'heading', text: `${index + 1}. ${pair.quote}`, localized: true })
+    }
+    blocks.push(
+      { kind: 'bullet', text: labels.bullet(facts.earlier, pair.before), localized: true },
+      { kind: 'bullet', text: labels.bullet(facts.later, pair.after), localized: true },
+    )
+    const figures = labels.figures(pair, ctx)
+    if (figures.length > 0) {
+      blocks.push({ kind: 'label', text: labels.decisiveFigures, localized: true })
+      for (const text of figures) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+    if (pair.addedRecordIds.length > 0) {
+      blocks.push({ kind: 'label', text: labels.newMoments, localized: true })
+      for (const text of labels.records(pair.addedRecordIds, 'added', ctx)) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+    if (pair.removedRecordIds.length > 0) {
+      blocks.push({ kind: 'label', text: labels.noLongerInWindow, localized: true })
+      for (const text of labels.records(pair.removedRecordIds, 'removed', ctx)) blocks.push({ kind: 'bullet', text, localized: true })
+    }
+  })
+  for (const caveat of rendered.caveats) blocks.push({ kind: 'note', text: labels.note(caveat), localized: true })
+  if (facts.qualifications) {
+    for (const text of rendered.qualifications) blocks.push({ kind: 'note', text: labels.limitation(text), localized: true })
+  } else {
+    for (const text of comparison.qualifications) blocks.push({ kind: 'note', text: `Limitation: ${text}` })
+  }
+  blocks.push(
+    matchLabel === undefined
+      ? { kind: 'footer', text: sourceFooter(later.analysis) }
+      : {
+          kind: 'footer',
+          localized: true,
+          text: renderChangeCardFooter(
+            {
+              matchLabel: matchLabel || undefined,
+              reader: later.analysis.provider === 'local' ? 'local' : 'foundry',
+              playerSelected: (later.analysis.selectedPlayers?.length ?? 0) > 0,
+            },
+            language,
+          ),
+        },
+  )
+  return { blocks, extended: extended || blocks.length > EXTENDED_LINES }
 }
 
 /** What each snapshot says, for display beside a comparison that cannot be reduced to one line. */

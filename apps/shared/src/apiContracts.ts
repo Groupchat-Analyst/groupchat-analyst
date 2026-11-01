@@ -1,4 +1,7 @@
 import type { AnalysisPeriod, MatchClock, MatchTeam } from './match.js'
+import type { ClaimPresentation } from './claimPresentation.js'
+
+export type * from './claimPresentation.js'
 
 export type EvidenceKind =
   | 'possession'
@@ -341,9 +344,23 @@ export type ClaimEvidence = {
   reference: EvidenceReference
 }
 
+/**
+ * Application-owned state of an unresolved player/subject reference. The interface renders
+ * localized text from this code; provider clarification prose never drives behaviour.
+ */
+export type ClaimResolution =
+  | { status: 'player-choice'; players: PlayerResolutionOption[] }
+  | { status: 'player-not-in-fixture'; name: string }
+  | { status: 'unsupported-wording'; players: PlayerResolutionOption[] }
+  | { status: 'needs-clarification' }
+
 export type ClaimResult = {
   claim: InterpretedClaim
   reply?: string
+  /** Absent on responses saved before structured resolution; consumers must treat that explicitly. */
+  resolution?: ClaimResolution
+  /** Typed, language-free descriptors. Always set by the current server; absent on older saved responses. */
+  presentation?: ClaimPresentation
   playerResolution?: {
     continuation: string
     candidates: PlayerResolutionOption[]

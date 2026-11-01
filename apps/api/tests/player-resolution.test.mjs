@@ -223,19 +223,20 @@ test('same-squad unrelated, foreign, and tampered continuation choices are rejec
   )
 })
 
-test('full player names and explicit team context do not expose an ambiguous choice', async () => {
-  for (const opinion of [
-    'How many passes did Bruno Fernandes complete?',
-    'How many passes did Bruno complete for Eastport?',
-  ]) {
-    const result = await analyzeOpinion(
-      request(opinion),
-      providerFor([ambiguousBruno]).provider,
-    )
-    assert.equal(result.claims[0].assessment, 'clarification needed')
-    assert.equal(result.claims[0].playerResolution, undefined)
-    assert.equal(result.claims[0].playerSubject, undefined)
-  }
+test('a full player name resolves deterministically, while explicit team context without a roster match exposes no choice', async () => {
+  const full = await analyzeOpinion(
+    request('How many passes did Bruno Fernandes complete?'),
+    providerFor([ambiguousBruno]).provider,
+  )
+  assert.equal(full.claims[0].playerResolution, undefined)
+  assert.equal(full.claims[0].claim.playerSubject.id, 'east-player-08')
+  const qualified = await analyzeOpinion(
+    request('How many passes did Bruno complete for Eastport?'),
+    providerFor([ambiguousBruno]).provider,
+  )
+  assert.equal(qualified.claims[0].assessment, 'clarification needed')
+  assert.equal(qualified.claims[0].playerResolution, undefined)
+  assert.equal(qualified.claims[0].playerSubject, undefined)
 })
 
 test('Martin and Pedro name aliases complete selection and recheck with attributed evidence', async () => {

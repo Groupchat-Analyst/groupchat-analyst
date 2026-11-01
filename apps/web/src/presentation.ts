@@ -145,13 +145,34 @@ export type ShareCardClaim = {
   text: string
   /** Null for statistical requests, which have no verdict to show. */
   verdict: string | null
+  /** True when `verdict` and `limitations` were already rendered in the reader's language from a typed presentation. */
+  rendered?: boolean
   /** Figures are background context, not evidence for the judgement. */
   contextOnly: boolean
   facts: string[]
   moments: string[]
   counter: string[]
+  /** Typed sources of `facts`, `moments` and `counter`, so localized cards never parse the English lines. */
+  factData?: ShareFact[]
+  momentRefs?: EvidenceReference[]
+  counterRefs?: EvidenceReference[]
+  /** `facts`, `moments` and `counter` were rendered in the reader's language from the typed sources. */
+  linesRendered?: boolean
   limitations: string[]
   omitted: number
+}
+
+export type ShareFact = {
+  entity: { kind: 'team'; team: string } | { kind: 'player'; id: string; name: string; team: string }
+  metric: string
+  value: number
+}
+
+/** Localized wording around already-rendered share-card text; English defaults apply when absent. */
+export type ShareCardLabels = {
+  verdict: (verdict: string) => string
+  limitation: (text: string) => string
+  source: (text: string) => string
 }
 
 export type ShareCardModel = {
@@ -161,6 +182,13 @@ export type ShareCardModel = {
   claims: ShareCardClaim[]
   footer?: string
   extended: boolean
+  /** Scope and answer were rendered in the reader's language from typed descriptors. */
+  scopeLocalized?: boolean
+  answerLocalized?: boolean
+  footerLocalized?: boolean
+  /** English text of a saved legacy answer, shown only as labelled source. */
+  legacySource?: string
+  labels?: ShareCardLabels
 }
 
 const MAX_EVENT_FACTS = 3
@@ -223,8 +251,22 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
         : ASSESSMENT_LABELS[result.assessment],
     contextOnly: isUnsupportedJudgement(result),
     facts: [...stats, ...playerStats],
+    factData: [
+      ...result.statistics
+        .filter((stat) => stat.value !== null && (teams.size === 0 || teams.has(stat.team)))
+        .map((stat): ShareFact => ({ entity: { kind: 'team', team: stat.team }, metric: stat.metric, value: stat.value as number })),
+      ...result.playerStatistics
+        .filter((stat) => stat.value !== null)
+        .map((stat): ShareFact => ({
+          entity: { kind: 'player', id: stat.playerId, name: stat.playerName, team: stat.team },
+          metric: stat.metric,
+          value: stat.value as number,
+        })),
+    ],
     moments: shown.map(({ reference }) => eventLine(reference, roster)),
     counter: shownCounter.map(({ reference }) => eventLine(reference, roster)),
+    momentRefs: shown.map(({ reference }) => reference),
+    counterRefs: shownCounter.map(({ reference }) => reference),
     limitations: dedupe([
       ...result.claim.clarificationNeeds,
       ...(isRoutineLimitation(result)
@@ -289,7 +331,8 @@ export type CardBlockKind =
   | 'note'
   | 'footer'
 
-export type CardBlock = { kind: CardBlockKind; text: string }
+/** `localized` text is already in the reader's language (or verbatim source) and must not be translated again. */
+export type CardBlock = { kind: CardBlockKind; text: string; localized?: boolean }
 
 export const SYNTHETIC_LABEL = 'Synthetic data · fictional match'
 
@@ -320,28 +363,35 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
   blocks.push(
     { kind: 'label', text: 'Original wording' },
     { kind: 'take', text: `“${model.take}”` },
-    { kind: 'scope', text: model.scope },
-    { kind: 'answer', text: model.answer },
+    { kind: 'scope', text: model.scope, ...(model.scopeLocalized ? { localized: true } : {}) },
+    { kind: 'answer', text: model.answer, ...(model.answerLocalized ? { localized: true } : {}) },
   )
+  const verdictText = (verdict: string) => model.labels?.verdict(verdict) ?? `Verdict: ${verdict}`
+  const limitationText = (text: string) => model.labels?.limitation(text) ?? `Limitation: ${text}`
   model.claims.forEach((claim, index) => {
     if (model.claims.length > 1) {
       blocks.push({
         kind: 'heading',
         text: `${index + 1}. ${claim.text}${claim.verdict ? ` — ${claim.verdict}` : ''}`,
+        ...(claim.rendered ? { localized: true } : {}),
       })
     } else if (claim.verdict) {
-      blocks.push({ kind: 'heading', text: `Verdict: ${claim.verdict}` })
+      blocks.push({
+        kind: 'heading',
+        text: verdictText(claim.verdict),
+        ...(claim.rendered ? { localized: true } : {}),
+      })
     }
     if (claim.facts.length > 0) {
       blocks.push({ kind: 'label', text: claim.contextOnly ? CONTEXT_ONLY_LABEL : 'Key facts' })
     }
-    for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact })
+    for (const fact of claim.facts) blocks.push({ kind: 'bullet', text: fact, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.moments.length > 0) {
       blocks.push({ kind: 'label', text: 'Selected recorded moments' })
     }
-    for (const moment of claim.moments) blocks.push({ kind: 'bullet', text: moment })
+    for (const moment of claim.moments) blocks.push({ kind: 'bullet', text: moment, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.counter.length > 0) blocks.push({ kind: 'label', text: 'Evidence against' })
-    for (const item of claim.counter) blocks.push({ kind: 'bullet', text: item })
+    for (const item of claim.counter) blocks.push({ kind: 'bullet', text: item, ...(claim.linesRendered ? { localized: true } : {}) })
     if (claim.omitted > 0) {
       blocks.push({
         kind: 'note',
@@ -349,10 +399,21 @@ export function shareCardBlocks(model: ShareCardModel): CardBlock[] {
       })
     }
     for (const limitation of claim.limitations) {
-      blocks.push({ kind: 'note', text: `Limitation: ${limitation}` })
+      blocks.push({
+        kind: 'note',
+        text: limitationText(limitation),
+        ...(claim.rendered ? { localized: true } : {}),
+      })
     }
   })
-  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL })
+  if (model.legacySource) {
+    blocks.push({
+      kind: 'note',
+      text: model.labels?.source(model.legacySource) ?? `Source: ${model.legacySource}`,
+      localized: true,
+    })
+  }
+  blocks.push({ kind: 'footer', text: model.footer ?? SYNTHETIC_LABEL, ...(model.footerLocalized ? { localized: true } : {}) })
   return blocks
 }
 

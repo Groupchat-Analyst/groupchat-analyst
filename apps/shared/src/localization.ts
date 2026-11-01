@@ -1,3 +1,6 @@
+import { resolutionTranslations } from './resolutionLocale.ts'
+import { translateComparisonMessage } from './comparisonLocale.ts'
+
 export type AppLanguage = 'en' | 'es' | 'fr' | 'de' | 'ar'
 
 export const APP_LANGUAGES: ReadonlyArray<{
@@ -1931,6 +1934,7 @@ export function translateText(text: string, language: AppLanguage): string {
   const translated =
     (language === 'ar' ? arabicSupplementalTranslations[content] : undefined) ??
     translations[language]?.[content] ??
+    resolutionTranslations[language]?.[content] ??
     evidenceTranslations[language]?.[content] ??
     content
   return `${leading}${translated}${trailing}`
@@ -2029,8 +2033,56 @@ function arabicCountedMetricLabel(countText: string, metric: string): string | u
   return metricForms.singular
 }
 
+type LocalizedStatisticRule = {
+  expression: RegExp
+  canonical: (groups: Record<string, string>) => string
+}
+
+const localizedStatisticRules: LocalizedStatisticRule[] = [
+  // Team comparisons share a bounded metric vocabulary; only the syntax varies by language.
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:tuvo|ha tenido|registró)\s+(?<direction>más|menos)\s+(?<metric>tiros a puerta|disparos a puerta|tiros|disparos|posesión|goles)\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction, metric }) => `${team} had ${direction?.toLowerCase() === 'menos' ? 'fewer' : 'more'} ${/puerta/iu.test(metric ?? '') ? 'shots on target' : /tiros|disparos/iu.test(metric ?? '') ? 'shots' : /posesión/iu.test(metric ?? '') ? 'possession' : 'goals'} than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:a eu|avait|a enregistré)\s+(?<direction>plus de|davantage de|moins de)\s+(?<metric>tirs cadrés|tirs|possession|buts)\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, metric, direction }) => `${team} had ${direction === 'moins de' ? 'fewer' : 'more'} ${/cadrés/iu.test(metric ?? '') ? 'shots on target' : /tirs/iu.test(metric ?? '') ? 'shots' : /possession/iu.test(metric ?? '') ? 'possession' : 'goals'} than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:hatte|verzeichnete)\s+(?<direction>mehr|weniger)\s+(?<metric>Schüsse aufs Tor|Torschüsse|Schüsse|Ballbesitz|Tore)\s+als\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, metric, direction }) => `${team} had ${direction === 'weniger' ? 'fewer' : 'more'} ${/aufs Tor|Torschüsse/iu.test(metric ?? '') ? 'shots on target' : /Schüsse/iu.test(metric ?? '') ? 'shots' : /Ballbesitz/iu.test(metric ?? '') ? 'possession' : 'goals'} than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:(?:لديه|لديها|كان لديه|كان لديها)\s+)?(?<metric>تسديدات على المرمى|تسديدة على المرمى|تسديدات|تسديدة|استحواذ|أهداف|أهدافاً)\s+(?<direction>أكثر|أقل)\s+من\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction, metric }) => `${team} had ${direction === 'أقل' ? 'fewer' : 'more'} ${/على المرمى/iu.test(metric ?? '') ? 'shots on target' : /تسديد/iu.test(metric ?? '') ? 'shots' : /استحواذ/iu.test(metric ?? '') ? 'possession' : 'goals'} than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:no tuvo|no registró)\s+(?:ningún|ninguna|ningunos?)\s+(?<metric>tiro a puerta|tiros a puerta|disparo a puerta|tiros|disparos)[.!?؟]*$/iu, canonical: ({ team, metric }) => `${team} had no ${/puerta/iu.test(metric ?? '') ? 'shots on target' : 'shots'}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+n['’]a cadré aucun tir[.!?؟]*$/iu, canonical: ({ team }) => `${team} had no shots on target.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:hatte keinen Schuss aufs Tor|hatte keine Torschüsse)[.!?؟]*$/iu, canonical: ({ team }) => `${team} had no shots on target.` },
+  { expression: /^(?:لم يكن لدى|لم يسجل)\s+(?<team>Northbridge|Eastport)\s+(?:أي\s+)?(?<metric>تسديدة على المرمى|تسديدات على المرمى|تسديدة|تسديدات)[.!?؟]*$/iu, canonical: ({ team, metric }) => `${team} had no ${/على المرمى/iu.test(metric ?? '') ? 'shots on target' : 'shots'}.` },
+  // A full question form is required so ordinary mentions of a metric are not reinterpreted.
+  { expression: /^(?:¿?cuántos|cuántas)\s+(?<metric>tiros a puerta|disparos a puerta|tiros|disparos|goles)\s+(?:tuvo|registró)\s+(?<team>Northbridge|Eastport)\??[.!؟]*$/iu, canonical: ({ team, metric }) => `How many ${/puerta/iu.test(metric ?? '') ? 'shots on target' : /goles/iu.test(metric ?? '') ? 'goals' : 'shots'} did ${team} have?` },
+  { expression: /^combien de (?<metric>tirs cadrés|tirs|buts)\s+(?<team>Northbridge|Eastport)\s+(?:a-t-il eu|a-t-elle eu|a enregistrés?)[\s?!.]*$/iu, canonical: ({ team, metric }) => `How many ${/cadrés/iu.test(metric ?? '') ? 'shots on target' : /buts/iu.test(metric ?? '') ? 'goals' : 'shots'} did ${team} have?` },
+  { expression: /^wie viele (?<metric>Schüsse aufs Tor|Torschüsse|Schüsse|Tore)\s+(?:hatte|verzeichnete)\s+(?<team>Northbridge|Eastport)[\s?!.]*$/iu, canonical: ({ team, metric }) => `How many ${/aufs Tor|Torschüsse/iu.test(metric ?? '') ? 'shots on target' : /Tore/iu.test(metric ?? '') ? 'goals' : 'shots'} did ${team} have?` },
+  { expression: /^كم\s+(?<metric>تسديدة على المرمى|تسديدات على المرمى|تسديدة|تسديدات|هدف|أهداف)\s+(?:لدى|عند)\s+(?<team>Northbridge|Eastport)[؟?.!]*$/iu, canonical: ({ team, metric }) => `How many ${/على المرمى/iu.test(metric ?? '') ? 'shots on target' : /تسديد/iu.test(metric ?? '') ? 'shots' : 'goals'} did ${team} have?` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:a réussi|a complété|a effectué)\s+(?<direction>plus de|moins de)\s+passes\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction }) => `${team} completed ${direction === 'moins de' ? 'fewer' : 'more'} passes than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+hat\s+(?<direction>mehr|weniger)\s+Pässe\s+(?:erfolgreich\s+)?(?:abgeschlossen|gespielt)\s+als\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction }) => `${team} completed ${direction === 'weniger' ? 'fewer' : 'more'} passes than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:أكمل|أتم|سجل)\s+(?<metric>تمريرات|تمريرات مكتملة)\s+(?<direction>أكثر|أقل)\s+من\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction }) => `${team} completed ${direction === 'أقل' ? 'fewer' : 'more'} passes than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:tuvo|tiene)\s+(?:un\s+)?(?:mayor|mejor)\s+porcentaje\s+de\s+(?:pases\s+completados|precisión\s+de\s+pase)\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} had higher pass completion percentage than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:a|avait)\s+(?:un\s+)?(?:meilleur|plus élevé)\s+taux\s+de\s+(?:réussite|complétion)\s+des\s+passes\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} had higher pass completion percentage than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:hat|hatte)\s+(?:eine\s+)?höhere\s+(?:Passquote|Passabschlussquote)\s+als\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} had higher pass completion percentage than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:لديه|لديها)\s+نسبة\s+(?:إكمال|إتمام)\s+التمريرات\s+(?:أعلى|أفضل)\s+من\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} had higher pass completion percentage than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:completó|completo|ha completado)\s+(?<direction>más|menos)\s+pases(?:\s+completados)?\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent, direction }) => `${team} completed ${direction === 'menos' ? 'fewer' : 'more'} passes than ${opponent}.` },
+  // Distance is recognized only as the unavailable physical metric, never as a shot or possession proxy.
+  { expression: /^(?<team>Northbridge|Eastport)\s+(?:recorrió|cubrió)\s+más\s+distancia\s+que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} covered more distance than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+a parcouru plus de distance que\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} covered more distance than ${opponent}.` },
+  { expression: /^(?<team>Northbridge|Eastport)\s+legte mehr Strecke zurück als\s+(?<opponent>Northbridge|Eastport)[.!?؟]*$/iu, canonical: ({ team, opponent }) => `${team} covered more distance than ${opponent}.` },
+  { expression: /^(?:قطع\s+(?<team>Northbridge|Eastport)\s+مسافة أكبر من\s+(?<opponent>Northbridge|Eastport)|(?<team2>Northbridge|Eastport) قطع مسافة أكبر من (?<opponent2>Northbridge|Eastport))[.!?؟]*$/iu, canonical: ({ team, opponent, team2, opponent2 }) => `${team ?? team2} covered more distance than ${opponent ?? opponent2}.` },
+]
+
+function canonicalizeLocalizedStatisticFamily(text: string): string | undefined {
+  for (const { expression, canonical } of localizedStatisticRules) {
+    const groups = expression.exec(text)?.groups
+    if (groups) return canonical(groups)
+  }
+  return undefined
+}
 export function canonicalizeSupportedFootballOpinion(opinion: string): string {
   const trimmed = opinion.trim()
+  const compoundParts = trimmed.split(/\s+(?:but|however|pero|mais|aber|لكن|بل)\s+(?=(?:Northbridge|Eastport)\b)/iu)
+  if (compoundParts.length > 1) {
+    return compoundParts.map((part) => canonicalizeSupportedFootballOpinion(part.replace(/[,.!?؟]+$/u, '')).replace(/[,.!?؟]+$/u, '')).join(' but ')
+  }
+  const localizedStatistic = canonicalizeLocalizedStatisticFamily(trimmed)
+  if (localizedStatistic) return localizedStatistic
   for (const { pattern, canonical } of localizedFootballOpinions) {
     const match = pattern.exec(trimmed)
     if (!match) continue
@@ -2287,6 +2339,9 @@ export function translateNarrative(text: string, language: AppLanguage): string 
   if (language === 'en') return text
   const exact = translateText(text, language)
   if (exact !== text) return exact
+
+  const structured = translateComparisonMessage(text, language)
+  if (structured !== null) return structured
 
   const movingTo = text.match(/^Moving to (.+)…$/u)
   if (movingTo) {
