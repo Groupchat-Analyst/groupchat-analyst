@@ -12,14 +12,16 @@ Based on `Origin/main` `e22e76a2a4d415d2107101e8e4956804c7fec2a0` (PR #11). Fixe
 - **Stale-state invalidation.** A foreign-team override now drops candidates, `resolution` and the signed continuation, so a superseded claim cannot expose buttons or accept a continuation.
 - **Sharing.** Copy, card, download, native share and previews are hidden while any claim is unresolved (`hasUnresolvedClaims`), and shown after resolution.
 - **Localization.** Comparison ("What changed") not-comparable states, fallback replies, loading, "Moving to …", clock status and attribution strings are now template-driven in all five languages (`comparisonLocale.ts`); the same templates generate and translate the English, so they cannot drift.
+- **Typed factual-comparison and evidence presentation.** Factual comparison answers (shots, shots on target, goals, possession, pass counts/completion, player-vs-player) are rendered from typed facts (`comparisonFactsFromResult` → `formatFactualComparison`, `factualPresentation.ts`) with per-language templates, number formatting and plural forms (including Arabic singular/dual/plural). The same output feeds Fan, Analyst, copy reply, card text, share preview and the downloaded image. Evidence descriptions for turnovers, possession intervals and other events come from `evidenceLocale.ts`, resolved by stable record ID against the evidence foundation; unrecognised legacy references show a localized label plus the original English source wording, clearly marked. Changing incidental English narrative (`reply`, `limitation`, evidence `description`) cannot change this output (regression test).
+- **Question-language parity and compound questions.** Bounded multilingual normalisation of team comparisons, shot-count questions, pass counts/rates and distance claims (`localization.ts`); the Arabic «إيستبورت لديه تسديدات على المرمى أكثر من نورثبريدج.» is now an assessed claim. Supported two-proposition questions yield two claims in all five languages; a Foundry response that merges a recognised contrastive compound into one claim becomes an explicit clarification with no partial statistics. No extra model calls.
 - **Saved responses.** Responses without `resolution` fall back to their signed continuation, or to a generic localized clarification; evidence and original wording are preserved and nothing is guessed.
 
 ## Verification
 
 Automated (offline, stubbed providers):
 
-- API: **398/398** pass, including the actual Azure Table client against local Azurite (emulator, not Azure).
-- Web: **168/168** pass; TypeScript/production builds and lint pass (existing Vite bundle-size warning). `git diff --check` clean.
+- API: **444/444** pass, including the actual Azure Table client against local Azurite (emulator, not Azure).
+- Web: **177/177** pass (includes 57′→58′ typed comparison in all five languages, native Arabic question, incidental-English invariance); TypeScript/production builds and lint pass (existing Vite bundle-size warning). `git diff --check` clean.
 - Matrix: 4 fixtures × 5 languages × local and stubbed-Foundry (generic prose, paraphrase, incomplete category) × 1′ / 58′ / 90+4′; both candidate selections per ambiguity with zero additional interpreter calls; Gomes/Gomez, Martin/Martínez, absent players, pronouns/noun phrases, unsupported wording, mixed (one resolved + one pending) claims, foreign-team override, legacy responses, comparison template translation.
 
 Browser (local-rules API, Vite dev server, desktop Chromium; **no Foundry**):
@@ -34,9 +36,9 @@ Browser (local-rules API, Vite dev server, desktop Chromium; **no Foundry**):
 ## Remaining limitations and unverified
 
 - **Hosted Foundry, hosted Azure Table and the deployed site are not verified.** Foundry behaviour is covered only by stubs and replayed captures.
-- Application-owned prose outside the clarification/comparison/status surfaces (statistic and player answers, evidence descriptions) still uses the existing dictionary/regex localization over English text; it is not yet generated from structured fields. Treat full structured generation as incomplete.
-- The Arabic/other-language statistical question families beyond performance and pass completions are not extended (e.g. an Arabic shots question is reported as unsupported in a localized state).
-- Compound questions that are not split by the interpreter (e.g. "… and … ?" in one sentence) remain a single claim.
+- **Response localisation is NOT fully structured.** Migrated to typed facts: factual comparisons, player-performance answers, statistic-request answers, and evidence descriptions for passes, shots, recoveries, pressure, turnovers, possession intervals and other events. Still on the legacy English-prose path (`translateNarrative` over server English): count-assertion answers (“every/no … shot”), goal-before-half-time, historical-circumstance/run-of-play, subjective/tactical-topic replies, coaching, unavailable-data and insufficient-evidence `reply`/`limitation` text, share-card claim verdict/limitation lines for those claims, and the “What changed” earlier-answer text. These keep working but remain English-source translation; no typed reason/limitation codes were added to the API contract.
+- Compound questions: supported connectors are split into separate claims; other compositions fall back to the existing single-claim/clarification behaviour.
+- Arabic card shaping was inspected only for the earlier Arabic card; cards in all five languages were not re-inspected for this change.
 - Browser checks used desktop Chromium viewport emulation only: no real device, no iPhone native share, no screen reader, no native-speaker review. Clipboard copy could not be exercised in the automation browser; copy text relies on the same builders as the card (unit-tested), not a browser clipboard read. Only Arabic and a subset of languages were rendered as downloaded cards.
 - Not exercised in a browser: Redmere/Westhaven/Return populated Analyst views in every language (covered by API/web matrix tests only).
 ## Production settings
