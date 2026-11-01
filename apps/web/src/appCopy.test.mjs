@@ -238,7 +238,7 @@ const SCENARIOS = [
     reply: {
       en: 'Bukayo Saka: 1 goal, 2 shots on target, 1 of 2 passes completed, 1 recovery, 59 recorded minutes.',
       es: 'Bukayo Saka: 1 gol, 2 tiros a puerta, 1 de 2 pases completados, 1 recuperación, 59 minutos registrados.',
-      fr: 'Bukayo Saka : 1 but, 2 tirs cadrés, 1 passes réussies sur 2, 1 récupération, 59 minutes enregistrées.',
+      fr: 'Bukayo Saka : 1 but, 2 tirs cadrés, 1 passe réussie sur 2, 1 récupération, 59 minutes enregistrées.',
       de: 'Bukayo Saka: 1 Tor, 2 Schüsse aufs Tor, 1 von 2 Pässen angekommen, 1 Ballgewinn, 59 erfasste Minuten.',
       ar: 'بوكايو ساكا: هدف، تسديدتان على المرمى، 1 من 2 تمريرة ناجحة، استخلاص، 59 دقيقة مسجّلة.',
     },

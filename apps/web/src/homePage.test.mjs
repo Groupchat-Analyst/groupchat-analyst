@@ -24,7 +24,9 @@ test('the only primary action is Try it Out and it opens match selection, not th
 
 test('the homepage states the disclosure and avoids unsupported claims', async () => {
   const source = await readFile(new URL('./HomePage.tsx', import.meta.url), 'utf8')
-  assert.match(source, /Fictional matches · Local rules · No AI model connected/)
+  assert.match(source, /Fictional matches, no live feed \u00b7 AI reads questions when enabled \u00b7 Local rules available/)
+  assert.doesNotMatch(source, /No AI model connected|not an AI model/)
+  assert.match(source, /no AI is involved in this homepage illustration/)
   assert.match(source, /WhatsApp companion is planned/)
   assert.doesNotMatch(source, /testimonial|users love|live data|powered by AI/i)
 })

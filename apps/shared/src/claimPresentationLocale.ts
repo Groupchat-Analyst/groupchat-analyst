@@ -152,6 +152,7 @@ const EN = {
   'pl.participated': '{player} took part; no further figures are available here.',
   'pl.contrib': '{player}: {items}.',
   'pl.passes': '{completed} of {attempts} passes completed',
+  'pl.passes.one': '{completed} of {attempts} pass completed',
   'co.none': 'No possession-loss figures are available for this question.',
   'co.sample': 'Possession losses in the annotated build-up sample: {total}.',
   'co.all': 'Possession losses across all recorded passes: {total}.',
@@ -223,7 +224,7 @@ const EN = {
 }
 
 type DictKey = keyof typeof EN
-type Dict = Record<DictKey, string>
+type Dict = Record<Exclude<DictKey, 'pl.passes.one'>, string> & Partial<Record<'pl.passes.one', string>>
 
 const ES: Dict = {
   'v.supported': 'Respaldada',
@@ -324,6 +325,7 @@ const ES: Dict = {
   'pl.participated': '{player} participó; aquí no hay más cifras disponibles.',
   'pl.contrib': '{player}: {items}.',
   'pl.passes': '{completed} de {attempts} pases completados',
+  'pl.passes.one': '{completed} de {attempts} pase completado',
   'co.none': 'No hay cifras de pérdidas de posesión disponibles para esta pregunta.',
   'co.sample': 'Pérdidas de posesión en la muestra anotada de construcción: {total}.',
   'co.all': 'Pérdidas de posesión en todos los pases registrados: {total}.',
@@ -493,6 +495,7 @@ const FR: Dict = {
   'pl.participated': '{player} a participé ; aucun autre chiffre n’est disponible ici.',
   'pl.contrib': '{player} : {items}.',
   'pl.passes': '{completed} passes réussies sur {attempts}',
+  'pl.passes.one': '{completed} passe réussie sur {attempts}',
   'co.none': 'Aucun chiffre de pertes de balle n’est disponible pour cette question.',
   'co.sample': 'Pertes de balle dans l’échantillon annoté de construction : {total}.',
   'co.all': 'Pertes de balle sur l’ensemble des passes enregistrées : {total}.',
@@ -662,6 +665,7 @@ const DE: Dict = {
   'pl.participated': '{player} war beteiligt; weitere Zahlen liegen hier nicht vor.',
   'pl.contrib': '{player}: {items}.',
   'pl.passes': '{completed} von {attempts} Pässen angekommen',
+  'pl.passes.one': '{completed} von {attempts} Pass angekommen',
   'co.none': 'Für diese Frage liegen keine Zahlen zu Ballverlusten vor.',
   'co.sample': 'Ballverluste in der annotierten Aufbau-Stichprobe: {total}.',
   'co.all': 'Ballverluste über alle erfassten Pässe: {total}.',
@@ -961,7 +965,10 @@ function renderPlayerFacts(facts: PlayerFacts, ctx: PresentationContext, languag
   }
   const items = facts.contributions.map((item) => {
     if (item.code === 'passes') {
-      return text(language, 'pl.passes', {
+      // French uses the singular for 0 and 1 completions; the other languages agree with the attempts count.
+      const singular = language === 'fr' ? item.completed < 2 : item.attempts === 1
+      const key = singular && DICTS[language]['pl.passes.one'] !== undefined ? 'pl.passes.one' : 'pl.passes'
+      return text(language, key, {
         completed: formatNumber(item.completed, language),
         attempts: formatNumber(item.attempts, language),
       })
