@@ -1,5 +1,26 @@
 # Release and deployment runbook
 
+## Historical replay fan beta
+
+The feature-branch job in `.github/workflows/shared-preview.yml` deploys only
+to the named `fanbeta` environment; the main-branch production job is
+unchanged. Check the dispatched branch, commit and deployment URL before
+sharing. The beta uses its own `FoundryFanBeta` table in the existing storage
+account, not the production `FoundryJudging` table. Its backend settings are
+`FOUNDRY_ALLOWANCE_MAX_REQUESTS=12`,
+`FOUNDRY_ALLOWANCE_MAX_PER_CLIENT=4`,
+`FOUNDRY_ALLOWANCE_WINDOW_HOURS=8760` and
+`FOUNDRY_CAPTURE_RAW_OUTPUT=false`.
+
+The allowance counts model attempts, not questions: an eligible answer can
+consume two attempts, and failures consume reservations. Client limits are
+network-address buckets, not authenticated people, and depend on the proxy's
+forwarded headers. The fixed window renews at its boundary; it is not a
+permanent trial cap. To stop beta AI, select **fanbeta** under the Static Web
+App's **Settings → Environment variables**, set `FOUNDRY_PUBLIC_ENABLED=false`,
+apply and verify the backend restarted. Do not change production settings or
+clear either table.
+
 Status: **multilingual response, player-clarification and native-language local-rule repair prepared, not deployed**. The current work is on `repair/localised-examples-and-formatting` (based on `ac15800`); anonymous Foundry analysis remains controlled only by backend configuration and the shared durable Azure Table allowance, which this repair does not change. No deployment, live model request, Azure change, allowance reset or credential change has occurred. Deploying requires a separate owner decision.
 
 ## Candidate and workflow
