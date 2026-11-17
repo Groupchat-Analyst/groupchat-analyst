@@ -44,9 +44,16 @@ function validPunditText(value: unknown, facts: PunditFacts): PunditValidation {
   if (/\b(?:ramsey|giroud|lacazette|schmeichel|xhaka|oxlade)\b/i.test(prose)) return { field: 'text', rule: 'player-name-outside-token' }
   if (/\b(?:scor(?:e|ed|ing)|equalis(?:e|ed|ing)|equaliz(?:e|ed|ing)|goal|corner|sav(?:e|ed)|blocked|shot|attempt)\b/i.test(prose)) return { field: 'text', rule: 'event-word-outside-token' }
   if (/\b(?:one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(prose)) return { field: 'text', rule: 'number-word-outside-token' }
+  if (/^\s*(?:yes|no)\b|\b(?:definitely|certainly|undoubtedly|proves?|proved)\b|\b(?:back|challenge|reject|agree with|disagree with|push back on)\s+(?:that|this|the)\s+(?:take|claim|opinion)\b/i.test(prose)) return { field: 'text', rule: 'broad-judgement-verdict' }
+  const broadConcept = /\b(?:eas(?:e|ed|ing)\s+off|slow(?:ed|ing)?\s+down|retreat(?:ed|ing)?|tempo|pace|intensity|intent(?:ion)?|tactic(?:al|s)?|defensive\s+shape|territorial\s+control|dominance|dominat(?:e|ed|ing)|luck(?:y)?|comfort(?:able)?|pressur(?:e|ed|ing))\b/i
+  const uncertainty = /\b(?:cannot|can't|can’t|could not|couldn't|couldn’t|do not|don't|don’t|does not|doesn't|doesn’t)\s+(?:establish|determine|prove|show|tell)|\b(?:uncertain|unknown|unavailable|not recorded|more evidence|not enough evidence)\b/i
+  if (prose.split(/[.!?;]+|\b(?:but|although|though|however|yet)\b/i).some((clause) => broadConcept.test(clause) && !uncertainty.test(clause))) {
+    return { field: 'text', rule: 'unsupported-broad-judgement' }
+  }
   if (eventIds.length === 0) return { field: 'eventIds', rule: 'nonempty-array' }
   if (!eventIds.every((id) => typeof id === 'string' && allowedIds.has(id))) return { field: 'eventIds', rule: 'unknown-or-invalid-event-id' }
-  return { text: text.replace(/\[\[[A-Z0-9_]+\]\]/g, (token) => phrases.get(token)!.text) }
+  const expanded = text.replace(/\[\[[A-Z0-9_]+\]\]/g, (token) => phrases.get(token)!.text)
+  return { text: `${expanded} Overall tempo and tactical intent would require more evidence.` }
 }
 
 function checkedFacts(facts: PunditFacts): string[] {

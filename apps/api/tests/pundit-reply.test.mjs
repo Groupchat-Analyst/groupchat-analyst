@@ -29,7 +29,7 @@ const environment = { FOUNDRY_PUBLIC_ENABLED: 'true' }
 const request = { headers: { get: () => null }, json: async () => requestBody }
 
 function harness({ reply = {
-  text: 'I would back that take: Arsenal kept Leicester working. [[SHOT_COUNTS]], and after [[GOAL_177960849]] they still came forward. [[SHOT_SAVE_CORNER]], which suggests the pressure did not simply disappear once the scores were level. That is a fair reading of the chances, although the records cannot tell us the whole tactical picture.',
+  text: 'Arsenal were still creating. [[SHOT_COUNTS]], and after [[GOAL_177960849]] they still came forward. [[SHOT_SAVE_CORNER]].',
   eventIds: ['177960786', '177960827', '177960831', '177960849', '177960899', '177960861', '177960900'],
 }, failReserve = false, claims = [claim] } = {}) {
   const calls = []
@@ -84,10 +84,10 @@ test('pundit generation follows engine calculation and reserves each call', asyn
   assert.deepEqual(response.jsonBody.claims[0].claim.timePeriod, { kind: 'before-event', eventId: '177960902', lookbackSeconds: 600 })
   const facts = JSON.parse(h.calls[1].messages[1].content)
   const generationInstructions = h.calls[1].messages[0].content
-  assert.match(generationInstructions, /3–5 natural, concise sentences/)
-  assert.match(generationInstructions, /Open with a clear judgement/)
-  assert.match(generationInstructions, /kept creating after an equaliser/)
-  assert.match(generationInstructions, /tactical explanations as interpretations/)
+  assert.match(generationInstructions, /2–3 natural, concise sentences/)
+  assert.match(generationInstructions, /not a verdict/)
+  assert.match(generationInstructions, /still creating/)
+  assert.match(generationInstructions, /cannot establish overall tempo/)
   assert.match(generationInstructions, /Do not write raw coordinates, event IDs, precise timestamps/)
   assert.match(generationInstructions, /insert at least one supplied verifiedPhrases token/)
   assert.match(generationInstructions, /number words one through ten \(even idiomatically\)/)
@@ -108,6 +108,7 @@ test('pundit generation follows engine calculation and reserves each call', asyn
   ])
   assert.match(response.jsonBody.punditReply.text, /after Aaron Ramsey made it 3–3 they still came forward/)
   assert.match(response.jsonBody.punditReply.text, /Lacazette’s shot was followed by Schmeichel’s save and Xhaka’s corner/)
+  assert.match(response.jsonBody.punditReply.text, /Overall tempo and tactical intent would require more evidence/)
   assert.doesNotMatch(response.jsonBody.punditReply.text, /\[\[|177960|origin|normalized|2H 39:|The recorded score at the start/)
   assert.equal(response.jsonBody.punditReply.text.match(/[.!?](?:\s|$)/g).length, 4)
   assert.match(response.jsonBody.punditReply.checked.join(' '), /Arsenal 5, Leicester City 0/)
@@ -250,7 +251,7 @@ test('opposing claims can use the same anchored evidence without a definitive ve
     { ...claim, id: 'claim-2', text: 'Northbridge were just taking potshots' },
   ]
   const h = harness({ claims: opposing, reply: {
-    text: 'I would push back on that. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that, which makes comfort a difficult judgement. The tactical picture remains incomplete.',
+    text: 'Arsenal were still creating. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that. The records cannot establish the wider tactical picture.',
     eventIds: ['177960786', '177960827', '177960831', '177960849', '177960899', '177960861', '177960900'],
   } })
   const response = await h.handler({ ...request, json: async () => ({
@@ -261,7 +262,7 @@ test('opposing claims can use the same anchored evidence without a definitive ve
   const facts = JSON.parse(h.calls[1].messages[1].content)
   assert.deepEqual(facts.shotCounts, { Arsenal: 5, 'Leicester City': 0 })
   assert.deepEqual(response.jsonBody.claims.map((item) => item.claim.timePeriod.eventId), ['177960902', '177960902'])
-  assert.match(response.jsonBody.punditReply.text, /push back/)
+  assert.match(response.jsonBody.punditReply.text, /still creating/)
   assert.match(response.jsonBody.punditReply.checked.join(' '), /origin \(94, 63\)/)
 })
 
@@ -273,7 +274,7 @@ test('opposing control take with an evidence-only clarification reaches the same
     clarificationReason: 'unavailable-evidence',
   }
   const h = harness({ claims: [control], reply: {
-    text: 'I would push back on Leicester containing Arsenal’s attack. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that, suggesting Arsenal remained a threat. The records do not establish the entire tactical picture.',
+    text: 'Arsenal were still creating. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that. The records do not establish the entire tactical picture.',
     eventIds: ['177960786', '177960827', '177960831', '177960849', '177960899', '177960861', '177960900'],
   } })
   const response = await h.handler({ ...request, json: async () => ({
@@ -303,7 +304,7 @@ test('opposing control take with an evidence-only clarification reaches the same
   assert.deepEqual(facts.sequence.map(({ id }) => id), ['177960899', '177960861', '177960900', '177960902'])
   assert.match(facts.verifiedPhrases.find(({ token }) => token === '[[GOAL_177960849]]').text, /3–3/)
   assert.match(facts.limitations.join(' '), /possession intervals, passing, pressure observations/)
-  assert.match(response.jsonBody.punditReply.text, /push back/)
+  assert.match(response.jsonBody.punditReply.text, /still creating/)
   assert.match(response.jsonBody.punditReply.text, /Aaron Ramsey made it 3–3/)
   assert.match(response.jsonBody.punditReply.text, /Schmeichel’s save and Xhaka’s corner/)
 })
@@ -393,6 +394,11 @@ test('phrases follow the selected window and never borrow a missing sequence', a
 
 test('invalid reply and failed generation retain the factual answer', async () => {
   for (const reply of [
+    { text: 'No — Arsenal did not ease off. [[SHOT_SAVE_CORNER]].', eventIds: ['177960899', '177960861', '177960900'] },
+    { text: 'Arsenal slowed down after the equaliser. [[SHOT_SAVE_CORNER]].', eventIds: ['177960899', '177960861', '177960900'] },
+    { text: '[[SHOT_SAVE_CORNER]]. The team maintained its intensity.', eventIds: ['177960899', '177960861', '177960900'] },
+    { text: '[[SHOT_SAVE_CORNER]]. Arsenal did not ease off, although the tempo is uncertain.', eventIds: ['177960899', '177960861', '177960900'] },
+    { text: 'I would challenge that take. [[SHOT_SAVE_CORNER]].', eventIds: ['177960899', '177960861', '177960900'] },
     { text: 'Arsenal scored 99 goals. [[GOAL_177960849]]', eventIds: ['177960849'] },
     { text: 'Ramsey scored from thirty yards. [[GOAL_177960849]]', eventIds: ['177960849'] },
     { text: 'This is a plausible opinion. [[GOAL_177960849]]', eventIds: ['not-a-record'] },
@@ -484,7 +490,7 @@ test('valid generated reply is captured with no rejection when diagnostics are e
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'pundit-valid-'))
   try {
     process.chdir(temporaryDirectory)
-    const reply = { text: 'I would back that take. [[GOAL_177960849]], and the wider tactical picture remains uncertain.', eventIds: ['177960849'] }
+    const reply = { text: 'The record gives us this: [[GOAL_177960849]].', eventIds: ['177960849'] }
     let calls = 0
     const provider = new FoundryInterpretationProvider(
       { baseUrl: 'https://example.invalid/openai/v1', apiKey: 'offline-only', deployment: 'stub' },

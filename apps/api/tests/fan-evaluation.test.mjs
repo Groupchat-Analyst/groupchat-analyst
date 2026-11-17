@@ -176,10 +176,10 @@ function mockRoute(claims, reply) {
 test('opposing takes reach generation with the same evidence and limitations', async (t) => {
   const ids = [...sortedIds(preShots), '177960861', '177960900']
   for (const item of [
-    { subject: 'Northbridge', opinion: 'Arsenal were piling on the pressure in the ten minutes before Giroud scored.', judgement: 'I would back that take' },
-    { subject: 'Eastport', opinion: 'Leicester had Arsenal under control in the ten minutes before Giroud scored.', judgement: 'I would challenge that take' },
+    { subject: 'Northbridge', opinion: 'Arsenal were piling on the pressure in the ten minutes before Giroud scored.' },
+    { subject: 'Eastport', opinion: 'Leicester had Arsenal under control in the ten minutes before Giroud scored.' },
   ]) await t.test(item.opinion, async () => {
-    const reply = { text: `${item.judgement}. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that suggests the attack remained a threat. The wider tactical picture remains uncertain.`, eventIds: ids }
+    const reply = { text: 'Arsenal were still creating. [[SHOT_COUNTS]], and [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] after that suggests the attack remained a threat.', eventIds: ids }
     const h = mockRoute([anchoredClaim(item.subject)], reply)
     const response = await h.handler(request(item.opinion), context)
     assert.equal(response.status, 200)
@@ -192,7 +192,7 @@ test('opposing takes reach generation with the same evidence and limitations', a
     assert.match(facts.verifiedPhrases.find(({ token }) => token === '[[GOAL_177960849]]').text, /3–3/)
     assert.deepEqual(facts.sequence.map(({ id }) => id), ['177960899', '177960861', '177960900', '177960902'])
     assert.match(facts.limitations.join(' '), /possession intervals, passing, pressure observations/)
-    assert.match(response.jsonBody.punditReply.text, new RegExp(item.judgement))
+    assert.match(response.jsonBody.punditReply.text, /still creating/)
     assert.match(response.jsonBody.punditReply.text, /remained a threat/)
     assert.match(response.jsonBody.punditReply.checked.join(' '), /Source:.*7770599/)
     assert.match(response.jsonBody.punditReply.checked.join(' '), /29:34\.620655 inclusive.*39:34\.620655 exclusive/)
@@ -278,7 +278,7 @@ test('captured Ramsey clarification remains a clarification; corrected interpret
   const corrected = { ...capturedRamsey, timePeriod: { kind: 'after-event', eventId: '177960849', lookbackSeconds: null },
     historicalEventAnchor: { eventId: '177960849', relationship: 'equaliser' }, clarificationNeeds: [], clarificationReason: null }
   const h = mockRoute([corrected], {
-    text: 'I would challenge that take. [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] suggests Arsenal remained a threat, though the wider tactical picture is uncertain.',
+    text: 'Arsenal were still creating. [[GOAL_177960849]]. [[SHOT_SAVE_CORNER]] suggests Arsenal remained a threat.',
     eventIds: ['177960849', '177960899', '177960861', '177960900'],
   })
   const response = await h.handler(request(opinion), context)
@@ -292,6 +292,7 @@ test('captured Ramsey clarification remains a clarification; corrected interpret
   assert.deepEqual(facts.sequence.map(({ id }) => id), ['177960849', '177960899', '177960861', '177960900', '177960902'])
   assert.match(facts.window, /37:11\.119656.*exclusive.*86:00/)
   assert.match(response.jsonBody.punditReply.text, /remained a threat/)
+  assert.match(response.jsonBody.punditReply.text, /Overall tempo and tactical intent would require more evidence/)
   assert.match(response.jsonBody.punditReply.checked.join(' '), /177960849.*excluded/)
 })
 
