@@ -48,7 +48,7 @@ function harness({ reply = {
   const handler = createAnalyzeHandler(new LocalInterpretationProvider(), environment, () => ({
     async reserve() {
       reservations++
-      if (failReserve && reservations === 2) throw new FoundryAllowanceExceededError('total')
+      if (failReserve && reservations === 2) throw new FoundryAllowanceExceededError(failReserve)
     },
   }), () => provider)
   return { handler, calls, errors, reservations: () => reservations, context: { invocationId: 'offline-request-123', error: (...args) => errors.push(args) } }
@@ -513,13 +513,19 @@ test('valid generated reply is captured with no rejection when diagnostics are e
 })
 
 test('no generation call occurs if the second allowance reservation fails', async () => {
-  const h = harness({ failReserve: true })
-  const response = await h.handler(request, h.context)
-  assert.equal(response.status, 200)
-  assert.equal(h.calls.length, 1)
-  assert.equal(h.reservations(), 2)
-  assert.equal(response.jsonBody.punditReply, undefined)
-  assert.match(response.jsonBody.punditNotice, /factual answer/)
+  for (const [scope, message] of [
+    ['total', /shared AI request allowance is exhausted/],
+    ['client', /AI request allowance for this network is exhausted/],
+  ]) {
+    const h = harness({ failReserve: scope })
+    const response = await h.handler(request, h.context)
+    assert.equal(response.status, 200)
+    assert.equal(h.calls.length, 1)
+    assert.equal(h.reservations(), 2)
+    assert.equal(response.jsonBody.punditReply, undefined)
+    assert.match(response.jsonBody.punditNotice, message)
+    assert.match(response.jsonBody.punditNotice, /factual answer/)
+  }
 })
 
 test('a clarification at an earlier replay time never invokes generation or reveals the goal', async () => {

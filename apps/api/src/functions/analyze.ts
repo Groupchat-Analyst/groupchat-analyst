@@ -210,7 +210,9 @@ export function createAnalyzeHandler(
                   error instanceof FoundryAllowanceUnavailableError ? 'allowance-unavailable' : 'unexpected-error'
             rejection = { field: generationStarted ? 'response' : 'allowance', rule }
             context.error(`Pundit reply unavailable: requestId=${requestId} field=${rejection.field} rule=${rule}`)
-            result.punditNotice = 'The generated reply was unavailable; the factual answer is shown instead.'
+            result.punditNotice = error instanceof FoundryAllowanceExceededError
+              ? `${error.message} The factual answer is shown instead.`
+              : 'The generated reply was unavailable; the factual answer is shown instead.'
           }
           if (generationStarted && environment.FOUNDRY_CAPTURE_RAW_OUTPUT?.trim().toLowerCase() === 'true') {
             try {
