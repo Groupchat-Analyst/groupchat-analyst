@@ -60,6 +60,21 @@ const constructedClaim = {
   clarificationNeeds: [],
 }
 
+test('safe pundit failure records contain only bounded metadata', async () => {
+  const records = []
+  const allowance = new AzureTableFoundryAllowance({
+    async createEntity(entity) { records.push(entity) },
+  }, allowanceSettings)
+  await allowance.recordPunditFailure({ requestId: 'request-123', stage: 'validation', field: 'text', rule: 'broad-judgement-verdict', question: 'private fan question', reply: 'private fan reply' })
+  assert.deepEqual(records, [{
+    partitionKey: 'pundit-failures', rowKey: 'request-123',
+    stage: 'validation', field: 'text', rule: 'broad-judgement-verdict',
+  }])
+  await assert.rejects(allowance.recordPunditFailure({ requestId: 'unsafe/id', stage: 'generation', field: 'response', rule: 'provider-transport' }), /Invalid diagnostic metadata/)
+  await assert.rejects(allowance.recordPunditFailure({ requestId: 'request-123', stage: 'generation', field: 'response', rule: 'private fan reply' }), /Invalid diagnostic metadata/)
+  assert.equal(records.length, 1)
+})
+
 class SharedMemoryTable {
   entity = null
   revision = 0

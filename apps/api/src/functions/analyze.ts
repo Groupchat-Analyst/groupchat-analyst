@@ -17,10 +17,11 @@ import {
   FoundryAllowanceUnavailableError,
   foundryClientIdentity,
 } from '../foundryAllowance.js'
+import type { PunditFailureDiagnostic } from '../foundryAllowance.js'
 
 export const ANALYSIS_MODE_HEADER = 'x-analysis-mode'
 
-type PunditValidation = { text: string } | { field: string; rule: string }
+type PunditValidation = { text: string } | { field: PunditFailureDiagnostic['field']; rule: string }
 
 function validPunditText(value: unknown, facts: PunditFacts): PunditValidation {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return { field: 'response', rule: 'expected-object' }
@@ -188,13 +189,16 @@ export function createAnalyzeHandler(
           const requestId = context.invocationId
           let generationStarted = false
           let rawResponse: string | null = null
-          let rejection: { field: string; rule: string } | null = null
+          let rejection: { field: PunditFailureDiagnostic['field']; rule: string } | null = null
+          let failureStage: PunditFailureDiagnostic['stage'] = 'allowance'
           try {
             await createAllowance(environment).reserve(
               foundryClientIdentity(request.headers?.get('x-forwarded-for') ?? null),
             )
             generationStarted = true
+            failureStage = 'generation'
             const generated = await activeProvider.generatePunditReply(facts, (content) => { rawResponse = content })
+            failureStage = 'validation'
             const validation = validPunditText(generated, facts)
             if ('rule' in validation) {
               rejection = validation
@@ -213,6 +217,13 @@ export function createAnalyzeHandler(
             result.punditNotice = error instanceof FoundryAllowanceExceededError
               ? `${error.message} The factual answer is shown instead.`
               : 'The generated reply was unavailable; the factual answer is shown instead.'
+          }
+          if (rejection && environment.FOUNDRY_SAFE_DIAGNOSTICS_ENABLED?.trim().toLowerCase() === 'true') {
+            try {
+              await createAllowance(environment).recordPunditFailure({ requestId, stage: failureStage, ...rejection })
+            } catch {
+              context.error(`Pundit failure diagnostic could not be recorded: requestId=${requestId}`)
+            }
           }
           if (generationStarted && environment.FOUNDRY_CAPTURE_RAW_OUTPUT?.trim().toLowerCase() === 'true') {
             try {

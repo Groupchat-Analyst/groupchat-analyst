@@ -79,6 +79,15 @@ An authorized owner must configure the shared Azure Storage account and preserve
 
 Eligible historical pundit replies make a second Foundry attempt after deterministic evidence calculation. This requires another reservation from the same shared and client limits. Replies are prompted to lead with recorded events, checked for verified tokens and several unsupported broad-judgement patterns, and given an explicit tempo and tactical-intent limitation. These checks are not a complete semantic guarantee. If the reservation or generation fails, or the reply fails validation, no further model request is made and the factual answer is shown with a notice. A complete live check therefore needs up to two remaining allowances.
 
+For a beta investigation, `FOUNDRY_SAFE_DIAGNOSTICS_ENABLED=true` stores failed
+pundit reply metadata in the configured allowance table under partition
+`pundit-failures`: invocation ID, failure stage, field and rule, plus Azure's
+timestamp. It never stores the question, model output or provider error text.
+Storage failures are logged and the factual fallback remains available. This
+opt-in diagnostic does not change allowance counts. Records persist until an
+authorized operator deletes them; set the flag to `false` to stop new records.
+Raw output capture must remain disabled.
+
 Keep the provider's existing input limits, 8192 completion-token ceiling, 30-second timeout, structured-output validation and no-retry behavior. Do not enable raw-output capture. The ordinary public route uses Foundry only when `FOUNDRY_PUBLIC_ENABLED=true`; users can explicitly select local rules, and a client can never grant itself AI access.
 
 ### GitHub Actions secret

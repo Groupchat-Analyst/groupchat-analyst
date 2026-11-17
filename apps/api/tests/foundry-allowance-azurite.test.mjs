@@ -296,6 +296,15 @@ test('real Azure Table adapter preserves and enforces the allowance on Azurite',
         (await table.getEntity('foundry-judge', 'allowance')).totalCount,
         2,
       )
+      await allowance.recordPunditFailure({
+        requestId: 'offline-invocation-123', stage: 'validation',
+        field: 'text', rule: 'broad-judgement-verdict',
+      })
+      const diagnostic = await table.getEntity('pundit-failures', 'offline-invocation-123')
+      assert.equal(diagnostic.stage, 'validation')
+      assert.equal(diagnostic.field, 'text')
+      assert.equal(diagnostic.rule, 'broad-judgement-verdict')
+      assert.equal((await table.getEntity('foundry-judge', 'allowance')).totalCount, 2)
     })
 
     await t.test('Azurite rejects a stale entity ETag', async () => {

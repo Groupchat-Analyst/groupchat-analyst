@@ -31,9 +31,10 @@ const request = { headers: { get: () => null }, json: async () => requestBody }
 function harness({ reply = {
   text: 'Arsenal were still creating. [[SHOT_COUNTS]], and after [[GOAL_177960849]] they still came forward. [[SHOT_SAVE_CORNER]].',
   eventIds: ['177960786', '177960827', '177960831', '177960849', '177960899', '177960861', '177960900'],
-}, failReserve = false, claims = [claim] } = {}) {
+}, failReserve = false, claims = [claim], safeDiagnostics = false, failDiagnostic = false } = {}) {
   const calls = []
   const errors = []
+  const diagnostics = []
   let reservations = 0
   const provider = new FoundryInterpretationProvider(
     { baseUrl: 'https://example.invalid/openai/v1', apiKey: 'offline-only', deployment: 'stub' },
@@ -45,13 +46,19 @@ function harness({ reply = {
       return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }), { status: 200 })
     },
   )
-  const handler = createAnalyzeHandler(new LocalInterpretationProvider(), environment, () => ({
+  const handler = createAnalyzeHandler(new LocalInterpretationProvider(), {
+    ...environment, FOUNDRY_SAFE_DIAGNOSTICS_ENABLED: String(safeDiagnostics),
+  }, () => ({
     async reserve() {
       reservations++
       if (failReserve && reservations === 2) throw new FoundryAllowanceExceededError(failReserve)
     },
+    async recordPunditFailure(record) {
+      if (failDiagnostic) throw new Error('test storage failure')
+      diagnostics.push(record)
+    },
   }), () => provider)
-  return { handler, calls, errors, reservations: () => reservations, context: { invocationId: 'offline-request-123', error: (...args) => errors.push(args) } }
+  return { handler, calls, errors, diagnostics, reservations: () => reservations, context: { invocationId: 'offline-request-123', error: (...args) => errors.push(args) } }
 }
 
 test('pundit generation follows engine calculation and reserves each call', async () => {
@@ -416,6 +423,28 @@ test('invalid reply and failed generation retain the factual answer', async () =
     assert.equal(h.reservations(), 2)
     assert.equal(h.errors.length, 1)
   }
+})
+
+test('safe diagnostics record failure stage and rule without fan content', async () => {
+  for (const [options, stage, field, rule] of [
+    [{ reply: { text: 'No — Arsenal did not ease off. [[GOAL_177960849]].', eventIds: ['177960849'] } }, 'validation', 'text', 'broad-judgement-verdict'],
+    [{ reply: new Error('sensitive provider details') }, 'generation', 'response', 'provider-transport'],
+    [{ failReserve: 'client' }, 'allowance', 'allowance', 'allowance-client'],
+  ]) {
+    const h = harness({ ...options, safeDiagnostics: true })
+    const response = await h.handler(request, h.context)
+    assert.equal(response.status, 200)
+    assert.deepEqual(h.diagnostics, [{ requestId: 'offline-request-123', stage, field, rule }])
+    assert.doesNotMatch(JSON.stringify(h.diagnostics), /Arsenal|pressure|sensitive provider details/)
+  }
+  const disabled = harness({ reply: new Error('offline') })
+  await disabled.handler(request, disabled.context)
+  assert.deepEqual(disabled.diagnostics, [])
+  const failed = harness({ reply: new Error('offline'), safeDiagnostics: true, failDiagnostic: true })
+  const response = await failed.handler(request, failed.context)
+  assert.equal(response.status, 200)
+  assert.match(response.jsonBody.punditNotice, /factual answer/)
+  assert.ok(failed.errors.some(([message]) => /diagnostic could not be recorded/.test(message)))
 })
 
 test('one used idiomatically is explicitly rejected and captured with the request and failed rule', async () => {

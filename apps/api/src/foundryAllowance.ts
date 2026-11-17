@@ -21,6 +21,13 @@ type AllowanceTable = Pick<
   'getEntity' | 'createEntity' | 'updateEntity' | 'listEntities'
 >
 
+export type PunditFailureDiagnostic = {
+  requestId: string
+  stage: 'allowance' | 'generation' | 'validation'
+  field: 'allowance' | 'response' | 'text' | 'eventIds'
+  rule: string
+}
+
 export type FoundryAllowanceSettings = {
   tableName: string
   maxRequests: number
@@ -207,6 +214,19 @@ export class AzureTableFoundryAllowance {
     } catch (error) {
       throw new FoundryAllowanceUnavailableError(error)
     }
+  }
+
+  async recordPunditFailure({ requestId, stage, field, rule }: PunditFailureDiagnostic): Promise<void> {
+    if (!/^[A-Za-z0-9-]{1,128}$/.test(requestId) || !/^[a-z0-9-]{1,128}$/.test(rule)) {
+      throw new Error('Invalid diagnostic metadata.')
+    }
+    await this.table.createEntity({
+      partitionKey: 'pundit-failures',
+      rowKey: requestId,
+      stage,
+      field,
+      rule,
+    })
   }
 
   async reserve(clientIdentity: string, now = Date.now()): Promise<void> {
