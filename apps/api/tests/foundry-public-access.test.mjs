@@ -12,6 +12,7 @@ import {
   foundryClientIdentity,
 } from '../dist/api/src/foundryAllowance.js'
 import { createAnalyzeHandler } from '../dist/api/src/functions/analyze.js'
+import { createAllowanceStatusHandler } from '../dist/api/src/functions/allowanceStatus.js'
 import { resolveDataset } from '../dist/api/src/datasets.js'
 import { FoundryInterpretationProvider } from '../dist/api/src/providers/foundry.js'
 import { createInterpretationProvider } from '../dist/api/src/providers/index.js'
@@ -73,6 +74,31 @@ test('safe pundit failure records contain only bounded metadata', async () => {
   await assert.rejects(allowance.recordPunditFailure({ requestId: 'unsafe/id', stage: 'generation', field: 'response', rule: 'provider-transport' }), /Invalid diagnostic metadata/)
   await assert.rejects(allowance.recordPunditFailure({ requestId: 'request-123', stage: 'generation', field: 'response', rule: 'private fan reply' }), /Invalid diagnostic metadata/)
   assert.equal(records.length, 1)
+})
+
+test('opt-in status checks report only remaining allowance without reservations', async () => {
+  const table = new SharedMemoryTable()
+  const allowance = new AzureTableFoundryAllowance(table, { ...allowanceSettings, maxRequests: 12, maxPerClient: 4 })
+  const identity = foundryClientIdentity('192.0.2.10')
+  assert.deepEqual(await allowance.remaining(identity), { total: 12, client: 4 })
+  await allowance.reserve(identity)
+  await allowance.reserve(identity)
+  const handler = createAllowanceStatusHandler({ FOUNDRY_SAFE_DIAGNOSTICS_ENABLED: 'true' }, () => allowance)
+  const statusRequest = request(analysisRequest)
+  const response = await handler(statusRequest, { error: () => assert.fail('Unexpected error') })
+  assert.equal(response.status, 200)
+  assert.equal(response.headers['cache-control'], 'no-store')
+  assert.deepEqual(response.jsonBody, { remaining: { total: 10, client: 2 } })
+  assert.deepEqual(await allowance.remaining(foundryClientIdentity('192.0.2.11')), { total: 10, client: 4 })
+  assert.deepEqual(await allowance.remaining(identity, table.entity.windowStart + 8760 * 60 * 60 * 1000), { total: 12, client: 4 })
+  assert.equal(table.entity.totalCount, 2)
+  const disabled = await createAllowanceStatusHandler({}, () => allowance)(statusRequest, { error() {} })
+  assert.equal(disabled.status, 404)
+  table.fail = true
+  const errors = []
+  const failed = await handler(statusRequest, { error: (message) => errors.push(message) })
+  assert.equal(failed.status, 503)
+  assert.equal(errors.length, 1)
 })
 
 class SharedMemoryTable {

@@ -87,6 +87,10 @@ Storage failures are logged and the factual fallback remains available. This
 opt-in diagnostic does not change allowance counts. Records persist until an
 authorized operator deletes them; set the flag to `false` to stop new records.
 Raw output capture must remain disabled.
+While this flag is enabled, `GET /api/allowance-status` reports only the shared
+and requesting network's remaining calls, without reserving a call. It uses
+the same forwarded-address handling as the analysis route; it is a snapshot,
+not a reservation, and the normal limits still enforce concurrent use.
 
 Keep the provider's existing input limits, 8192 completion-token ceiling, 30-second timeout, structured-output validation and no-retry behavior. Do not enable raw-output capture. The ordinary public route uses Foundry only when `FOUNDRY_PUBLIC_ENABLED=true`; users can explicitly select local rules, and a client can never grant itself AI access.
 

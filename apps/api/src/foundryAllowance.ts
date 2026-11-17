@@ -229,6 +229,24 @@ export class AzureTableFoundryAllowance {
     })
   }
 
+  async remaining(clientIdentity: string, now = Date.now()): Promise<{ total: number; client: number }> {
+    let existing: AllowanceEntity | null
+    try {
+      existing = await this.read()
+    } catch (error) {
+      throw new FoundryAllowanceUnavailableError(error)
+    }
+    const windowMs = this.settings.windowHours * 60 * 60 * 1000
+    const windowStart = Math.floor(now / windowMs) * windowMs
+    if (existing && existing.windowStart > windowStart) throw new FoundryAllowanceUnavailableError()
+    const current = existing?.windowStart === windowStart ? existing : null
+    const counts = current ? parseClientCounts(current.clientCounts) : {}
+    return {
+      total: Math.max(0, this.settings.maxRequests - (current?.totalCount ?? 0)),
+      client: Math.max(0, this.settings.maxPerClient - (counts[clientIdentity] ?? 0)),
+    }
+  }
+
   async reserve(clientIdentity: string, now = Date.now()): Promise<void> {
     const windowMs = this.settings.windowHours * 60 * 60 * 1000
     const windowStart = Math.floor(now / windowMs) * windowMs
