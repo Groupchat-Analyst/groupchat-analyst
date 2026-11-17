@@ -55,11 +55,21 @@ export type ReasonCode =
 
 export type ScopeFact =
   | { kind: 'window'; period: AnalysisPeriod; through: MatchClock }
+  | { kind: 'rolling-window'; lookbackSeconds: number; through: MatchClock }
+  | { kind: 'after-goal'; anchorEventId: string; anchorTeam: MatchTeam; anchorTime: string; through: MatchClock }
   | {
       kind: 'before-goal'
       anchorEventId: string
       anchorTeam: MatchTeam
       anchorClock: MatchClock
+    }
+  | {
+      kind: 'before-goal-window'
+      anchorEventId: string
+      anchorTeam: MatchTeam
+      anchorTime: string
+      windowStartTime: string
+      lookbackSeconds: number
     }
   | { kind: 'first-half-goals'; through: MatchClock }
 

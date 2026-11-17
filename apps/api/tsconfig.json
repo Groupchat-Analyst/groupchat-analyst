@@ -6,6 +6,7 @@
     "rootDir": "..",
     "outDir": "dist",
     "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

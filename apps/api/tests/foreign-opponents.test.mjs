@@ -13,6 +13,7 @@ test('catalog foreign opponents never become possession context for another team
   for (const [datasetId, opinion] of [
     [W, 'Kingswell had more possession than Redmere'],
     [W, 'Redmere had more possession than Kingswell'],
+    [W, 'Kingswell had less possession than Arsenal'],
     [RD, 'Redmere had less possession than Westhaven'],
     [RD, 'Westhaven had less possession than Redmere'],
     [B, 'Northbridge had more possession than Westhaven'],
@@ -63,7 +64,6 @@ test('distinct outside aliases keep their original spelling in claims and replie
 test('uncatalogued explicit opponents ask for clarification without substitute figures', async () => {
   for (const [id, opinion] of [
     [B, 'Northbridge had more possession than Chelsea'],
-    [W, 'Kingswell had less possession than Arsenal'],
     [RD, 'Alderwick completed more passes than Mystery FC'],
     [W, 'Palmer completed more passes than Saka'],
   ]) {

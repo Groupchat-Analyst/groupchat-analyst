@@ -38,6 +38,7 @@ import {
   classifyPitchArea,
   EVIDENCE_CAPABILITIES,
   matchClockAtElapsed,
+  type EvidenceCapability,
   type EvidenceCalculation,
   type SyntheticMatchEvidence,
 } from '../../shared/src/evidence.js'
@@ -45,6 +46,11 @@ import {
   analyzeMatch,
   elapsedMatchMinute,
   formatMatchClock,
+  formatMatchEventTime,
+  formatSourcePeriodTime,
+  elapsedEventSeconds,
+  eventsBeforeAnchor,
+  eventsAfterAnchor,
   TEAMS,
   type MatchEvent,
   type MatchClock,
@@ -132,7 +138,7 @@ function reference(
       : undefined
   return {
     id: event.id,
-    time: formatMatchClock(event.clock),
+    time: formatMatchEventTime(event),
     team: event.team,
     description: shooter
       ? `${event.description} Shooter: ${shooter.name} (${shooter.id}).`
@@ -148,16 +154,34 @@ function periodLabel(
   if (goalBeforeHalfTimeAssertion(claim)) {
     return 'Recorded first-half goal events'
   }
-  if (claim.timePeriod.kind === 'selected') return selectedPeriodLabel
+  if (claim.timePeriod.kind === 'selected') {
+    return claim.timePeriod.lookbackSeconds === undefined
+      ? selectedPeriodLabel
+      : `The ${claim.timePeriod.lookbackSeconds}-second window ending at the selected replay time (start and end inclusive).`
+  }
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find((event) => event.id === anchorId)
   if (!anchor) throw new Error('Validated historical event anchor was not found.')
-  return `Recorded match play strictly before ${formatMatchClock(anchor.clock)} (${anchor.id} ${anchor.team} goal)`
+  if (claim.timePeriod.kind === 'after-event') {
+    return `Recorded play after ${formatMatchEventTime(anchor)} (${anchor.id}), excluding that goal, through the selected replay time inclusive.`
+  }
+  if (claim.timePeriod.lookbackSeconds !== undefined) {
+    const windowStart = anchor.sourcePeriodSeconds !== undefined &&
+        anchor.sourcePeriodSeconds >= claim.timePeriod.lookbackSeconds
+      ? formatSourcePeriodTime(
+          anchor.clock.period,
+          anchor.sourcePeriodSeconds - claim.timePeriod.lookbackSeconds,
+        )
+      : `${claim.timePeriod.lookbackSeconds} seconds before ${formatMatchEventTime(anchor)}`
+    return `From ${windowStart} inclusive up to, but excluding, ${formatMatchEventTime(anchor)} (${anchor.id}).`
+  }
+  return `Recorded match play strictly before ${formatMatchEventTime(anchor)} (${anchor.id} ${anchor.team} goal)`
 }
 
 function eventsForClaim(
   claim: InterpretedClaim,
   selectedEvents: MatchEvent[],
+  selectedClock: MatchClock,
 ): MatchEvent[] {
   if (goalBeforeHalfTimeAssertion(claim)) {
     return selectedEvents.filter(
@@ -169,21 +193,30 @@ function eventsForClaim(
         (!claim.playerSubject || event.playerId === claim.playerSubject.id),
     )
   }
-  if (claim.timePeriod.kind === 'selected') return selectedEvents
+  if (claim.timePeriod.kind === 'selected') {
+    const lookback = claim.timePeriod.lookbackSeconds
+    return lookback === undefined ? selectedEvents : selectedEvents.filter(
+      (event) => elapsedEventSeconds(event) >= elapsedMatchMinute(selectedClock) * 60 - lookback,
+    )
+  }
   const anchorId = claim.timePeriod.eventId
   const anchor = selectedEvents.find((event) => event.id === anchorId)
   if (!anchor) return []
-  const cutoff = elapsedMatchMinute(anchor.clock)
-  return selectedEvents.filter((event) => elapsedMatchMinute(event.clock) < cutoff)
+  if (claim.timePeriod.kind === 'after-event') {
+    return eventsAfterAnchor(selectedEvents, anchor, elapsedMatchMinute(selectedClock) * 60)
+  }
+  return eventsBeforeAnchor(selectedEvents, anchor, claim.timePeriod.lookbackSeconds)
 }
 
 function availabilityFor(
   requiredEvidence: EvidenceKind[],
+  overrides: Partial<Record<EvidenceKind, string>> = {},
 ): EvidenceAvailability[] {
   return requiredEvidence.map((kind) => ({
     kind,
-    available: UNAVAILABLE_EVIDENCE[kind] === undefined,
+    available: overrides[kind] === undefined && UNAVAILABLE_EVIDENCE[kind] === undefined,
     detail:
+      overrides[kind] ??
       UNAVAILABLE_EVIDENCE[kind] ??
       (kind === 'build-up-phase'
         ? 'A small versioned sample labels build-up sequences and links selected passes, turnovers, and pressure events; coverage is not complete for the match.'
@@ -1072,6 +1105,57 @@ function calculationTraces(
   ) {
     return []
   }
+  const eventCountMetric =
+    claim.meaning.comparison?.metric ??
+    (claim.requiredEvidence.includes('shots-on-target')
+      ? 'shots-on-target'
+      : claim.requiredEvidence.includes('shots')
+        ? 'shots'
+        : claim.requiredEvidence.includes('goals')
+          ? 'goals'
+          : undefined)
+  if (
+    claim.intent === 'statistical-request' &&
+    (eventCountMetric === 'shots' ||
+      eventCountMetric === 'shots-on-target' ||
+      eventCountMetric === 'goals')
+  ) {
+    const teams = claim.meaning.comparison
+      ? TEAMS.filter(
+          (team) =>
+            team === claim.subject ||
+            team === claim.meaning.comparison?.opponent,
+        )
+      : claim.subject
+        ? [claim.subject]
+        : TEAMS
+    return teams.map((team) => {
+      const denominatorEvents = events.filter(
+        (event) => event.type === 'shot' && event.team === team,
+      )
+      const numeratorEvents = denominatorEvents.filter((event) =>
+        event.type === 'shot' &&
+          (eventCountMetric === 'shots'
+            ? true
+            : eventCountMetric === 'goals'
+              ? event.outcome === 'goal'
+              : event.outcome === 'goal' || event.outcome === 'saved'),
+      )
+      return {
+        team,
+        metric: eventCountMetric,
+        value: numeratorEvents.length,
+        numerator: numeratorEvents.length,
+        denominator: denominatorEvents.length,
+        numeratorRecordIds: numeratorEvents.map(({ id }) => id),
+        denominatorRecordIds: denominatorEvents.map(({ id }) => id),
+        denominatorDescription:
+          eventCountMetric === 'shots'
+            ? `All ${denominatorEvents.length} recorded ${team} shot events in the claim window; this is a count, not a rate.`
+            : `All ${denominatorEvents.length} recorded ${team} shot events in the claim window; the numerator includes only ${eventCountMetric.replaceAll('-', ' ')} records.`,
+      }
+    })
+  }
   const teams =
     claim.intent === 'coaching-question'
       ? claim.subject
@@ -1370,12 +1454,13 @@ function assessOneClaim(
   fixture: SyntheticMatchEvidence,
   period: AnalysisPeriod,
   selectionAdvanced: EvidenceCalculation,
+  unavailableEvidenceOverrides: Partial<Record<EvidenceKind, string>> = {},
 ): ClaimResult {
   const evidenceEvents =
     goalBeforeHalfTimeAssertion(claim) !== undefined ||
-    claim.timePeriod.kind === 'before-event'
-      ? eventsForClaim(claim, allSelectedEvents)
-      : eventsForClaim(claim, selectedPeriodEvents)
+    claim.timePeriod.kind !== 'selected' || claim.timePeriod.lookbackSeconds !== undefined
+      ? eventsForClaim(claim, allSelectedEvents, selectedClock)
+      : eventsForClaim(claim, selectedPeriodEvents, selectedClock)
   const anchorEvent = claim.historicalEventAnchor && claim.subject !== null
     ? allSelectedEvents.find(
         (event) => event.id === claim.historicalEventAnchor?.eventId,
@@ -1383,13 +1468,12 @@ function assessOneClaim(
     : undefined
   const scopedEvents =
     claim.timePeriod.kind === 'before-event' && anchorEvent
-      ? evidenceEvents.filter(
-          (event) =>
-            elapsedMatchMinute(event.clock) <
-            elapsedMatchMinute(anchorEvent.clock),
-        )
+      ? eventsBeforeAnchor(evidenceEvents, anchorEvent, claim.timePeriod.lookbackSeconds)
         : evidenceEvents
-  const availability = availabilityFor(claim.requiredEvidence)
+  const availability = availabilityFor(
+    claim.requiredEvidence,
+    unavailableEvidenceOverrides,
+  )
   const unsupportedBuildUpPassing = isUnsupportedBuildUpPassingScope(claim)
   const canRetrieveSubjectEvidence =
     (claim.subject !== null ||
@@ -1470,7 +1554,9 @@ function assessOneClaim(
                 detail:
                   'Phase-scoped pass counts, rates, and comparisons are not available from the selected build-up annotations. General match totals are not substituted.',
               }
-            : item.kind === 'passing' && !advanced.passCoverageComplete
+            : item.kind === 'passing' &&
+                !advanced.passCoverageComplete &&
+                unavailableEvidenceOverrides.passing === undefined
             ? {
                 ...item,
                 available: false,
@@ -1480,6 +1566,18 @@ function assessOneClaim(
             : item,
         )
       : []
+  const unavailableRequestedEvidence = claim.requiredEvidence.some((kind) =>
+    resolvedAvailability.some((item) => item.kind === kind && !item.available),
+  )
+  const countAssertion = countAssertionFor(claim)
+  const unavailableMetricRequest =
+    unavailableRequestedEvidence &&
+    (claim.intent === 'statistical-request' ||
+      Boolean(
+        claim.meaning.comparison &&
+          claim.meaning.comparison.operator !== 'comparison-request',
+      ) ||
+      Boolean(countAssertion))
 
   let assessment: ClaimResult['assessment'] =
     claim.clarificationNeeds.length > 0 ||
@@ -1491,6 +1589,11 @@ function assessOneClaim(
   if (
     assessment !== 'clarification needed' &&
     unsupportedBuildUpPassing
+  ) {
+    assessment = 'unavailable data'
+  } else if (
+    assessment !== 'clarification needed' &&
+    unavailableMetricRequest
   ) {
     assessment = 'unavailable data'
   } else if (assessment !== 'clarification needed' && claim.intent === 'statistical-request') {
@@ -1584,8 +1687,7 @@ function assessOneClaim(
     }
   }
 
-  const countAssertion = countAssertionFor(claim)
-  if (countAssertion) {
+  if (countAssertion && !unavailableRequestedEvidence) {
     assessment = assertionVerdict(
       countAssertion,
       assertionCounts(countAssertion, scopedEvents),
@@ -1612,7 +1714,7 @@ function assessOneClaim(
     playerCalculations: playerData.calculations,
     evidenceAvailability: resolvedAvailability,
     evidence: [
-      ...(canRetrieveSubjectEvidence
+      ...(canRetrieveSubjectEvidence && !unavailableMetricRequest
         ? evidenceForClaim(
             claim,
             assessment,
@@ -1626,7 +1728,7 @@ function assessOneClaim(
       ...(context?.evidence ?? []),
     ],
     calculations: [
-      ...(canRetrieveSubjectEvidence
+      ...(canRetrieveSubjectEvidence && !unavailableMetricRequest
         ? calculationTraces(claim, advanced, scopedEvents)
         : []),
       ...(context?.calculations ?? []),
@@ -1686,7 +1788,7 @@ function claimEndElapsed(
   events: MatchEvent[],
   advanced: EvidenceCalculation,
 ): number {
-  if (claim.timePeriod.kind === 'selected') return advanced.endElapsed
+  if (claim.timePeriod.kind !== 'before-event') return advanced.endElapsed
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find(({ id }) => id === anchorId)
   if (!anchor) throw new Error('Validated historical event anchor was not found.')
@@ -2125,10 +2227,36 @@ function scopeFact(
   period: AnalysisPeriod,
 ): ScopeFact {
   if (goalBeforeHalfTimeAssertion(claim)) return { kind: 'first-half-goals', through: selectedClock }
+  if (claim.timePeriod.kind === 'selected' && claim.timePeriod.lookbackSeconds !== undefined) {
+    return { kind: 'rolling-window', lookbackSeconds: claim.timePeriod.lookbackSeconds, through: selectedClock }
+  }
+  if (claim.timePeriod.kind === 'after-event') {
+    const anchorId = claim.timePeriod.eventId
+    const anchor = events.find(({ id }) => id === anchorId)
+    if (!anchor) throw new Error('Validated historical event anchor was not found.')
+    return { kind: 'after-goal', anchorEventId: anchor.id, anchorTeam: anchor.team, anchorTime: formatMatchEventTime(anchor), through: selectedClock }
+  }
   if (claim.timePeriod.kind === 'before-event') {
     const anchorId = claim.timePeriod.eventId
     const anchor = events.find(({ id }) => id === anchorId)
     if (!anchor) throw new Error('Validated historical event anchor was not found.')
+    if (claim.timePeriod.lookbackSeconds !== undefined) {
+      const start = anchor.sourcePeriodSeconds !== undefined &&
+          anchor.sourcePeriodSeconds >= claim.timePeriod.lookbackSeconds
+        ? formatSourcePeriodTime(
+            anchor.clock.period,
+            anchor.sourcePeriodSeconds - claim.timePeriod.lookbackSeconds,
+          )
+        : `${claim.timePeriod.lookbackSeconds} seconds before ${formatMatchEventTime(anchor)}`
+      return {
+        kind: 'before-goal-window',
+        anchorEventId: anchor.id,
+        anchorTeam: anchor.team,
+        anchorTime: formatMatchEventTime(anchor),
+        windowStartTime: start,
+        lookbackSeconds: claim.timePeriod.lookbackSeconds,
+      }
+    }
     return {
       kind: 'before-goal',
       anchorEventId: anchor.id,
@@ -2410,6 +2538,8 @@ function unavailableOutcome(result: ClaimResult): AnswerOutcome {
     metric = 'territorial-control'
   } else if (comparisonMetric) {
     metric = comparisonMetric
+  } else if (claim.requiredEvidence.includes('possession')) {
+    metric = 'possession-percentage'
   }
   return {
     answer: { code: 'unavailable-metric', ...(metric ? { metric } : {}), evidenceKinds },
@@ -2822,13 +2952,18 @@ function createSummary(
   selectedClock: MatchClock,
 ): string {
   if (claims.length === 0) {
-    return 'Enter an opinion to interpret its claims and retrieve relevant evidence from this synthetic fixture.'
+    return fixture.dataset.provenance === 'observed'
+      ? 'Enter an opinion to retrieve evidence from this historical replay.'
+      : 'Enter an opinion to interpret its claims and retrieve relevant evidence from this synthetic fixture.'
   }
 
   const answers = claims.map((result) =>
     answerForClaim(result, fixture, events, advanced, selectedClock),
   )
-  return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. This is a fictional match using real-player names; all performances and results are fictional.`
+  const disclosure = fixture.dataset.provenance === 'observed'
+    ? 'Historical replay from Wyscout. Only mapped source shot events are available; other event types and metrics are not inferred.'
+    : 'This is a fictional match using real-player names; all performances and results are fictional.'
+  return `${answers.join(' ')}\n\nSelected period: ${selectedPeriodLabel}. ${disclosure}`
 }
 
 const possessionControlPattern = /possess|domina|in control|controll?ed|ran the (?:game|match)|bossed|outplay|had the ball/i
@@ -3041,7 +3176,17 @@ function topicContextSentence(claim: InterpretedClaim, advanced: EvidenceCalcula
   const anchorId = claim.timePeriod.eventId
   const anchor = events.find(({ id }) => id === anchorId)
   if (!anchor) throw new Error('Validated historical event anchor was not found.')
-  return `That counts play strictly before ${anchor.team}'s goal at ${formatMatchClock(anchor.clock)}, leaving the goal itself out.`
+  if (claim.timePeriod.lookbackSeconds !== undefined) {
+    const windowStart = anchor.sourcePeriodSeconds !== undefined &&
+        anchor.sourcePeriodSeconds >= claim.timePeriod.lookbackSeconds
+      ? formatSourcePeriodTime(
+          anchor.clock.period,
+          anchor.sourcePeriodSeconds - claim.timePeriod.lookbackSeconds,
+        )
+      : `${claim.timePeriod.lookbackSeconds} seconds before ${formatMatchEventTime(anchor)}`
+    return `That counts ${claim.requiredEvidence.includes('shots') ? 'shots' : 'recorded play'} from ${windowStart} inclusive up to, but excluding, ${formatMatchEventTime(anchor)} (${anchor.id}).`
+  }
+  return `That counts play strictly before ${anchor.team}'s goal at ${formatMatchEventTime(anchor)}, leaving the goal itself out.`
 }
 
 function fanComparison(result: ClaimResult): string | undefined {
@@ -3266,6 +3411,7 @@ function createEvidenceFoundation(
   periodLabel: string,
   fixture: SyntheticMatchEvidence,
   selectedEvents: MatchEvent[],
+  capabilities: EvidenceCapability[],
 ): AnalysisResponse['evidenceFoundation'] {
   const passReferences = advanced.passes.map((pass) =>
     evidenceReference(
@@ -3308,7 +3454,7 @@ function createEvidenceFoundation(
       source: fixture.dataset.source,
       provenance: fixture.dataset.provenance,
     },
-    capabilities: EVIDENCE_CAPABILITIES,
+    capabilities,
     possessionDenominatorMinutes: advanced.denominatorMinutes,
     possessionCoverageComplete: advanced.possessionCoverageComplete,
     passCoverageComplete: advanced.passCoverageComplete,
@@ -3730,7 +3876,7 @@ function validateGrant(
   const fixture = dataset.evidence
   const end = elapsedMatchMinute(request.selectedClock)
   const availableEvents = dataset.events.filter(
-    (event) => elapsedMatchMinute(event.clock) <= end,
+    (event) => elapsedEventSeconds(event) <= end * 60,
   )
   let claims: InterpretedClaim[]
   try {
@@ -4063,7 +4209,7 @@ async function analyzeSlottedOpinion(
   )
   const selectedElapsedMinute = elapsedMatchMinute(request.selectedClock)
   const eventsThroughSelectedTime = matchEvents.filter(
-    (event) => elapsedMatchMinute(event.clock) <= selectedElapsedMinute,
+    (event) => elapsedEventSeconds(event) <= selectedElapsedMinute * 60,
   )
   const advanced = calculateEvidence(
     fixture,
@@ -4076,13 +4222,16 @@ async function analyzeSlottedOpinion(
       ? `Match so far through ${selectedTime}`
       : `Last 10 minutes ending ${selectedTime}`
   const interpretationContext = {
+    teams: TEAMS,
     events: eventsThroughSelectedTime,
     selectedClock: request.selectedClock,
     selectedTime,
     period: request.period,
-    capabilities: EVIDENCE_CAPABILITIES,
+    capabilities: dataset.capabilities ?? EVIDENCE_CAPABILITIES,
     players: fixture.players,
     inputLanguage: request.inputLanguage,
+    ...(dataset.winningGoal ? { winningGoal: dataset.winningGoal } : {}),
+    ...(dataset.goalScorers ? { goalScorers: dataset.goalScorers } : {}),
   }
   const interpreted = validatedClaims
     ? undefined
@@ -4126,7 +4275,7 @@ async function analyzeSlottedOpinion(
   const absentPlayer = absentPlayerFromClaims(claims, request.opinion, fixture.players, dataset.naming)
   const results = claims.map((claim) => {
     const anchorEventId =
-      claim.timePeriod.kind === 'before-event'
+      claim.timePeriod.kind !== 'selected'
         ? claim.timePeriod.eventId
         : undefined
     const anchor =
@@ -4135,7 +4284,7 @@ async function analyzeSlottedOpinion(
             (event) => event.id === anchorEventId,
           )
         : undefined
-    const claimAdvanced = anchor
+    const claimAdvanced = anchor && claim.timePeriod.kind === 'before-event'
       ? calculateEvidence(
           fixture,
           anchor.clock,
@@ -4143,7 +4292,11 @@ async function analyzeSlottedOpinion(
           undefined,
           elapsedMatchMinute(anchor.clock),
         )
-      : advanced
+      : claim.timePeriod.kind === 'after-event' && anchor
+        ? calculateEvidence(fixture, request.selectedClock, 'match-so-far', elapsedEventSeconds(anchor) / 60, undefined, elapsedEventSeconds(anchor) / 60)
+        : claim.timePeriod.kind === 'selected' && claim.timePeriod.lookbackSeconds !== undefined
+          ? calculateEvidence(fixture, request.selectedClock, 'match-so-far', selectedElapsedMinute - claim.timePeriod.lookbackSeconds / 60)
+          : advanced
     return assessOneClaim(
       claim,
       matchAnalysis.periodEvents,
@@ -4154,12 +4307,15 @@ async function analyzeSlottedOpinion(
       fixture,
       request.period,
       advanced,
+      dataset.unavailableEvidence,
     )
   })
   const periodStatistics: AnalysisResponse['periodStatistics'] = {
     Northbridge: {
       shots: matchAnalysis.shots.Northbridge.shots,
-      shotsOnTarget: matchAnalysis.shots.Northbridge.shotsOnTarget,
+      shotsOnTarget: dataset.unavailableEvidence?.['shots-on-target']
+        ? null
+        : matchAnalysis.shots.Northbridge.shotsOnTarget,
       goals: matchAnalysis.periodEvents.filter(
         (event) =>
           event.type === 'shot' &&
@@ -4169,7 +4325,9 @@ async function analyzeSlottedOpinion(
     },
     Eastport: {
       shots: matchAnalysis.shots.Eastport.shots,
-      shotsOnTarget: matchAnalysis.shots.Eastport.shotsOnTarget,
+      shotsOnTarget: dataset.unavailableEvidence?.['shots-on-target']
+        ? null
+        : matchAnalysis.shots.Eastport.shotsOnTarget,
       goals: matchAnalysis.periodEvents.filter(
         (event) =>
           event.type === 'shot' &&
@@ -4228,6 +4386,7 @@ async function analyzeSlottedOpinion(
       selectedPeriodLabel,
       fixture,
       matchAnalysis.periodEvents,
+      dataset.capabilities ?? EVIDENCE_CAPABILITIES,
     ),
     claims: results.map((result, index) => {
       const resolution = claimResolution(

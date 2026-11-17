@@ -339,7 +339,7 @@ test('player selection uses the signed continuation without another allowance or
   }
 })
 
-test('all four fixtures use their own selected-time context and calculated evidence', async () => {
+test('all catalog fixtures use their own selected-time context and calculated evidence', async () => {
   for (const fixture of DATASET_CATALOG) {
     const body = {
       ...analysisRequest,
@@ -362,12 +362,16 @@ test('all four fixtures use their own selected-time context and calculated evide
     assert.ok(result.claims[0].statistics.length > 0)
     const userContext = requestContext[0].messages[1].content
     const fixtureData = resolveDataset(fixture.id)
-    assert.ok(userContext.includes(fixtureData.evidence.players[0].name))
+    if (fixture.historicalReplay) {
+      assert.equal(fixtureData.evidence.players.length, 0)
+    } else {
+      assert.ok(userContext.includes(fixtureData.evidence.players[0].name))
+    }
     assert.ok(userContext.includes(fixtureData.events[0].id))
     const parsedContext = JSON.parse(userContext)
     assert.deepEqual(
       parsedContext.availableTeams,
-      [...new Set(fixtureData.evidence.players.map(({ team }) => team))],
+      ['Northbridge', 'Eastport'],
     )
   }
 })

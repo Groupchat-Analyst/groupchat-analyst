@@ -78,7 +78,7 @@ test('serializes strict schema and selected scorer context through the actual pr
   assert.match(systemInstructions, /Keep requested operation, claim meaning, and time scope distinct/)
   assert.match(systemInstructions, /quantitative count or rate before a goal remains intent statistical-request/)
   assert.match(systemInstructions, /A numerical assertion before a goal remains factual-claim/)
-  assert.match(systemInstructions, /For every before-event scope, select a real goal/)
+  assert.match(systemInstructions, /For every before-event or after-event scope, select a real goal/)
   assert.match(systemInstructions, /A player's statistics may be scoped before a team goal without claiming that player scored it/)
   assert.match(systemInstructions, /For a team comparison, put the first team in subject/)
   assert.match(systemInstructions, /comparison-request/)
@@ -91,7 +91,7 @@ test('serializes strict schema and selected scorer context through the actual pr
   assert.match(systemInstructions, /Broad team judgements such as/)
   assert.match(systemInstructions, /which side covered the greater distance/)
   assert.match(systemInstructions, /For an unavailable comparison phrased as a question/)
-  assert.match(systemInstructions, /exclusive cutoff/)
+  assert.match(systemInstructions, /before-event scope excludes the goal and later events/)
 
   const userContext = JSON.parse(serializedBody.messages[1].content)
   assert.deepEqual(userContext.availableTeams, ['Northbridge', 'Eastport'])
@@ -216,6 +216,7 @@ test('raw file capture is opt-in and stores only structured output and usage', a
     }
     const provider = createFoundryProvider(environment, () => {})
     const context = {
+      teams: ['Northbridge', 'Eastport'],
       events: [],
       selectedClock: { period: 2, minute: 58 },
       selectedTime: '58′',

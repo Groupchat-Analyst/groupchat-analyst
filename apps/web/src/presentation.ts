@@ -232,6 +232,9 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
   const playerStats = result.playerStatistics
     .filter((stat) => stat.value !== null)
     .map((stat) => `${stat.playerName}: ${stat.value} ${statLabel(stat.metric, stat.value as number)}`)
+  const calculationFacts = (result.calculations ?? []).map((calculation) =>
+    `${calculation.team} ${calculation.metric}${calculation.area ? ` (${calculation.area})` : ''}: numerator ${calculation.numerator} [${calculation.numeratorRecordIds.join(', ') || 'none'}]; denominator ${calculation.denominator} [${calculation.denominatorRecordIds.join(', ') || 'none'}]. ${calculation.denominatorDescription}`,
+  )
 
   const ranked = evidence.filter(({ role }) => role === 'anchor' || role === 'supporting')
   const context = evidence.filter(({ role }) => role === 'context' || role === 'calculation')
@@ -250,7 +253,7 @@ function claimSection(result: ClaimResult, roster: Roster): ShareCardClaim {
         ? null
         : ASSESSMENT_LABELS[result.assessment],
     contextOnly: isUnsupportedJudgement(result),
-    facts: [...stats, ...playerStats],
+    facts: [...stats, ...calculationFacts, ...playerStats],
     factData: [
       ...result.statistics
         .filter((stat) => stat.value !== null && (teams.size === 0 || teams.has(stat.team)))
@@ -308,7 +311,11 @@ export function buildShareCardModel(
     )
   return {
     take: opinion,
-    scope: describePeriodLabel(analysis.selectedPeriodLabel),
+    scope: describePeriodLabel(
+      analysis.claims.length === 1
+        ? analysis.claims[0].periodLabel ?? analysis.selectedPeriodLabel
+        : analysis.selectedPeriodLabel,
+    ),
     answer: describeEvidence(
       analysis.fanReply ?? summaryBody(analysis.summary),
       roster,
@@ -340,14 +347,24 @@ export const SYNTHETIC_LABEL = 'Synthetic data · fictional match'
 export function sourceFooter(analysis: AnalysisResponse): string {
   const dataset = analysis.evidenceFoundation.dataset
   const entry = findCatalogEntry(dataset?.id)
+  const historicalReplay = entry?.historicalReplay === true
   const match = entry && dataset
     ? `${entry.teams[0]} v ${entry.teams[1]} · ${entry.name} v${dataset.version}`
+    : null
+  const attribution = historicalReplay && entry?.sourceAttribution && entry.license
+    ? `${entry.sourceAttribution} · ${entry.license}`
     : null
   const reader = analysis.provider === 'local' ? 'read by local rules' : 'read by Foundry (server-side)'
   const selection = analysis.selectedPlayers?.length
     ? 'Player selected by you; no additional model call was made.'
     : null
-  return [SYNTHETIC_LABEL, match, reader, selection].filter(Boolean).join(' · ')
+  return [
+    historicalReplay ? 'Historical replay · observed source data' : SYNTHETIC_LABEL,
+    match,
+    attribution,
+    reader,
+    selection,
+  ].filter(Boolean).join(' · ')
 }
 
 /** Single source of truth for the card: the on-screen card, copied text and exported image all use these blocks. */

@@ -1,5 +1,6 @@
 import {
   formatMatchClock,
+  formatMatchEventTime,
   TEAMS,
   type MatchEvent,
   type MatchTeam,
@@ -61,6 +62,27 @@ type ParsedComparisonRequest = {
 type ParsedSingleStatisticRequest = {
   subject: MatchTeam
   metric: ClaimMetric
+}
+
+function parseWhoComparison(text: string): ParsedComparisonRequest | undefined {
+  const match =
+    /^\s*who\s+(?:had|has|have)\s+(?<direction>more|fewer|less)\s+(?<metric>shots(?:\s+on\s+target)?|goals)\b/i.exec(
+      text,
+    )
+  if (!match?.groups) return undefined
+  const metricWord = match.groups.metric.toLowerCase().replace(/\s+/g, ' ')
+  return {
+    subject: TEAMS[0],
+    opponent: TEAMS[1],
+    metric:
+      metricWord === 'shots on target'
+        ? 'shots-on-target'
+        : metricWord === 'goals'
+          ? 'goals'
+          : 'shots',
+    intent: 'statistical-request',
+    operator: 'comparison-request',
+  }
 }
 
 function parsePassCompletionAssertion(
@@ -552,12 +574,25 @@ function clarificationQuestion(text: string): string {
 }
 
 type GoalReference =
-  | { goal: MatchEvent }
+  | { goal: MatchEvent; lookbackSeconds?: number }
   | { goal?: undefined; clarification: string }
 
 function goalLabel(goal: MatchEvent): string {
-  return `${goal.team} ${formatMatchClock(goal.clock)}`
+  return `${goal.team} ${formatMatchEventTime(goal)}`
 }
+
+function goalChoiceList(goals: MatchEvent[]): string {
+  const examples = goals.slice(0, 3).map(goalLabel)
+  const remaining = goals.length - examples.length
+  return remaining > 0
+    ? `${examples.join(' or ')} or ${remaining} other recorded goals`
+    : examples.join(' or ')
+}
+
+const GOAL_WINDOW_PHRASE =
+  /\b(?<amount>10|ten)\s+minutes?\s+before\s+(?:(?<scorer>(?:[\p{L}][\p{L}'’.-]*\s+){0,2}[\p{L}][\p{L}'’.-]*)['’]s\s+)?(?<noun>winning\s+goal|winner|goal|opener|equali[sz]er)\b/iu
+const SCORER_WINDOW_PHRASE =
+  /\b(?<amount>10|ten)\s+minutes?\s+before\s+(?<scorer>[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,2})\s+scored\b/iu
 
 /**
  * Resolves "before the goal" against goals recorded up to the selected time.
@@ -567,25 +602,71 @@ function goalLabel(goal: MatchEvent): string {
 function resolveReferencedGoal(
   text: string,
   events: MatchEvent[],
+  winningGoal?: InterpretationContext['winningGoal'],
 ): GoalReference | undefined {
   const groups = GOAL_PHRASE.exec(text)?.groups
-  if (!groups) return undefined
+  const windowGroups = GOAL_WINDOW_PHRASE.exec(text)?.groups
+  const scorerWindow = SCORER_WINDOW_PHRASE.exec(text)?.groups
+  if (!groups && !windowGroups && !scorerWindow) return undefined
+  const window = windowGroups ?? scorerWindow
+  const lookbackSeconds = window
+    ? Number(window.amount.toLowerCase() === 'ten' ? 10 : window.amount) * 60
+    : undefined
+  const withWindow = (goal: MatchEvent): GoalReference => ({
+    goal,
+    ...(lookbackSeconds === undefined ? {} : { lookbackSeconds }),
+  })
   const goals = events.filter(
     (event) => event.type === 'shot' && event.outcome === 'goal',
   )
+  if (scorerWindow) {
+    const matchesScorer = winningGoal?.scorerAliases.some(
+      (alias) => normalizeName(alias) === normalizeName(scorerWindow.scorer),
+    )
+    if (!matchesScorer) return undefined
+    const matchingGoals = goals.filter(
+      (event) => event.type === 'shot' && event.playerId === winningGoal?.sourcePlayerId,
+    )
+    if (matchingGoals.length === 1) return withWindow(matchingGoals[0])
+    return { clarification: 'Which spell do you mean? No matching goal can be identified at the selected replay time.' }
+  }
   if (goals.length === 0) {
     return {
       clarification:
         'No goal is recorded at or before the selected match time, so “before the goal” has nothing to anchor to.',
     }
   }
-  const which = groups.which?.toLowerCase().replace(/\s+/g, ' ')
-  const noun = groups.noun.toLowerCase()
+  const noun = (windowGroups?.noun ?? groups?.noun ?? '').toLowerCase()
+  const scorer = windowGroups?.scorer?.trim()
+  if (/\b(?:winner|winning\s+goal)\b/.test(noun)) {
+    const goal = winningGoal
+      ? goals.find(
+          (event) =>
+            event.type === 'shot' &&
+            event.id === winningGoal.eventId &&
+            event.playerId === winningGoal.sourcePlayerId,
+        )
+      : undefined
+    const matchesScorer =
+      !scorer ||
+      Boolean(
+        winningGoal?.scorerAliases.some(
+          (alias) => normalizeName(alias) === normalizeName(scorer),
+        ),
+      )
+    if (goal && matchesScorer) return withWindow(goal)
+    return {
+      clarification: scorer && !matchesScorer
+        ? `The named scorer “${scorer}” does not match the recorded winning-goal anchor in this fixture.`
+        : 'No verified winning-goal anchor is available in this fixture at the selected time.',
+    }
+  }
+  const which = groups?.which?.toLowerCase().replace(/\s+/g, ' ')
   if (which === 'first' || which === 'opening' || noun === 'opener') {
-    return { goal: goals[0] }
+    return withWindow(goals[0])
   }
   if (which === 'last' || which === 'latest' || which === 'most recent') {
-    return { goal: goals[goals.length - 1] }
+    return withWindow(goals[goals.length - 1])
   }
   if (/^equali[sz]er$/.test(noun)) {
     const score: Record<MatchTeam, number> = { Northbridge: 0, Eastport: 0 }
@@ -595,16 +676,16 @@ function resolveReferencedGoal(
       score[goal.team] += 1
       if (behind && score.Northbridge === score.Eastport) equalisers.push(goal)
     }
-    if (equalisers.length === 1) return { goal: equalisers[0] }
+    if (equalisers.length === 1) return withWindow(equalisers[0])
     return {
       clarification: equalisers.length === 0
         ? 'No equaliser is recorded at or before the selected match time. Name the goal you mean, for example “before Eastport scored”.'
         : `Which equaliser do you mean: ${equalisers.map(goalLabel).join(' or ')}?`,
     }
   }
-  if (goals.length === 1) return { goal: goals[0] }
+  if (goals.length === 1) return withWindow(goals[0])
   return {
-    clarification: `Which goal do you mean by “before the goal”: ${goals.map(goalLabel).join(' or ')}? Name the scorer, for example “before Eastport scored”.`,
+    clarification: `Which goal do you mean by “before the goal”: ${goalChoiceList(goals)}? Name the scorer, for example “before Eastport scored”.`,
   }
 }
 
@@ -688,13 +769,54 @@ function assertionClaimFromText(
   }
 }
 
+const HISTORICAL_GOAL_QUESTION_CANONICAL = new Map<string, string>([
+  [
+    'quién tuvo más tiros en los diez minutos antes del gol ganador de giroud',
+    'Who had more shots in the ten minutes before Giroud’s winner?',
+  ],
+  [
+    'qui a eu le plus de tirs dans les dix minutes avant le but de la victoire de giroud',
+    'Who had more shots in the ten minutes before Giroud’s winner?',
+  ],
+  [
+    'wer hatte in den zehn minuten vor girouds siegtor mehr schüsse',
+    'Who had more shots in the ten minutes before Giroud’s winner?',
+  ],
+  [
+    'من سدد أكثر خلال الدقائق العشر التي سبقت هدف جيرو الحاسم',
+    'Who had more shots in the ten minutes before Giroud’s winner?',
+  ],
+])
+
+function canonicalHistoricalGoalQuestion(text: string): string | undefined {
+  const normalized = text
+    .normalize('NFC')
+    .replace(/^[¿¡]+/u, '')
+    .replace(/[.!?؟]+$/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLocaleLowerCase()
+  return HISTORICAL_GOAL_QUESTION_CANONICAL.get(normalized)
+}
+
 function claimFromText(
   text: string,
   index: number,
   context: InterpretationContext,
   forcedPlayer?: PlayerEntityReference,
 ): InterpretedClaim {
-  const referencedGoal = resolveReferencedGoal(text, context.events)
+  const canonicalQuestion = canonicalHistoricalGoalQuestion(text)
+  if (canonicalQuestion) {
+    return {
+      ...claimFromText(canonicalQuestion, index, context, forcedPlayer),
+      text,
+    }
+  }
+  const referencedGoal = resolveReferencedGoal(
+    text,
+    context.events,
+    context.winningGoal,
+  )
   const assertionClaim = assertionClaimFromText(
     referencedGoal ? text.replace(GOAL_PHRASE, '').trim() : text,
     index,
@@ -706,10 +828,16 @@ function claimFromText(
       ...assertionClaim,
       text,
       ...(referencedGoal?.goal ? {
-        timePeriod: { kind: 'before-event', eventId: referencedGoal.goal.id },
+        timePeriod: {
+          kind: 'before-event',
+          eventId: referencedGoal.goal.id,
+          ...(referencedGoal.lookbackSeconds === undefined
+            ? {}
+            : { lookbackSeconds: referencedGoal.lookbackSeconds }),
+        },
         historicalEventAnchor: {
           eventId: referencedGoal.goal.id,
-          relationship: `Goal by ${referencedGoal.goal.team} at ${formatMatchClock(referencedGoal.goal.clock)}`,
+          relationship: `Goal by ${referencedGoal.goal.team} at ${formatMatchEventTime(referencedGoal.goal)}`,
         },
       } : referencedGoal ? { clarificationNeeds: [referencedGoal.clarification] } : {}),
     }
@@ -718,12 +846,14 @@ function claimFromText(
     ? [forcedPlayer]
     : mentionedPlayers(text, context.players)
   const playerComparison = parsePlayerComparison(text, playerMentions)
+  const whoComparison = parseWhoComparison(text)
   const passRequest = parsePassCompletionRequest(text)
   const passAssertion = parsePassCompletionAssertion(text)
   const runningDistance = parseRunningDistanceComparison(text)
   const singleStatistic = parseSingleStatisticRequest(text)
   const completedPasses = playerComparison ? undefined : parseCompletedPassCount(text)
-  const metricComparison = passRequest ?? passAssertion ?? completedPasses ?? runningDistance
+  const metricComparison =
+    whoComparison ?? passRequest ?? passAssertion ?? completedPasses ?? runningDistance
   const parsedClaim = metricComparison || singleStatistic
     ? undefined
     : interpretClaim(text.replace(GOAL_PHRASE, '')).claims[0]
@@ -800,13 +930,15 @@ function claimFromText(
       opponentPlayer: null,
       metric,
       operator:
-        passRequest
+        whoComparison || passRequest
           ? 'comparison-request'
           : metricComparison.operator ?? 'greater-than',
     }
     category = 'factual-comparison'
     intent = metricComparison.intent
-    description = passRequest
+    description = whoComparison
+      ? `Compare both teams’ recorded ${metric.replaceAll('-', ' ')} in the requested goal-relative window.`
+      : passRequest
       ? 'Compare both teams’ recorded pass attempts, completions, and completion percentages in the selected period.'
       : completedPasses
         ? `${completedPasses.subject}'s recorded completed passes (a count, not attempts or completion percentage) compared with ${completedPasses.opponent}'s: ${completedPasses.operator}.`
@@ -936,7 +1068,9 @@ function claimFromText(
     clarificationNeeds.push(clarificationQuestion(text))
   }
   if (referencedGoal?.goal) {
-    description = `${description} Counts recorded play strictly before the ${goalLabel(referencedGoal.goal)} goal, which is excluded.`
+    description = referencedGoal.lookbackSeconds === undefined
+      ? `${description} Counts recorded play strictly before the ${goalLabel(referencedGoal.goal)} goal, which is excluded.`
+      : `${description} Counts recorded play from ${referencedGoal.lookbackSeconds} seconds before the ${goalLabel(referencedGoal.goal)} goal, including the start and excluding the goal.`
   } else if (referencedGoal) {
     clarificationNeeds.push(referencedGoal.clarification)
   }
@@ -964,8 +1098,16 @@ function claimFromText(
     )
   }
 
+  const lookbackSeconds =
+    referencedGoal && 'goal' in referencedGoal && referencedGoal.goal
+      ? referencedGoal.lookbackSeconds
+      : undefined
   const timePeriod: InterpretedClaim['timePeriod'] = goalReference
-    ? { kind: 'before-event', eventId: goalReference.id }
+    ? {
+        kind: 'before-event',
+        eventId: goalReference.id,
+        ...(lookbackSeconds === undefined ? {} : { lookbackSeconds }),
+      }
     : { kind: 'selected' }
 
   return {
@@ -1000,7 +1142,7 @@ function claimFromText(
     historicalEventAnchor: goalReference
       ? {
           eventId: goalReference.id,
-          relationship: `Goal by ${goalReference.team} at ${formatMatchClock(goalReference.clock)}`,
+          relationship: `Goal by ${goalReference.team} at ${formatMatchEventTime(goalReference)}`,
         }
       : null,
     clarificationNeeds,

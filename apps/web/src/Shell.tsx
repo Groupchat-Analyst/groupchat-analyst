@@ -59,7 +59,7 @@ function Matches({ unknownId }: { unknownId?: string }) {
     <Chrome>
       <section className="home-page" aria-labelledby="page-title">
         <h1 id="page-title">Choose a match</h1>
-        <p className="matches-lede">Fictional matches, each with its own story. Pick one to start.</p>
+        <p className="matches-lede">Fictional and historical matches, each with its own story. Pick one to start.</p>
         {unknownId !== undefined && <p className="api-error" role="alert">That match isn’t available. Choose one below.</p>}
         <ul className="match-list">
           {DATASET_CATALOG.map((entry) => (
@@ -73,7 +73,9 @@ function Matches({ unknownId }: { unknownId?: string }) {
                   </span>
                   <strong>{entry.teams[0]} v {entry.teams[1]}</strong>
                   <span>{entry.scenario}</span>
-                  <span className="match-meta">{entry.name} · fictional · {entry.examples.length} example opinions</span>
+                  <span className="match-meta">
+                    {entry.name} · {entry.historicalReplay ? 'historical replay' : 'fictional'} · {entry.examples.length} example {entry.examples.length === 1 ? 'opinion' : 'opinions'}
+                  </span>
                 </a>
               </li>
             </LocalizedMarkup>

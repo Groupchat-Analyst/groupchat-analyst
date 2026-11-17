@@ -11,6 +11,7 @@ import {
   localizedTeamMonogram,
 } from '../../shared/src/displayNames'
 import { translateNarrative, translateText } from '../../shared/src/localization'
+import { findCatalogEntry } from '../../shared/src/datasetCatalog'
 
 export type KeyMoment = { label: string; clock: MatchClock }
 
@@ -111,6 +112,7 @@ export function MatchHeader({
   onRetry,
 }: MatchHeaderProps) {
   const { language } = useLocalization()
+  const historicalReplay = findCatalogEntry(datasetId)?.historicalReplay === true
   const { requested, displayed, displayedClock, status, error, playing } = snapshot
   const last = timeline.length - 1
   const requestedIndex = timeline.findIndex((clock) => clockKey(clock) === clockKey(requested))
@@ -144,7 +146,9 @@ export function MatchHeader({
   return (
     <LocalizedMarkup>
     <section className="match-header" aria-labelledby="match-header-title">
-      <h2 id="match-header-title" className="visually-hidden">Fictional match replay</h2>
+      <h2 id="match-header-title" className="visually-hidden">
+        {historicalReplay ? 'Historical match replay' : 'Fictional match replay'}
+      </h2>
       <div className="scoreboard">
         <div className="team-name north"><span className="team-monogram north" aria-hidden="true">{localizedTeamMonogram(datasetId, teams[0], language) ?? teamMonogram(teams[0])}</span>{teams[0]}</div>
         <div
@@ -169,7 +173,11 @@ export function MatchHeader({
       </div>
       {displayed && (
         <details className="all-evidence match-squad">
-          <summary>{translateText('View squads', language)}</summary>
+          <summary>{translateText(historicalReplay ? 'View lineup data' : 'View squads', language)}</summary>
+          {historicalReplay && displayed.players.length === 0 ? (
+            <p>{translateText('Lineups, substitutions, and player participation are not mapped in this historical replay.', language)}</p>
+          ) : (
+            <>
           <p>{translateText('Familiar names. Fictional teams and performances.', language)}</p>
           {teams.map((team) => (
             <section key={team} aria-label={team}>
@@ -199,6 +207,8 @@ export function MatchHeader({
               ))}
             </section>
           ))}
+            </>
+          )}
         </details>
       )}
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>

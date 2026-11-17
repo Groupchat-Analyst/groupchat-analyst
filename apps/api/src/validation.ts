@@ -119,7 +119,10 @@ function isTeam(value: unknown): value is 'Northbridge' | 'Eastport' {
   return value === 'Northbridge' || value === 'Eastport'
 }
 
-function isClock(value: unknown): value is MatchClock {
+function isClock(
+  value: unknown,
+  secondHalfStoppageMinutes = 4,
+): value is MatchClock {
   if (!isRecord(value)) return false
   const expectedKeys =
     value.stoppageMinutes === undefined
@@ -142,7 +145,7 @@ function isClock(value: unknown): value is MatchClock {
     return false
   }
 
-  return getMatchTimeOptions().some(
+  return getMatchTimeOptions(secondHalfStoppageMinutes).some(
     (clock) =>
       clock.period === value.period &&
       clock.minute === value.minute &&
@@ -174,7 +177,9 @@ export function parseAnalysisRequest(value: unknown): AnalysisRequest {
   if (typeof value.opinion !== 'string' || value.opinion.length > 2000) {
     throw new InputValidationError('Opinion must be text no longer than 2,000 characters.')
   }
-  if (!isClock(value.selectedClock)) {
+  const secondHalfStoppageMinutes =
+    findCatalogEntry(value.datasetId)?.historicalReplay === true ? 6 : 4
+  if (!isClock(value.selectedClock, secondHalfStoppageMinutes)) {
     throw new InputValidationError('Selected match time is invalid.')
   }
   if (
@@ -224,7 +229,7 @@ export function parseResolvedPlayerRecheckRequest(
     !hasExactKeys(value, ['action', 'continuation', 'selectedClock', 'period']) ||
     value.action !== 'recheck-resolved-player' ||
     typeof value.continuation !== 'string' ||
-    !isClock(value.selectedClock) ||
+    !isClock(value.selectedClock, 6) ||
     (value.period !== 'match-so-far' && value.period !== 'last-10-minutes')
   ) {
     throw new InputValidationError('Resolved-player recheck request is invalid.')
@@ -707,7 +712,7 @@ export function validateInterpretation(
         claim.intent !== 'unavailable-metric') ||
       (claim.intent === 'unavailable-metric' &&
         !requiredEvidence.some((kind) =>
-          ['physical-measurements', 'player-events', 'shot-location'].includes(kind),
+          ['physical-measurements', 'player-events', 'shot-location', 'possession'].includes(kind),
         ))
     ) {
       throw new Error(`${label} intent does not match its evidence request.`)
@@ -738,9 +743,39 @@ export function validateInterpretation(
     ) {
       normalizedTimePeriod = { kind: 'selected' }
     } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId', 'lookbackSeconds']) &&
+      timePeriod.kind === 'selected' && timePeriod.eventId === null &&
+      typeof timePeriod.lookbackSeconds === 'number' &&
+      Number.isInteger(timePeriod.lookbackSeconds) &&
+      timePeriod.lookbackSeconds > 0 && timePeriod.lookbackSeconds <= 3600
+    ) {
+      normalizedTimePeriod = { kind: 'selected', lookbackSeconds: timePeriod.lookbackSeconds }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'lookbackSeconds']) &&
+      timePeriod.kind === 'selected' &&
+      typeof timePeriod.lookbackSeconds === 'number' &&
+      Number.isInteger(timePeriod.lookbackSeconds) &&
+      timePeriod.lookbackSeconds > 0 && timePeriod.lookbackSeconds <= 3600
+    ) {
+      normalizedTimePeriod = { kind: 'selected', lookbackSeconds: timePeriod.lookbackSeconds }
+    } else if (
+      (hasExactKeys(timePeriod, ['kind', 'eventId']) ||
+        (hasExactKeys(timePeriod, ['kind', 'eventId', 'lookbackSeconds']) && timePeriod.lookbackSeconds === null)) &&
+      timePeriod.kind === 'after-event' &&
+      typeof timePeriod.eventId === 'string' && eventIds.has(timePeriod.eventId)
+    ) {
+      normalizedTimePeriod = { kind: 'after-event', eventId: timePeriod.eventId }
+    } else if (
       hasExactKeys(timePeriod, ['kind', 'eventId']) &&
       timePeriod.kind === 'selected' &&
       timePeriod.eventId === null
+    ) {
+      normalizedTimePeriod = { kind: 'selected' }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId', 'lookbackSeconds']) &&
+      timePeriod.kind === 'selected' &&
+      timePeriod.eventId === null &&
+      timePeriod.lookbackSeconds === null
     ) {
       normalizedTimePeriod = { kind: 'selected' }
     } else if (
@@ -752,6 +787,32 @@ export function validateInterpretation(
       normalizedTimePeriod = {
         kind: 'before-event',
         eventId: timePeriod.eventId,
+      }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId', 'lookbackSeconds']) &&
+      timePeriod.kind === 'before-event' &&
+      typeof timePeriod.eventId === 'string' &&
+      eventIds.has(timePeriod.eventId) &&
+      timePeriod.lookbackSeconds === null
+    ) {
+      normalizedTimePeriod = {
+        kind: 'before-event',
+        eventId: timePeriod.eventId,
+      }
+    } else if (
+      hasExactKeys(timePeriod, ['kind', 'eventId', 'lookbackSeconds']) &&
+      timePeriod.kind === 'before-event' &&
+      typeof timePeriod.eventId === 'string' &&
+      eventIds.has(timePeriod.eventId) &&
+      typeof timePeriod.lookbackSeconds === 'number' &&
+      Number.isInteger(timePeriod.lookbackSeconds) &&
+      timePeriod.lookbackSeconds > 0 &&
+      timePeriod.lookbackSeconds <= 3600
+    ) {
+      normalizedTimePeriod = {
+        kind: 'before-event',
+        eventId: timePeriod.eventId,
+        lookbackSeconds: timePeriod.lookbackSeconds,
       }
     } else {
       throw new Error(`${label} time period is invalid or references an unavailable event.`)
@@ -780,18 +841,18 @@ export function validateInterpretation(
       }
     }
     if (
-      normalizedTimePeriod.kind === 'before-event' &&
+      normalizedTimePeriod.kind !== 'selected' &&
       (!historicalEventAnchor ||
         historicalEventAnchor.eventId !== normalizedTimePeriod.eventId)
     ) {
-      throw new Error(`${label} before-event period must use its historical anchor.`)
+      throw new Error(`${label} event period must use its historical anchor.`)
     }
     const clarificationNeeds = requireStringArray(
       claim.clarificationNeeds,
       `${label} clarification needs`,
     )
-    if (historicalEventAnchor && normalizedTimePeriod.kind !== 'before-event') {
-      throw new Error(`${label} historical anchor must use its exclusive before-event period.`)
+    if (historicalEventAnchor && normalizedTimePeriod.kind === 'selected') {
+      throw new Error(`${label} historical anchor must use its event period.`)
     }
     if (
       meaning.category === 'historical-circumstance' &&
@@ -808,7 +869,7 @@ export function validateInterpretation(
     ) {
       throw new Error(`${label} needs clarification when its subject is unknown.`)
     }
-    if (normalizedTimePeriod.kind === 'before-event') {
+    if (normalizedTimePeriod.kind !== 'selected') {
       const anchorEvent = availableEvents.find(
         (event) => event.id === normalizedTimePeriod.eventId,
       )

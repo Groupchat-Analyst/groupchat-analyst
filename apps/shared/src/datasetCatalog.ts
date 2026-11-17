@@ -4,6 +4,7 @@ export const BASELINE_DATASET_ID = 'northbridge-eastport-analysis-demo'
 export const RETURN_DATASET_ID_PUBLIC = 'northbridge-eastport-return-demo'
 export const WESTHAVEN_DATASET_ID_PUBLIC = 'westhaven-kingswell-demo'
 export const REDMERE_DATASET_ID_PUBLIC = 'redmere-alderwick-demo'
+export const ARSENAL_LEICESTER_DATASET_ID = 'arsenal-leicester-wyscout-2499719'
 
 export type DatasetMoment = { label: string; clock: MatchClock }
 
@@ -29,7 +30,10 @@ export type DatasetCatalogEntry = {
   /** Short, human description of what the match is like to explore. */
   scenario: string
   description: string
-  fictional: true
+  fictional: boolean
+  historicalReplay?: true
+  sourceAttribution?: string
+  license?: string
   moments: DatasetMoment[]
   examples: DatasetExample[]
 }
@@ -135,6 +139,33 @@ export const DATASET_CATALOG: readonly DatasetCatalogEntry[] = [
       { id: 'before-goal', text: 'Redmere FC had no shots on target before the goal', clock: stoppage(2, 90, 4), period: 'match-so-far', shows: 'Three goals are recorded, so the question asks which one', expectedAssessment: 'clarification needed' },
       { id: 'shots', text: 'Redmere FC had more shots than Alderwick United', clock: stoppage(2, 90, 4), period: 'match-so-far', shows: 'A factual comparison that is supported on the full match', expectedAssessment: 'supported' },
       { id: 'jackson', text: 'Jackson has been poor', clock: second(75), period: 'match-so-far', shows: 'Broad player opinion: his recorded contributions, no rating', expectedAssessment: 'insufficient evidence for a firm conclusion' },
+    ],
+  },
+  {
+    id: ARSENAL_LEICESTER_DATASET_ID,
+    version: '1.0.0',
+    name: 'Arsenal 4–3 Leicester · 11 August 2017',
+    teams: ['Arsenal', 'Leicester City'],
+    teamAliases: [['Arsenal'], ['Leicester City', 'Leicester']],
+    scenario: 'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.',
+    description: 'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.',
+    fictional: false,
+    historicalReplay: true,
+    sourceAttribution: 'Wyscout, Events, Figshare article 7770599, match 2499719; Luca Pappalardo and Emanuele Massucco.',
+    license: 'CC BY 4.0',
+    moments: [
+      { label: '85′ · Giroud winner (source 2H 39:34.621)', clock: second(85) },
+      { label: '90+6′ · full-time', clock: stoppage(2, 90, 6) },
+    ],
+    examples: [
+      {
+        id: 'shots-before-giroud-winner',
+        text: 'Who had more shots in the ten minutes before Giroud’s winner?',
+        clock: second(85),
+        period: 'match-so-far',
+        shows: 'Exact 600-second pre-goal shot counts with source event IDs',
+        expectedAssessment: 'statistics provided',
+      },
     ],
   },
 ]

@@ -34,6 +34,17 @@ test('replay validation rejects a malformed score or an unknown event team', () 
   assert.ok(!isMatchReplayResponse(stray, '58′', teams))
 })
 
+test('replay validation preserves shots whose source outcome is unclassified', () => {
+  const teams = ['Arsenal', 'Leicester City']
+  const historical = frame(...teams)
+  historical.events[0] = {
+    ...historical.events[0],
+    type: 'shot',
+    outcome: 'unclassified',
+  }
+  assert.ok(isMatchReplayResponse(historical, '58′', teams))
+})
+
 test('monograms come from the displayed team name', () => {
   assert.equal(teamMonogram('Northbridge'), 'N')
   assert.equal(teamMonogram('Eastport'), 'E')

@@ -17,8 +17,8 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 200 || status >= 300 ? false : true, status, text: async () => JSON.stringify(body) }
 }
 
-test('the client deadline outlasts the 30 s provider deadline', () => {
-  assert.ok(ANALYSIS_TIMEOUT_MS > 30_000)
+test('the client deadline outlasts two sequential 30 s provider deadlines', () => {
+  assert.ok(ANALYSIS_TIMEOUT_MS > 60_000)
 })
 
 test('a never-settling request times out, aborts the fetch and clears the timer', async () => {

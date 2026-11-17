@@ -1,9 +1,9 @@
 /**
- * The Foundry provider gives up on the model after 30 s (apps/api/src/providers/foundry.ts).
- * 45 s leaves room for that, plus validation, the Functions host and the network, so a normal
+ * Foundry can make two sequential calls of up to 30 s each.
+ * 75 s leaves room for both, plus allowance checks, validation, the Functions host and the network, so a normal
  * server-side completion or a server-side timeout error still reaches the user first.
  */
-export const ANALYSIS_TIMEOUT_MS = 45_000
+export const ANALYSIS_TIMEOUT_MS = 75_000
 
 export class AnalysisTimeoutError extends Error {
   constructor(timeoutMs: number) {

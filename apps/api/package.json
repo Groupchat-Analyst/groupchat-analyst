@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
+    "test:fan-evaluation": "npm run build && node --test tests/fan-evaluation.test.mjs tests/historical-replay.test.mjs tests/watford-frozen.test.mjs tests/pundit-reply.test.mjs tests/foundry-captured-replay.test.mjs tests/foundry-provider.test.mjs tests/foundry-public-access.test.mjs tests/player-resolution.test.mjs",
     "start": "npm run build && func start"
   },
   "dependencies": {

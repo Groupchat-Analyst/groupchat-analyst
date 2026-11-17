@@ -6,6 +6,7 @@ import type {
 import {
   analyzeMatch,
   formatMatchClock,
+  formatMatchEventTime,
   getMatchTimeOptions,
   type MatchClock,
 } from '../../../shared/src/match.js'
@@ -16,7 +17,10 @@ import { playerParticipationAt } from '../../../shared/src/playerParticipation.j
 import { resolveDataset } from '../datasets.js'
 import type { MatchReplayResponse } from '../../../shared/src/apiContracts.js'
 
-function isMatchClock(value: unknown): value is MatchClock {
+function isMatchClock(
+  value: unknown,
+  secondHalfStoppageMinutes = 4,
+): value is MatchClock {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -29,7 +33,7 @@ function isMatchClock(value: unknown): value is MatchClock {
     return false
   }
 
-  return getMatchTimeOptions().some(
+  return getMatchTimeOptions(secondHalfStoppageMinutes).some(
     (clock) =>
       clock.period === value.period &&
       clock.minute === value.minute &&
@@ -44,13 +48,15 @@ export function getReplayFrame(
   clock: unknown,
   datasetId?: unknown,
 ): MatchReplayResponse {
-  if (!isMatchClock(clock)) {
-    throw new TypeError('Select a valid match time from the fictional fixture.')
-  }
   if (datasetId !== undefined && !findCatalogEntry(datasetId)) {
     throw new TypeError('datasetId is not a supported match.')
   }
   const dataset = resolveDataset(datasetId)
+  const secondHalfStoppageMinutes =
+    findCatalogEntry(dataset.id)?.historicalReplay === true ? 6 : 4
+  if (!isMatchClock(clock, secondHalfStoppageMinutes)) {
+    throw new TypeError('Select a valid match time from the current fixture.')
+  }
 
   const analysis = analyzeMatch(dataset.events, clock, 'match-so-far')
   const selectedElapsed = elapsedMatchMinute(clock)
@@ -73,7 +79,7 @@ export function getReplayFrame(
     })),
     events: analysis.periodEvents.map((event) => ({
       id: event.id,
-      time: formatMatchClock(event.clock),
+      time: formatMatchEventTime(event),
       team: event.team,
       description: event.description,
       type: event.type,
@@ -111,10 +117,10 @@ export function createReplayHandler() {
       if (error instanceof TypeError) {
         return { status: 400, jsonBody: { error: error.message } }
       }
-      context.error('Synthetic replay request failed.', error)
+      context.error('Match replay request failed.', error)
       return {
         status: 500,
-        jsonBody: { error: 'The synthetic replay could not be loaded.' },
+        jsonBody: { error: 'The match replay could not be loaded.' },
       }
     }
   }

@@ -220,7 +220,10 @@ const EN = {
   'reason.insufficient-evidence': 'Insufficient evidence',
   'scope.match-so-far': 'Match so far, up to {clock}',
   'scope.last-10-minutes': 'Last 10 minutes, up to {clock}',
+  'scope.rollingWindow': 'The {seconds}-second window ending at {clock} (both boundaries included)',
+  'scope.afterGoal': 'After {team}’s goal at {start} (excluded), through {clock} inclusive',
   'scope.beforeGoal': 'Before the {team} goal at {clock} (that goal and later events excluded)',
+  'scope.beforeGoalWindow': 'The {seconds}-second window from {start} inclusive up to {team}’s goal at {end} (exclusive)',
   'scope.firstHalf': 'First-half goals, checked at {clock}',
 }
 
@@ -393,7 +396,10 @@ const ES: Dict = {
   'reason.insufficient-evidence': 'Evidencia insuficiente',
   'scope.match-so-far': 'El partido hasta ahora, hasta el {clock}',
   'scope.last-10-minutes': 'Los últimos 10 minutos, hasta el {clock}',
+  'scope.rollingWindow': 'La ventana de {seconds} segundos hasta {clock} (ambos límites incluidos)',
+  'scope.afterGoal': 'Después del gol de {team} en {start} (excluido), hasta {clock} inclusive',
   'scope.beforeGoal': 'Antes del gol de {team} en el {clock} (se excluyen ese gol y los eventos posteriores)',
+  'scope.beforeGoalWindow': 'La ventana de {seconds} segundos desde {start} inclusive hasta el gol de {team} en {end} (excluido)',
   'scope.firstHalf': 'Goles de la primera parte, comprobados en el {clock}',
 }
 
@@ -563,7 +569,10 @@ const FR: Dict = {
   'reason.insufficient-evidence': 'Éléments insuffisants',
   'scope.match-so-far': 'Match jusqu’ici, jusqu’à {clock}',
   'scope.last-10-minutes': 'Les 10 dernières minutes, jusqu’à {clock}',
+  'scope.rollingWindow': 'La fenêtre de {seconds} secondes jusqu’à {clock} (bornes incluses)',
+  'scope.afterGoal': 'Après le but de {team} à {start} (exclu), jusqu’à {clock} inclus',
   'scope.beforeGoal': 'Avant le but de {team} à {clock} (ce but et les événements suivants exclus)',
+  'scope.beforeGoalWindow': 'La fenêtre de {seconds} secondes à partir de {start} inclus jusqu’au but de {team} à {end} (exclu)',
   'scope.firstHalf': 'Buts de la première mi-temps, vérifiés à {clock}',
 }
 
@@ -733,7 +742,10 @@ const DE: Dict = {
   'reason.insufficient-evidence': 'Unzureichende Belege',
   'scope.match-so-far': 'Spiel bisher, bis {clock}',
   'scope.last-10-minutes': 'Letzte 10 Minuten, bis {clock}',
+  'scope.rollingWindow': 'Das {seconds}-Sekunden-Fenster bis {clock} (beide Grenzen eingeschlossen)',
+  'scope.afterGoal': 'Nach dem Tor von {team} bei {start} (ausgeschlossen), bis {clock} einschließlich',
   'scope.beforeGoal': 'Vor dem Tor von {team} bei {clock} (dieses Tor und spätere Ereignisse ausgenommen)',
+  'scope.beforeGoalWindow': 'Das {seconds}-Sekunden-Fenster ab {start} einschließlich bis zum Tor von {team} bei {end} (ausschließlich)',
   'scope.firstHalf': 'Tore der ersten Halbzeit, geprüft bei {clock}',
 }
 
@@ -902,7 +914,10 @@ const AR: Dict = {
   'reason.insufficient-evidence': 'أدلة غير كافية',
   'scope.match-so-far': 'المباراة حتى الآن، حتى {clock}',
   'scope.last-10-minutes': 'آخر 10 دقائق، حتى {clock}',
+  'scope.rollingWindow': 'نافذة {seconds} ثانية حتى {clock} (شاملة الحدين)',
+  'scope.afterGoal': 'بعد هدف {team} عند {start} (غير شامل)، حتى {clock} شاملًا',
   'scope.beforeGoal': 'قبل هدف {team} عند {clock} (يُستثنى ذلك الهدف وما بعده من أحداث)',
+  'scope.beforeGoalWindow': 'نافذة {seconds} ثانية من {start} شاملةً حتى هدف {team} عند {end} (غير شامل)',
   'scope.firstHalf': 'أهداف الشوط الأول، فُحصت عند {clock}',
 }
 
@@ -1327,10 +1342,21 @@ export function renderPresentationScope(scope: ScopeFact, ctx: PresentationConte
     switch (scope.kind) {
       case 'window':
         return text(language, `scope.${scope.period}`, { clock: clockText(scope.through) })
+      case 'rolling-window':
+        return text(language, 'scope.rollingWindow', { seconds: String(scope.lookbackSeconds), clock: clockText(scope.through) })
+      case 'after-goal':
+        return text(language, 'scope.afterGoal', { team: ctx.nameOf({ kind: 'team', team: scope.anchorTeam }), start: scope.anchorTime, clock: clockText(scope.through) })
       case 'before-goal':
         return text(language, 'scope.beforeGoal', {
           team: ctx.nameOf({ kind: 'team', team: scope.anchorTeam }),
           clock: clockText(scope.anchorClock),
+        })
+      case 'before-goal-window':
+        return text(language, 'scope.beforeGoalWindow', {
+          seconds: String(scope.lookbackSeconds),
+          start: scope.windowStartTime,
+          team: ctx.nameOf({ kind: 'team', team: scope.anchorTeam }),
+          end: scope.anchorTime,
         })
       case 'first-half-goals':
         return text(language, 'scope.firstHalf', { clock: clockText(scope.through) })

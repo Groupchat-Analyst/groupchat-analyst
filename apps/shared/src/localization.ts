@@ -37,6 +37,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Return match': 'Partido de vuelta',
     'Westhaven fixture': 'Partido de Westhaven',
     'Redmere fixture': 'Partido de Redmere',
+    'Historical replay': 'Repetición histórica',
+    'Arsenal 4–3 Leicester · 11 August 2017': 'Arsenal 4–3 Leicester · 11 de agosto de 2017',
+    'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.': 'Repetición histórica · solo se han mapeado los tiros de Wyscout; los demás tipos de eventos y métricas no están disponibles.',
+    'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.': 'Repetición histórica de Arsenal contra Leicester City con datos de eventos de Wyscout. Se han mapeado los tiros; los demás tipos de eventos y métricas no están disponibles.',
     'Explore this fictional match through its recorded events and evidence.': 'Explora este partido ficticio mediante sus eventos registrados y pruebas.',
     'A fictional football fixture for exploring evidence at selected moments.': 'Un partido de fútbol ficticio para explorar pruebas en momentos concretos.',
     'Recorded moment': 'Momento registrado',
@@ -386,6 +390,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Return match': 'Match retour',
     'Westhaven fixture': 'Match de Westhaven',
     'Redmere fixture': 'Match de Redmere',
+    'Historical replay': 'Rediffusion historique',
+    'Arsenal 4–3 Leicester · 11 August 2017': 'Arsenal 4–3 Leicester · 11 août 2017',
+    'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.': 'Rediffusion historique · seuls les tirs Wyscout sont mappés ; les autres types d’événements et métriques ne sont pas disponibles.',
+    'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.': 'Rediffusion historique d’Arsenal contre Leicester City à partir des événements Wyscout. Les tirs sont mappés ; les autres types d’événements et métriques ne sont pas disponibles.',
     'Explore this fictional match through its recorded events and evidence.': 'Explorez ce match fictif à travers ses événements enregistrés et ses preuves.',
     'A fictional football fixture for exploring evidence at selected moments.': 'Un match de football fictif pour explorer les preuves à des moments précis.',
     'Recorded moment': 'Moment enregistré',
@@ -731,6 +739,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Return match': 'Rückspiel',
     'Westhaven fixture': 'Westhaven-Spiel',
     'Redmere fixture': 'Redmere-Spiel',
+    'Historical replay': 'Historische Wiederholung',
+    'Arsenal 4–3 Leicester · 11 August 2017': 'Arsenal 4–3 Leicester · 11. August 2017',
+    'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.': 'Historische Wiederholung · nur Wyscout-Schussereignisse sind zugeordnet; andere Ereignistypen und Kennzahlen sind nicht verfügbar.',
+    'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.': 'Historische Wiederholung von Arsenal gegen Leicester City anhand von Wyscout-Ereignisdaten. Schüsse sind zugeordnet; andere Ereignistypen und Kennzahlen sind nicht verfügbar.',
     'Explore this fictional match through its recorded events and evidence.': 'Erkunde dieses fiktive Spiel anhand seiner aufgezeichneten Ereignisse und Belege.',
     'A fictional football fixture for exploring evidence at selected moments.': 'Ein fiktives Fußballspiel, um Belege zu ausgewählten Zeitpunkten zu erkunden.',
     'Recorded moment': 'Aufgezeichneter Moment',
@@ -1076,6 +1088,10 @@ const translations: Partial<Record<Exclude<AppLanguage, 'en'>, Record<string, st
     'Return match': 'مباراة الإياب',
     'Westhaven fixture': 'مباراة وستهافن',
     'Redmere fixture': 'مباراة ريدمير',
+    'Historical replay': 'إعادة تاريخية',
+    'Arsenal 4–3 Leicester · 11 August 2017': 'أرسنال 4–3 ليستر · 11 أغسطس 2017',
+    'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.': 'إعادة تاريخية · تم ربط أحداث التسديد من Wyscout فقط؛ أنواع الأحداث والمقاييس الأخرى غير متاحة.',
+    'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.': 'إعادة تاريخية لمباراة أرسنال وليستر استناداً إلى بيانات أحداث Wyscout. تم ربط أحداث التسديد؛ أنواع الأحداث والمقاييس الأخرى غير متاحة.',
     'Explore this fictional match through its recorded events and evidence.': 'استكشف هذه المباراة الخيالية من خلال أحداثها المسجلة وأدلتها.',
     'A fictional football fixture for exploring evidence at selected moments.': 'مباراة كرة قدم خيالية لاستكشاف الأدلة عند لحظات محددة.',
     'Recorded moment': 'لحظة مسجلة',
@@ -1432,6 +1448,7 @@ const arabicSupplementalTranslations: Record<string, string> = {
   'A universal claim checked against every recorded shot': 'ادعاء شامل تمت مراجعته مقابل كل تسديدة مسجلة.',
   'Three goals are recorded, so the question asks which one': 'سُجلت ثلاثة أهداف، لذا يلزم تحديد الهدف المقصود.',
   'A factual comparison that is supported on the full match': 'مقارنة واقعية تدعمها بيانات المباراة كاملة.',
+  'Exact 600-second pre-goal shot counts with source event IDs': 'عدد دقيق للتسديدات خلال الـ600 ثانية السابقة للهدف مع معرّفات أحداث المصدر.',
   'View evidence': 'عرض الأدلة',
   Subject: 'الموضوع',
   'What we understood': 'فهمنا للطلب',
@@ -2926,6 +2943,8 @@ export function localizedExample(text: string, language: AppLanguage): string {
   if (language === 'en') return text
   if (language !== 'ar' && EXAMPLE_TEXT[text]) return EXAMPLE_TEXT[text][language]
   const arabicExamples: Record<string, string> = {
+    'Who had more shots in the ten minutes before Giroud’s winner?':
+      'من سدد أكثر خلال الدقائق العشر التي سبقت هدف جيرو الحاسم؟',
     'Eastport had more possession than Northbridge but Northbridge had more shots':
       'استحوذ إيستبورت على الكرة أكثر من نورثبريدج، لكن سدد نورثبريدج أكثر.',
     'Northbridge had more possession than Eastport':

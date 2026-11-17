@@ -11,6 +11,8 @@ export const TEAMS: MatchTeam[] = ['Northbridge', 'Eastport']
 
 const FIRST_HALF_STOPPAGE_MINUTES = 3
 const SECOND_HALF_REGULATION_END = 90
+const SECOND_HALF_STOPPAGE_MINUTES = 4
+const MAX_SECOND_HALF_STOPPAGE_MINUTES = 6
 
 export function elapsedMatchMinute(clock: MatchClock): number {
   if (clock.period === 1) {
@@ -31,7 +33,16 @@ export function formatMatchClock(clock: MatchClock): string {
   return `${minute}′`
 }
 
-export function getMatchTimeOptions(): MatchClock[] {
+export function getMatchTimeOptions(
+  secondHalfStoppageMinutes = SECOND_HALF_STOPPAGE_MINUTES,
+): MatchClock[] {
+  if (
+    !Number.isInteger(secondHalfStoppageMinutes) ||
+    secondHalfStoppageMinutes < SECOND_HALF_STOPPAGE_MINUTES ||
+    secondHalfStoppageMinutes > MAX_SECOND_HALF_STOPPAGE_MINUTES
+  ) {
+    throw new RangeError('Second-half stoppage minutes must be between 4 and 6.')
+  }
   const firstHalf: MatchClock[] = Array.from({ length: 45 }, (_, index) => ({
     period: 1,
     minute: index + 1,
@@ -49,7 +60,7 @@ export function getMatchTimeOptions(): MatchClock[] {
     minute: index + 46,
   }))
   const secondHalfStoppage: MatchClock[] = Array.from(
-    { length: 4 },
+    { length: secondHalfStoppageMinutes },
     (_, index) => ({
       period: 2,
       minute: SECOND_HALF_REGULATION_END,

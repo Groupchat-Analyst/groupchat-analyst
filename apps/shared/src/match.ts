@@ -1,5 +1,6 @@
 import {
   elapsedMatchMinute,
+  formatMatchClock,
   type AnalysisPeriod,
   type MatchClock,
   type MatchTeam,
@@ -17,15 +18,17 @@ export type MatchEvent =
   | {
       id: string
       clock: MatchClock
+      sourcePeriodSeconds?: number
       team: MatchTeam
       type: 'shot'
-      outcome: 'goal' | 'saved' | 'blocked' | 'off-target'
+      outcome: 'goal' | 'saved' | 'blocked' | 'off-target' | 'unclassified'
       playerId?: string
       description: string
     }
   | {
       id: string
       clock: MatchClock
+      sourcePeriodSeconds?: number
       team: MatchTeam
       type: 'other'
       description: string
@@ -42,6 +45,41 @@ export type MatchAnalysis = {
   shots: Record<MatchTeam, TeamShotStats>
   periodEvents: MatchEvent[]
   explanation: string
+}
+
+export function elapsedEventSeconds(event: MatchEvent): number {
+  if (event.sourcePeriodSeconds !== undefined) {
+    return (event.clock.period === 1 ? 0 : 48 * 60) + event.sourcePeriodSeconds
+  }
+  return elapsedMatchMinute(event.clock) * 60
+}
+
+export function eventsBeforeAnchor(events: MatchEvent[], anchor: MatchEvent, lookbackSeconds?: number): MatchEvent[] {
+  const end = elapsedEventSeconds(anchor)
+  const start = lookbackSeconds === undefined ? Number.NEGATIVE_INFINITY : end - lookbackSeconds
+  return events.filter((event) => {
+    const time = elapsedEventSeconds(event)
+    return time >= start && time < end
+  })
+}
+
+export function eventsAfterAnchor(events: MatchEvent[], anchor: MatchEvent, endSeconds: number): MatchEvent[] {
+  const start = elapsedEventSeconds(anchor)
+  return events.filter((event) => {
+    const time = elapsedEventSeconds(event)
+    return time > start && time <= endSeconds
+  })
+}
+
+export function formatMatchEventTime(event: MatchEvent): string {
+  if (event.sourcePeriodSeconds === undefined) return formatMatchClock(event.clock)
+  return formatSourcePeriodTime(event.clock.period, event.sourcePeriodSeconds)
+}
+
+export function formatSourcePeriodTime(period: 1 | 2, sourcePeriodSeconds: number): string {
+  const minute = Math.floor(sourcePeriodSeconds / 60)
+  const seconds = (sourcePeriodSeconds % 60).toFixed(3).padStart(6, '0')
+  return `${period}H ${String(minute).padStart(2, '0')}:${seconds}`
 }
 
 export const SYNTHETIC_MATCH_EVENTS: MatchEvent[] = [
@@ -198,10 +236,10 @@ export function analyzeMatch(
   const periodStartMinute =
     period === 'last-10-minutes' ? selectedElapsedMinute - 10 : 0
   const eventsThroughSelectedTime = events.filter(
-    (event) => elapsedMatchMinute(event.clock) <= selectedElapsedMinute,
+    (event) => elapsedEventSeconds(event) <= selectedElapsedMinute * 60,
   )
   const periodEvents = eventsThroughSelectedTime.filter(
-    (event) => elapsedMatchMinute(event.clock) >= periodStartMinute,
+    (event) => elapsedEventSeconds(event) >= periodStartMinute * 60,
   )
   const score: MatchAnalysis['score'] = {
     Northbridge: 0,

@@ -5,6 +5,11 @@ type ByLanguage = Record<NonArabic, string>
 
 /** Composer wording for each catalogue example (es/fr/de); Arabic wording lives in localization.ts. */
 export const EXAMPLE_TEXT: Readonly<Record<string, ByLanguage>> = {
+  'Who had more shots in the ten minutes before Giroud’s winner?': {
+    es: '¿Quién tuvo más tiros en los diez minutos antes del gol ganador de Giroud?',
+    fr: 'Qui a eu le plus de tirs dans les dix minutes avant le but de la victoire de Giroud ?',
+    de: 'Wer hatte in den zehn Minuten vor Girouds Siegtor mehr Schüsse?',
+  },
   'Saka has had a horrible game': {
     es: 'Saka ha tenido un partido horrible.',
     fr: 'Saka a fait un match horrible.',
@@ -104,6 +109,11 @@ export const EXAMPLE_TEXT: Readonly<Record<string, ByLanguage>> = {
 
 /** Short "what this example shows" help (es/fr/de); Arabic help lives in localization.ts. */
 export const EXAMPLE_SHOWS: Readonly<Record<string, ByLanguage>> = {
+  'Exact 600-second pre-goal shot counts with source event IDs': {
+    es: 'Recuento exacto de tiros en los 600 segundos previos, con IDs de eventos fuente.',
+    fr: 'Décompte exact des tirs pendant les 600 secondes précédentes, avec les identifiants source.',
+    de: 'Exakte Schusszahl in den vorherigen 600 Sekunden mit Quellereignis-IDs.',
+  },
   'Broad player opinion: his recorded contributions, no rating': {
     es: 'Opinión general sobre un jugador: sus aportes registrados, sin nota.',
     fr: 'Opinion générale sur un joueur : ses actions enregistrées, sans note.',

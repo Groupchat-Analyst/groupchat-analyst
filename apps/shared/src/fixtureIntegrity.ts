@@ -2,12 +2,15 @@ import { elapsedMatchMinute, getMatchTimeOptions, type MatchClock } from './matc
 import type { MatchEvent } from './match.ts'
 import type { SyntheticMatchEvidence } from './evidence.ts'
 
-const VALID_CLOCKS = new Set(
-  getMatchTimeOptions().map((clock) => `${clock.period}:${clock.minute}:${clock.stoppageMinutes ?? 0}`),
-)
-
-function validClock(clock: MatchClock): boolean {
-  return VALID_CLOCKS.has(`${clock.period}:${clock.minute}:${clock.stoppageMinutes ?? 0}`)
+function validClock(clock: MatchClock, fixture: SyntheticMatchEvidence): boolean {
+  const secondHalfStoppageMinutes =
+    fixture.dataset.provenance === 'observed' ? 6 : 4
+  return getMatchTimeOptions(secondHalfStoppageMinutes).some(
+    (option) =>
+      option.period === clock.period &&
+      option.minute === clock.minute &&
+      (option.stoppageMinutes ?? 0) === (clock.stoppageMinutes ?? 0),
+  )
 }
 
 /**
@@ -45,6 +48,7 @@ export function validateFixtureIntegrity(
     return subs.some((sub) => sub.playerOnId === playerId && elapsed >= elapsedMatchMinute(sub.clock))
   }
 
+  if (fixture.dataset.provenance !== 'observed') {
   for (const team of ['Northbridge', 'Eastport'] as const) {
     const starters = fixture.players.filter((player) => player.team === team && player.status === 'starter')
     if (starters.length !== 11) report(`${team} must have exactly 11 starters.`)
@@ -52,8 +56,9 @@ export function validateFixtureIntegrity(
     const active = fixture.players.filter((player) => onPitchAt(team, player.id, lastElapsed))
     if (active.length !== 11) report(`${team} has ${active.length} active players at the end; expected 11.`)
   }
+  }
   for (const sub of fixture.substitutions) {
-    if (!validClock(sub.clock)) report(`Substitution ${sub.id} has an invalid clock.`)
+    if (!validClock(sub.clock, fixture)) report(`Substitution ${sub.id} has an invalid clock.`)
     const before = elapsedMatchMinute(sub.clock) - 0.0001
     if (!onPitchAt(sub.team, sub.playerOffId, before)) report(`Substitution ${sub.id}: outgoing player is not on the pitch.`)
     if (onPitchAt(sub.team, sub.playerOnId, before)) report(`Substitution ${sub.id}: incoming player is already on the pitch.`)
@@ -67,7 +72,7 @@ export function validateFixtureIntegrity(
   possessions.forEach((possession, index) => {
     const start = elapsedMatchMinute(possession.start)
     const end = elapsedMatchMinute(possession.end)
-    if (!validClock(possession.start) || !validClock(possession.end)) report(`Possession ${possession.id} has an invalid clock.`)
+    if (!validClock(possession.start, fixture) || !validClock(possession.end, fixture)) report(`Possession ${possession.id} has an invalid clock.`)
     if (end <= start) report(`Possession ${possession.id} must end after it starts.`)
     if (start < coverageStart || end > coverageEnd) report(`Possession ${possession.id} is outside declared coverage.`)
     if ((possession.status === 'controlled') !== (possession.team !== null)) {
@@ -90,14 +95,20 @@ export function validateFixtureIntegrity(
   let previousEvent = -Infinity
   for (const event of events) {
     const at = elapsedMatchMinute(event.clock)
-    if (!validClock(event.clock)) report(`Event ${event.id} has an invalid clock.`)
+    if (!validClock(event.clock, fixture)) report(`Event ${event.id} has an invalid clock.`)
     if (at < previousEvent) report(`Event ${event.id} is out of chronological order.`)
     previousEvent = at
     if (at < coverageStart || at > coverageEnd) report(`Event ${event.id} is outside declared coverage.`)
     if (event.type === 'shot') {
       if (!event.playerId) report(`Shot ${event.id} has no shooter.`)
-      else if (!onPitchAt(event.team, event.playerId, at)) report(`Shot ${event.id}: shooter is not an active ${event.team} player.`)
-      if (!possessions.some((p) => p.relatedEventIds.includes(event.id))) report(`Shot ${event.id} is not linked to any possession.`)
+      else if (
+        fixture.dataset.provenance !== 'observed' &&
+        !onPitchAt(event.team, event.playerId, at)
+      ) report(`Shot ${event.id}: shooter is not an active ${event.team} player.`)
+      if (
+        fixture.dataset.provenance !== 'observed' &&
+        !possessions.some((p) => p.relatedEventIds.includes(event.id))
+      ) report(`Shot ${event.id} is not linked to any possession.`)
     }
   }
 

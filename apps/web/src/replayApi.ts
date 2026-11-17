@@ -69,7 +69,8 @@ export function isMatchReplayResponse(
         event.outcome === 'goal' ||
         event.outcome === 'saved' ||
         event.outcome === 'blocked' ||
-        event.outcome === 'off-target'),
+        event.outcome === 'off-target' ||
+        event.outcome === 'unclassified'),
   )
 }
 

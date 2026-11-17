@@ -62,8 +62,8 @@ const run = (dataset, example, opinion, inputLanguage) => analyzeOpinion({
 
 const cases = DATASET_CATALOG.flatMap((dataset) => dataset.examples.map((example) => ({ dataset, example })))
 
-test('the catalogue offers 20 examples, giving 80 translated wordings', () => {
-  assert.equal(cases.length * LANGUAGES.length, 80)
+test('the catalogue offers 21 examples, giving 84 translated wordings', () => {
+  assert.equal(cases.length * LANGUAGES.length, 84)
 })
 
 for (const { dataset, example } of cases) {

@@ -82,8 +82,9 @@ export type InterpretedClaim = {
 
   requiredEvidence: EvidenceKind[]
   timePeriod:
-    | { kind: 'selected' }
-    | { kind: 'before-event'; eventId: string }
+    | { kind: 'selected'; lookbackSeconds?: number }
+    | { kind: 'before-event'; eventId: string; lookbackSeconds?: number }
+    | { kind: 'after-event'; eventId: string }
   historicalEventAnchor: { eventId: string; relationship: string } | null
   clarificationNeeds: string[]
 }
@@ -134,7 +135,7 @@ export type MatchReplayResponse = {
     team: MatchTeam
     description: string
     type: 'shot' | 'other'
-    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target'
+    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target' | 'unclassified'
   }>
 }
 
@@ -245,7 +246,7 @@ export type EvidenceFoundation = {
     time: string
     team: MatchTeam
     type: 'shot' | 'other'
-    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target'
+    outcome?: 'goal' | 'saved' | 'blocked' | 'off-target' | 'unclassified'
     playerId?: string
   }>
   recoveryRecords: Array<{
@@ -389,12 +390,17 @@ export type AnalysisResponse = {
   summary: string
   /** Canonical conversational Fan reply: the answer only, without the scope and synthetic-data trailer. */
   fanReply?: string
+  punditReply?: {
+    text: string
+    checked: string[]
+  }
+  punditNotice?: string
   selectedTime: string
   selectedPeriodLabel: string
   score: Record<MatchTeam, number>
   periodStatistics: Record<
     MatchTeam,
-    { shots: number; shotsOnTarget: number; goals: number }
+    { shots: number; shotsOnTarget: number | null; goals: number }
   >
   periodEvents: EvidenceReference[]
   evidenceFoundation: EvidenceFoundation

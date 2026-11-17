@@ -112,7 +112,6 @@ import { useLocalization } from './localizationContext'
 import './App.css'
 import './matchday.css'
 
-const MATCH_TIME_OPTIONS = getMatchTimeOptions()
 const REPLAY_DWELL_MS = 900
 const INITIAL_MATCH_TIME: MatchClock = {
   period: 1,
@@ -194,6 +193,12 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
       (Array.isArray(value.selectedPlayers) &&
         value.selectedPlayers.every(isPlayerResolutionOption))) &&
     (!('fanReply' in value) || value.fanReply === undefined || typeof value.fanReply === 'string') &&
+    (!('punditReply' in value) || value.punditReply === undefined ||
+      (typeof value.punditReply === 'object' && value.punditReply !== null &&
+        'text' in value.punditReply && typeof value.punditReply.text === 'string' &&
+        'checked' in value.punditReply && Array.isArray(value.punditReply.checked) &&
+        value.punditReply.checked.every((item: unknown) => typeof item === 'string'))) &&
+    (!('punditNotice' in value) || value.punditNotice === undefined || typeof value.punditNotice === 'string') &&
     'periodEvents' in value &&
     Array.isArray(value.periodEvents) &&
     'score' in value &&
@@ -1139,6 +1144,7 @@ function EvidenceFoundationPanel({
   const { language } = useLocalization()
   const num = (value: number) => formatNumber(value, language)
   const roster = foundation.players
+  const observedSource = foundation.dataset.provenance === 'observed'
   const nameOf = (id: string) => roster.find((player) => player.id === id)?.name ?? 'Unrecorded player'
   return (
     <LocalizedMarkup>
@@ -1148,14 +1154,16 @@ function EvidenceFoundationPanel({
           <p className="card-kicker">SOURCE & COVERAGE</p>
           <h2 id="evidence-foundation-title">Match data & coverage</h2>
         </div>
-        <span className="synthetic-badge"><span aria-hidden="true" />Synthetic fixture</span>
+        <span className="synthetic-badge"><span aria-hidden="true" />{observedSource ? 'Historical replay' : 'Synthetic fixture'}</span>
       </summary>
       <div className="foundation-content">
       <p className="evidence-group-summary">
-        {foundation.dataset.label} · version {foundation.dataset.version}. Possession percentages use only recorded controlled-possession minutes;
-        contested play and time out of play are excluded.
+        {foundation.dataset.label} · version {foundation.dataset.version}.
+        {observedSource
+          ? ' Only timestamped shot events are mapped; unrecorded metrics are unavailable, not zero.'
+          : ' Possession percentages use only recorded controlled-possession minutes; contested play and time out of play are excluded.'}
       </p>
-      <div className="advanced-team-grid">
+      {!observedSource && <div className="advanced-team-grid">
         {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => {
           const metrics = foundation.teams[team]
           const lossValues = Object.values(metrics.possessionLosses)
@@ -1196,17 +1204,17 @@ function EvidenceFoundationPanel({
             </article>
           )
         })}
-      </div>
-      <p className="evidence-denominator">
+      </div>}
+      {!observedSource && <p className="evidence-denominator">
         {foundation.possessionDenominatorMinutes} controlled minutes in the denominator ·{' '}
         {foundation.excludedOutOfPlayMinutes} out-of-play minutes excluded ·{' '}
         {foundation.contestedMinutes} contested minutes excluded
         {!foundation.possessionCoverageComplete &&
           ` · incomplete coverage: ${foundation.missingCoveragePeriods.join(', ')}`}
-      </p>
+      </p>}
       <details className="all-evidence">
-        <summary>Data dictionary, coverage, possession sequences, passes and turnovers</summary>
-        <p><strong>Source:</strong> {foundation.dataset.source}. Provenance: synthetic. Window: {foundation.windowLabel}.</p>
+        <summary>{observedSource ? 'Source, license and data coverage' : 'Data dictionary, coverage, possession sequences, passes and turnovers'}</summary>
+        <p><strong>Source:</strong> {foundation.dataset.source}. Provenance: {foundation.dataset.provenance}. Window: {foundation.windowLabel}.</p>
         <ul className="availability-list">
           {foundation.capabilities.map((capability) => (
             <li key={capability.id} className={capability.status === 'not-recorded' ? 'unavailable' : 'available'}>
@@ -1215,6 +1223,10 @@ function EvidenceFoundationPanel({
             </li>
           ))}
         </ul>
+        {observedSource ? (
+          <p>Possession, passing, lineups, player names, shot locations and shot accuracy are not mapped from this source snapshot. No values are inferred from the missing data.</p>
+        ) : (
+        <>
         <ul className="metric-definitions">
           {foundation.metricDefinitions.map((definition) => <li key={definition}>{definition}</li>)}
         </ul>
@@ -1281,8 +1293,10 @@ function EvidenceFoundationPanel({
             </li>
           ))}
         </ul>
+        </>
+        )}
       </details>
-      <details className="all-references">
+      {!observedSource && <details className="all-references">
         <summary>View fictional matchday squads and participation</summary>
         {(Object.keys(foundation.teams) as MatchTeam[]).map((team) => (
           <section key={team}>
@@ -1310,7 +1324,7 @@ function EvidenceFoundationPanel({
             </ol>
           </section>
         ))}
-      </details>
+      </details>}
       </div>
     </details>
     </LocalizedMarkup>
@@ -1649,7 +1663,8 @@ function TurnMessages({
     views.some(({ kind }) => kind === 'legacy') ? canonicalReply(analysis) : undefined,
     language,
   )
-  const visibleReply = answer.text
+  const showPundit = language === 'en' && analysis.punditReply !== undefined
+  const visibleReply = language === 'en' ? analysis.punditReply?.text ?? answer.text : answer.text
   // Clarification is rendered once, from the structured state; provider prose is never guidance.
   const notes = analysis.claims.flatMap((result, index) => {
     const state = states.get(result.claim.id)
@@ -1689,6 +1704,8 @@ function TurnMessages({
         {visibleReply && (
           <p className="msg-text" data-original-source="true" dir="auto">{visibleReply}</p>
         )}
+        {showPundit && <p className="msg-note">AI-generated football interpretation; the checked records are listed below.</p>}
+        {language === 'en' && analysis.punditNotice && <p className="msg-note">{analysis.punditNotice}</p>}
         {analysis.claims.length > 1 && evidenceClaims.length > 0 && (
           <ul className="msg-claims" aria-label="Claims in this opinion">
             {evidenceClaims.map(({ result, index }) => (
@@ -1723,6 +1740,11 @@ function TurnMessages({
         {evidenceClaims.length > 0 && (
           <details className="msg-evidence" key={view} open={view === 'analyst'}>
             <summary>How this was checked</summary>
+            {showPundit && analysis.punditReply && (
+              <ul>
+                {analysis.punditReply.checked.map((line, index) => <li key={index}>{line}</li>)}
+              </ul>
+            )}
             <div className="claim-result-list">
               {evidenceClaims.map(({ result, index }) => (
                 <ClaimCard key={result.claim.id} result={result} analysis={analysis} index={index} roster={analysis.evidenceFoundation.players} take={analysis.claims.length === 1 ? context.opinion : undefined} datasetId={datasetId} />
@@ -1731,7 +1753,12 @@ function TurnMessages({
           </details>
         )}
         <p className="msg-attribution">
-          {translateText('Fictional match', language)} · {translateText(
+          {translateText(
+            findCatalogEntry(datasetId)?.historicalReplay
+              ? 'Historical replay · observed source data'
+              : 'Fictional match',
+            language,
+          )} · {translateText(
             analysis.provider === 'local'
               ? 'Local rules · no model connection'
               : 'Foundry · server-side interpretation',
@@ -1752,17 +1779,21 @@ function TurnMessages({
 export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; autoDemo?: boolean }) {
   const { language } = useLocalization()
   const dataset = findCatalogEntry(datasetId)!
+  const matchTimeOptions = useMemo(
+    () => getMatchTimeOptions(dataset.historicalReplay ? 6 : undefined),
+    [dataset],
+  )
   const KEY_MOMENTS: KeyMoment[] = dataset.moments
   const isBaseline = datasetId === BASELINE_DATASET_ID
   const replay = useMemo(
     () =>
       new ReplayController(
-        MATCH_TIME_OPTIONS,
+        matchTimeOptions,
         INITIAL_MATCH_TIME,
         (clock, signal) => fetchReplayFrame(clock, signal, datasetId, dataset.teams),
         { dwellMs: REPLAY_DWELL_MS },
       ),
-    [datasetId, dataset.teams],
+    [datasetId, dataset.teams, matchTimeOptions],
   )
   const replaySnapshot = useSyncExternalStore(
     replay.subscribe,
@@ -2036,7 +2067,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
   }
 
   function selectClock(value: string) {
-    const nextClock = MATCH_TIME_OPTIONS.find((clock) => clockKey(clock) === value)
+    const nextClock = matchTimeOptions.find((clock) => clockKey(clock) === value)
     if (nextClock) replay.seek(nextClock)
   }
 
@@ -2182,7 +2213,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
     if (!analysis) return
     try {
       const answer = localizedAnswerText(analysis, datasetId, language)
-      await navigator.clipboard.writeText(answer.text)
+      await navigator.clipboard.writeText(language === 'en' ? analysis.punditReply?.text ?? answer.text : answer.text)
       setCopyMessage('Reply copied.')
     } catch {
       setCopyMessage('Select the reply above and copy it manually.')
@@ -2334,7 +2365,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
           <span>Groupchat<span className="brand-light">Analyst</span></span>
         </a>
         <nav className="site-nav" aria-label="Matches"><a href="#/matches">All matches</a></nav>
-        <span className="demo-label"><span aria-hidden="true" />Synthetic demo</span>
+        <span className="demo-label"><span aria-hidden="true" />{dataset.historicalReplay ? 'Historical replay' : 'Synthetic demo'}</span>
         <LanguageSelector />
       </header>
 
@@ -2352,7 +2383,7 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
             <MatchHeader
               datasetId={datasetId}
               teams={dataset.teams}
-              timeline={MATCH_TIME_OPTIONS}
+              timeline={matchTimeOptions}
               snapshot={replaySnapshot}
               keyMoments={KEY_MOMENTS}
               dwellMs={REPLAY_DWELL_MS}
@@ -2460,8 +2491,8 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                       <label className="time-control" htmlFor="match-time">
                         <span className="control-label">Match time</span>
                         <select id="match-time" value={clockKey(selectedClock)} onChange={(event) => selectClock(event.currentTarget.value)}>
-                          <optgroup label="First half">{MATCH_TIME_OPTIONS.filter((clock) => clock.period === 1).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
-                          <optgroup label="Second half">{MATCH_TIME_OPTIONS.filter((clock) => clock.period === 2).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
+                          <optgroup label="First half">{matchTimeOptions.filter((clock) => clock.period === 1).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
+                          <optgroup label="Second half">{matchTimeOptions.filter((clock) => clock.period === 2).map((clock) => <option key={clockKey(clock)} value={clockKey(clock)}>{formatMatchClock(clock)}</option>)}</optgroup>
                         </select>
                       </label>
                       <fieldset className="period-control">
@@ -2487,7 +2518,11 @@ export function MatchView({ datasetId, autoDemo = false }: { datasetId: string; 
                   })}
                 </div>
               )}
-              <p className="input-hint" id="input-hint">Fictional match: every performance and result is invented.</p>
+              <p className="input-hint" id="input-hint">
+                {dataset.historicalReplay
+                  ? `Historical replay from ${dataset.sourceAttribution} License: ${dataset.license}. Only mapped source records are shown.`
+                  : 'Fictional match: every performance and result is invented.'}
+              </p>
               {demo === 'ready-to-submit' && <p className="demo-note" role="status">Fictional replay at 57′, Match so far. Press “Check this moment” to see how the opinion is read.</p>}
             </form>
 

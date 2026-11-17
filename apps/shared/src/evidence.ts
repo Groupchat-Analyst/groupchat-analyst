@@ -613,11 +613,13 @@ function inWindow(
   start: number,
   end: number,
   exclusivePointCutoff?: number,
+  exclusivePointStart?: number,
 ): boolean {
   const elapsed = elapsedMatchMinute(clock)
   return (
     elapsed >= start &&
     elapsed <= end &&
+    (exclusivePointStart === undefined || elapsed > exclusivePointStart) &&
     (exclusivePointCutoff === undefined || elapsed < exclusivePointCutoff)
   )
 }
@@ -654,6 +656,7 @@ export function calculateEvidence(
   period: 'match-so-far' | 'last-10-minutes',
   explicitStartElapsed?: number,
   exclusivePointCutoff?: number,
+  exclusivePointStart?: number,
 ): EvidenceCalculation {
   const selectedElapsed = elapsedMatchMinute(selectedClock)
   const coverageStart = elapsedMatchMinute(fixture.coverage.start)
@@ -731,7 +734,7 @@ export function calculateEvidence(
   }
 
   const passes = fixture.passes.filter((pass) =>
-    inWindow(pass.clock, startElapsed, endElapsed, exclusivePointCutoff),
+    inWindow(pass.clock, startElapsed, endElapsed, exclusivePointCutoff, exclusivePointStart),
   )
   for (const pass of passes) {
     teams[pass.team].passAttempts += 1
@@ -747,7 +750,7 @@ export function calculateEvidence(
   }
 
   const turnovers = fixture.turnovers.filter((turnover) =>
-    inWindow(turnover.clock, startElapsed, endElapsed, exclusivePointCutoff),
+    inWindow(turnover.clock, startElapsed, endElapsed, exclusivePointCutoff, exclusivePointStart),
   )
   for (const turnover of turnovers) {
     const area = classifyPitchArea(turnover.location)
@@ -787,10 +790,10 @@ export function calculateEvidence(
     passes,
     turnovers,
     recoveries: fixture.recoveries.filter((recovery) =>
-      inWindow(recovery.clock, startElapsed, endElapsed, exclusivePointCutoff),
+      inWindow(recovery.clock, startElapsed, endElapsed, exclusivePointCutoff, exclusivePointStart),
     ),
     pressures: fixture.pressures.filter((pressure) =>
-      inWindow(pressure.clock, startElapsed, endElapsed, exclusivePointCutoff),
+      inWindow(pressure.clock, startElapsed, endElapsed, exclusivePointCutoff, exclusivePointStart),
     ),
     buildUpAnnotations: fixture.buildUpAnnotations
       .map((annotation) => ({
@@ -803,7 +806,7 @@ export function calculateEvidence(
           fixture.pressures.some(
             (pressure) =>
               pressure.id === id &&
-              inWindow(pressure.clock, startElapsed, endElapsed, exclusivePointCutoff),
+              inWindow(pressure.clock, startElapsed, endElapsed, exclusivePointCutoff, exclusivePointStart),
           ),
         ),
       }))

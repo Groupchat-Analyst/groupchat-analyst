@@ -413,10 +413,12 @@ test('structured player-performance messages have translation keys and preserve 
 test('fixture catalog copy is neutral and the opinion wording is localized', () => {
   const scenario = 'Explore this fictional match through its recorded events and evidence.'
   const description = 'A fictional football fixture for exploring evidence at selected moments.'
+  const historicalScenario = 'Historical replay · only Wyscout shot events are mapped; other event types and metrics are unavailable.'
+  const historicalDescription = 'Historical replay of Arsenal v Leicester City from Wyscout event data. Shot events are mapped; other event types and metrics are unavailable.'
   const spoilers = /\b(?:equalis\w*|goal\w*|winner|win|lead|goalless|score)\b/iu
   for (const fixture of DATASET_CATALOG) {
-    assert.equal(fixture.scenario, scenario, fixture.id)
-    assert.equal(fixture.description, description, fixture.id)
+    assert.equal(fixture.scenario, fixture.historicalReplay ? historicalScenario : scenario, fixture.id)
+    assert.equal(fixture.description, fixture.historicalReplay ? historicalDescription : description, fixture.id)
     assert.doesNotMatch(fixture.name, spoilers, fixture.id)
     assert.doesNotMatch(fixture.scenario, spoilers, fixture.id)
     assert.doesNotMatch(fixture.description, spoilers, fixture.id)
@@ -427,6 +429,8 @@ test('fixture catalog copy is neutral and the opinion wording is localized', () 
     assert.notEqual(translateNarrative('Nothing has been recorded yet.', code), 'Nothing has been recorded yet.', code)
     assert.notEqual(translateNarrative(scenario, code), scenario, code)
     assert.notEqual(translateNarrative(description, code), description, code)
+    assert.notEqual(translateNarrative(historicalScenario, code), historicalScenario, code)
+    assert.notEqual(translateNarrative(historicalDescription, code), historicalDescription, code)
     assert.notEqual(translateNarrative('Recorded moment', code), 'Recorded moment', code)
     assert.notEqual(translateNarrative('See how one minute changes the opinion', code), 'See how one minute changes the opinion', code)
     assert.notEqual(

@@ -56,6 +56,16 @@ test('replay exposes only squad participation known at the selected time', () =>
       { period: 1, minute: 1 },
       fixture.id,
     )
+    if (fixture.historicalReplay) {
+      assert.equal(kickoff.players.length, 0)
+      const fullTime = getReplayFrame(
+        { period: 2, minute: 90, stoppageMinutes: 6 },
+        fixture.id,
+      )
+      assert.equal(fullTime.players.length, 0)
+      assert.ok(fullTime.events.every((event) => /^\d+$/.test(event.id)))
+      continue
+    }
     assert.equal(kickoff.players.length, 40, fixture.id)
     assert.equal(
       kickoff.players.filter(({ status }) => status === 'starter').length,

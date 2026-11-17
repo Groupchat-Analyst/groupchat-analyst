@@ -268,7 +268,7 @@ test('every claim across all catalog examples and clocks has a known presentatio
             assert.equal(p.version, 1)
             assert.ok(ANSWER_CODES.includes(p.answer.code), p.answer.code)
             assert.ok(Array.isArray(p.limitations))
-            assert.ok(['window', 'before-goal', 'first-half-goals'].includes(p.scope.kind))
+            assert.ok(['window', 'before-goal', 'before-goal-window', 'first-half-goals'].includes(p.scope.kind))
           }
         }
       }

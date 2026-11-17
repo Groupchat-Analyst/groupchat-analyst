@@ -7,7 +7,9 @@ import { analyzeOpinion } from '../service.js'
 import { InputValidationError, parseAnalysisRequest } from '../validation.js'
 import type { InterpretationProvider } from '../providers/provider.js'
 import { InterpretationProviderError } from '../providers/provider.js'
-import { createFoundryProvider } from '../providers/foundry.js'
+import { appendLocalFoundryCapture, createFoundryProvider } from '../providers/foundry.js'
+import { historicalPunditFacts } from '../punditFacts.js'
+import type { PunditFacts } from '../providers/provider.js'
 import {
   createAzureTableFoundryAllowance,
   FoundryAllowanceConfigurationError,
@@ -17,6 +19,47 @@ import {
 } from '../foundryAllowance.js'
 
 export const ANALYSIS_MODE_HEADER = 'x-analysis-mode'
+
+type PunditValidation = { text: string } | { field: string; rule: string }
+
+function validPunditText(value: unknown, facts: PunditFacts): PunditValidation {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return { field: 'response', rule: 'expected-object' }
+  if (!('text' in value) || typeof value.text !== 'string') return { field: 'text', rule: 'expected-string' }
+  if (!('eventIds' in value) || !Array.isArray(value.eventIds)) return { field: 'eventIds', rule: 'expected-array' }
+  if (Object.keys(value).some((key) => key !== 'text' && key !== 'eventIds')) return { field: 'response', rule: 'unexpected-field' }
+  const text = value.text.trim()
+  const eventIds: unknown[] = value.eventIds
+  const allowedIds = new Set([...facts.shots, ...facts.sequence].map(({ id }) => id))
+  const phrases = new Map(facts.verifiedPhrases.map((phrase) => [phrase.token, phrase]))
+  const tokens = text.match(/\[\[[A-Z0-9_]+\]\]/g) ?? []
+  if (tokens.length === 0) return { field: 'text', rule: 'missing-verified-token' }
+  if (tokens.some((token) => !phrases.has(token))) return { field: 'text', rule: 'unknown-verified-token' }
+  if (tokens.some((token) => phrases.get(token)!.eventIds.some((id) => !eventIds.includes(id)))) return { field: 'eventIds', rule: 'missing-token-event-id' }
+  const prose = text.replace(/\[\[[A-Z0-9_]+\]\]/g, '')
+  if (text.length < 20 || text.length > 1200) return { field: 'text', rule: 'length-20-1200' }
+  if (/[\r\n]/.test(prose)) return { field: 'text', rule: 'single-paragraph' }
+  if (/[<>\[\]]/.test(prose)) return { field: 'text', rule: 'unexpected-markup-or-brackets' }
+  if (/https?:/i.test(prose)) return { field: 'text', rule: 'url-not-allowed' }
+  if (/\d/.test(prose)) return { field: 'text', rule: 'digit-outside-token' }
+  if (/\b(?:ramsey|giroud|lacazette|schmeichel|xhaka|oxlade)\b/i.test(prose)) return { field: 'text', rule: 'player-name-outside-token' }
+  if (/\b(?:scor(?:e|ed|ing)|equalis(?:e|ed|ing)|equaliz(?:e|ed|ing)|goal|corner|sav(?:e|ed)|blocked|shot|attempt)\b/i.test(prose)) return { field: 'text', rule: 'event-word-outside-token' }
+  if (/\b(?:one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(prose)) return { field: 'text', rule: 'number-word-outside-token' }
+  if (eventIds.length === 0) return { field: 'eventIds', rule: 'nonempty-array' }
+  if (!eventIds.every((id) => typeof id === 'string' && allowedIds.has(id))) return { field: 'eventIds', rule: 'unknown-or-invalid-event-id' }
+  return { text: text.replace(/\[\[[A-Z0-9_]+\]\]/g, (token) => phrases.get(token)!.text) }
+}
+
+function checkedFacts(facts: PunditFacts): string[] {
+  return [
+    `Source: ${facts.source}`,
+    `Window: ${facts.window}`,
+    `Score at the start: Arsenal ${facts.scoreAtStart.Arsenal}, Leicester City ${facts.scoreAtStart['Leicester City']}.`,
+    `Shots in the window: Arsenal ${facts.shotCounts.Arsenal}, Leicester City ${facts.shotCounts['Leicester City']}.`,
+    ...facts.shots.map((shot) => `Shot ${shot.id} · ${shot.time} · ${shot.team} · ${shot.playerName ?? `player ${shot.playerId}`} · origin (${shot.origin.x}, ${shot.origin.y}) · ${shot.outcome}.`),
+    ...facts.sequence.map((item) => `${item.id} · ${item.time} · ${item.description}.`),
+    ...facts.limitations,
+  ]
+}
 
 function isContinuationAction(body: unknown): boolean {
   return (
@@ -131,9 +174,49 @@ export function createAnalyzeHandler(
     }
 
     try {
+      const result = await analyzeOpinion(body, activeProvider)
+      if (foundryAttemptReserved && activeProvider.generatePunditReply && !isContinuationAction(body)) {
+        const facts = historicalPunditFacts(parseAnalysisRequest(body), result)
+        if (facts) {
+          const requestId = context.invocationId
+          let generationStarted = false
+          let rawResponse: string | null = null
+          let rejection: { field: string; rule: string } | null = null
+          try {
+            await createAllowance(environment).reserve(
+              foundryClientIdentity(request.headers?.get('x-forwarded-for') ?? null),
+            )
+            generationStarted = true
+            const generated = await activeProvider.generatePunditReply(facts, (content) => { rawResponse = content })
+            const validation = validPunditText(generated, facts)
+            if ('rule' in validation) {
+              rejection = validation
+              context.error(`Pundit reply rejected: requestId=${requestId} field=${validation.field} rule=${validation.rule}`)
+              result.punditNotice = 'The generated reply was unavailable; the factual answer is shown instead.'
+            } else {
+              result.punditReply = { text: validation.text, checked: checkedFacts(facts) }
+            }
+          } catch (error) {
+            const rule = error instanceof InterpretationProviderError ? `provider-${error.category}` :
+              error instanceof FoundryAllowanceExceededError ? `allowance-${error.scope}` :
+                error instanceof FoundryAllowanceConfigurationError ? 'allowance-configuration' :
+                  error instanceof FoundryAllowanceUnavailableError ? 'allowance-unavailable' : 'unexpected-error'
+            rejection = { field: generationStarted ? 'response' : 'allowance', rule }
+            context.error(`Pundit reply unavailable: requestId=${requestId} field=${rejection.field} rule=${rule}`)
+            result.punditNotice = 'The generated reply was unavailable; the factual answer is shown instead.'
+          }
+          if (generationStarted && environment.FOUNDRY_CAPTURE_RAW_OUTPUT?.trim().toLowerCase() === 'true') {
+            try {
+              await appendLocalFoundryCapture({ kind: 'pundit-generation', requestId, structuredOutput: rawResponse, rejection })
+            } catch {
+              context.error(`Pundit diagnostic capture failed: requestId=${requestId}`)
+            }
+          }
+        }
+      }
       return {
         status: 200,
-        jsonBody: await analyzeOpinion(body, activeProvider),
+        jsonBody: result,
       }
     } catch (error) {
       if (error instanceof InputValidationError) {
